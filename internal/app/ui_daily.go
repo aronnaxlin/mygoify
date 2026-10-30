@@ -8,8 +8,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
-	"netease-music-mygo/internal/player"
+	"mygoify/internal/netease"
+	"mygoify/internal/player"
 )
 
 // dailyArt is the cover of the day's songs: their first cover, blurred,

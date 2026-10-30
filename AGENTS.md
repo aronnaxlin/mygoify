@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Project
+
+MyGoify is a third-party Spotify desktop client, forked from [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) (remote `upstream`). Read [docs/DESIGN.md](docs/DESIGN.md) and [ROADMAP.md](ROADMAP.md) before changing architecture. Version 1 covers music only: no podcasts. Never implement PlayPlay, audio download or export, or anything that works around Spotify's restrictions.
+
+Until milestone M1 finishes, `internal/netease`, `internal/player` and `internal/speech` are still the upstream code, waiting to be replaced or removed.
+
 ## Tests
 
 Only write a test for behaviour that can actually break. If the code under test could change without the test noticing, or the test would fail on a harmless rewording, don't write it.

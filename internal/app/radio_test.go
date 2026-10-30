@@ -6,7 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"mygoify/internal/netease"
 )
 
 func TestCommentTime(t *testing.T) {

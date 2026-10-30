@@ -1,23 +1,18 @@
-# 网易云音乐 · MyGo
+# MyGoify
 
-用 Go 和 [MyGo](https://github.com/egoist/mygo) 写的第三方网易云音乐桌面客户端，原生界面，无 WebView。
+用 Go 和 [MyGo](https://github.com/egoist/mygo) 写的第三方 Spotify 桌面客户端，原生界面，无 WebView，低内存。主要支持 Omarchy（Hyprland）和 Apple Silicon 的 macOS。
 
-## 功能
+> **开发中。** 现在仓库里还是 [MyGo 云音乐](https://github.com/egoist/mygo-cloudmusic) 的代码，正在按 [ROADMAP](ROADMAP.md) 改造。
 
-- 扫码登录，登录态保存在系统凭据存储中
-- 每日推荐、推荐歌单、排行榜、我的歌单
-- 搜索单曲、歌手、专辑、用户与播客，输入时显示搜索建议，保留搜索历史
-- 歌手页的热门与最新歌曲、专辑与动态，关注歌手；专辑页与用户页
-- 播客：浏览与收听节目，订阅播客；在本机把节目转写成字幕（Qwen3-ASR），像歌词一样随播放滚动
-- 私人 FM（推荐 / 熟悉 / 探索）与心动模式
-- 边下边播，支持标准 / 较高 / 极高 / 无损（FLAC）/ Hi-Res 音质
-- 听过的歌曲缓存在本机，再次播放无需等待
-- 音量均衡，暂停与继续时淡出淡入，拖动进度无杂音
-- 退出后再打开，从上次的播放队列与进度继续
-- 逐字歌词与翻译，正在播放页的「律动」视图与歌曲评论
-- 刘海播放器：在屏幕顶部刘海处显示迷你播放器，悬停展开（在设置中开启）
-- 喜欢歌曲、播放队列、随机与循环播放
-- 浅色 / 深色 / 跟随系统
+## 怎么工作
+
+- **播放**：Spotify 官方的无头播放器 [Soloist](https://github.com/spotify/soloist)，作为后台服务运行；关掉窗口音乐照放。
+- **数据**：Spotify 官方 Web API，用你自己的开发者应用登录。
+- **界面**：沿用 MyGo 云音乐。
+
+设计细节见 [docs/DESIGN.md](docs/DESIGN.md)。第一版只做音乐：播放、曲库、歌单、搜索、歌词，不做播客。
+
+使用需要 Spotify Premium 和一个 Spotify for Developers 账号。
 
 ## 构建
 
@@ -31,12 +26,11 @@ go test ./...        # 运行测试
 
 ## 致谢
 
+- [MyGo 云音乐](https://github.com/egoist/mygo-cloudmusic)：本项目从它分叉，界面和交互都来自它
 - [MyGo](https://github.com/egoist/mygo)：原生 UI 与应用框架
-- [NeteaseCloudMusicApi](https://github.com/Binaryify/NeteaseCloudMusicApi)：eapi 加密与登录流程的参考
-- [folia-major](https://github.com/chthollyphile/folia-major)：歌词动画效果的参考
-- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)、[Qwen3-ASR](https://github.com/QwenLM/Qwen3-ASR) 与 [Silero VAD](https://github.com/snakers4/silero-vad)：本机语音识别
+- [Omarchy-Spotify](https://github.com/stappmus/Omarchy-Spotify)、[go-librespot](https://github.com/devgianlu/go-librespot)、[spotify-player](https://github.com/aome510/spotify-player)：实现经验的参考
 
-本项目与网易云音乐官方无关，音乐版权归各权利人所有。
+本项目与 Spotify 官方无关。Spotify 是 Spotify AB 的商标。音乐版权归各权利人所有。
 
 ## 许可证
 

@@ -1,21 +1,19 @@
 {
-  "name": "MyGo 云音乐",
-  "identifier": "dev.egoist.cloudmusic",
-  "slug": "mygo-cloudmusic",
-  "version": "0.1.22",
+  "name": "MyGoify",
+  "identifier": "io.github.aronnaxlin.mygoify",
+  "slug": "mygoify",
+  "version": "0.0.1",
   "out": "build",
   "updates": {
-    "publicKey": "WzJsOGNIuf6mcEqo5ff8jub+NoQQOEk4JXreLPYjgyQ=",
-    "github": "egoist/mygo-cloudmusic"
+    "publicKey": "J+ud+zDQIxzLYF3k16bTdPFCw8H2i2D0B0x9kUmaUks=",
+    "github": "aronnaxlin/mygoify"
   },
   "macos": {
     "icon": "icon/AppIcon.icon",
-    "minimumSystemVersion": "13.0",
-    "signingIdentity": "Developer ID Application: xinyu zeng (GJE9R5VE87)",
-    "notarize": { "keychainProfile": "notary" }
+    "minimumSystemVersion": "13.0"
   },
   "linux": {
-    "comment": "第三方网易云音乐桌面客户端",
+    "comment": "第三方 Spotify 桌面客户端",
     "categories": ["AudioVideo", "Audio", "Player"],
     "webview": false
   }

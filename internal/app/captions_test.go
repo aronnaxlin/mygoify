@@ -8,8 +8,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
-	"netease-music-mygo/internal/speech"
+	"mygoify/internal/netease"
+	"mygoify/internal/speech"
 )
 
 const sec = time.Second

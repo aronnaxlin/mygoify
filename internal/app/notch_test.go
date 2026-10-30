@@ -12,7 +12,7 @@ import (
 	"github.com/egoist/mygo/audio"
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"mygoify/internal/netease"
 )
 
 // The notch, turned off, shows itself as the first song plays, and only

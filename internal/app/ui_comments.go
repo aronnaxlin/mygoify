@@ -6,7 +6,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"mygoify/internal/netease"
 )
 
 // These load a page of a thread's comments, and like a comment or unlike

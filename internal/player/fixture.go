@@ -5,8 +5,8 @@ import (
 
 	"github.com/egoist/mygo/audio"
 
-	"netease-music-mygo/internal/lyrics"
-	"netease-music-mygo/internal/netease"
+	"mygoify/internal/lyrics"
+	"mygoify/internal/netease"
 )
 
 // These set a player up as it would be after loading, without loading

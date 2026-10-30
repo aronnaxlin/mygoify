@@ -6,8 +6,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/lyrics"
-	"netease-music-mygo/internal/netease"
+	"mygoify/internal/lyrics"
+	"mygoify/internal/netease"
 )
 
 // playingApp is an app playing a track with lyrics, at a position the test

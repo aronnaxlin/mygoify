@@ -7,8 +7,8 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/lyrics"
-	"netease-music-mygo/internal/netease"
+	"mygoify/internal/lyrics"
+	"mygoify/internal/netease"
 )
 
 var white = ui.RGB(255, 255, 255)

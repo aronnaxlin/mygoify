@@ -11,7 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
+	"mygoify/internal/netease"
 )
 
 // wallApp is an app showing the wall of a queue of n songs, the at-th
