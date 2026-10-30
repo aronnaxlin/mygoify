@@ -15,7 +15,7 @@ ROADMAP M0 各项验证的结果。代码在 `cmd/poc`。
 | P5 | 不用手机配对 | **推迟**。Soloist 的 zeroconf `tokenType` 是 `default`，不是 access token，要先有 librespot 那样的可复用凭据才能交给它 |
 | P6 | 进度插值的精度 | **基本通过**。连续播放 60 s，61 次进度推送：相邻推送之间外推的偏差 ≤ 1 ms；`timestamp_ms` 与本机时钟之差中位数 0.8 ms（最大 40.6 ms，为送达延迟），可直接用本机时钟插值。到耳朵的音频输出延迟没有测，M5 做歌词时用耳朵核对，必要时加固定补偿 |
 | P7 | 资源占用 | **通过**。空闲且已登录：PSS ≈ **56 MB**（主进程 42 + crashpad 辅助进程 14）。播放时：PSS **62.5 MB**，60 s 内不增长；CPU **0.85%** 单核。PipeWire 输出流名 `spotify`，44.1 kHz。响度均衡和 seek 延迟未测 |
-| P8 | Apple Silicon 的 Mac | 待测，需要 Mac |
+| P8 | Apple Silicon 的 Mac | **通过**。MacBook Air（arm64，macOS 27），Soloist 1.3.10.31 osx_arm64。P1、P2、P4 都通过：Web API 0.4 s 接受，1.6 s 后开播。空闲时 phys_footprint：主进程 28 MB + crashpad 辅助进程 3.8 MB。PoC 用 `GOOS=darwin GOARCH=arm64 CGO_ENABLED=0` 在 Linux 上交叉编译，Mac 上不需要装 Go |
 | P9 | API key 不出现在 `ps` 里 | **不通过**。Soloist 只接受 `-k` 参数，不读环境变量，key 会出现在 `/proc/<pid>/cmdline` 里，同机其他用户可见 |
 
 ## 其他发现

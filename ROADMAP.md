@@ -19,10 +19,10 @@
 | P5 ⏸ 推迟 | 不用手机完成配对：App 作为 zeroconf 发送方交给 Soloist 凭据 | 可选，失败也不阻塞，退回手机配对 |
 | P6 ✅ | 用 `position_sync` 在本地插值进度，和实际声音对比 | 误差 ≤ 100 ms，歌词同步够用 |
 | P7 ✅ | 资源：Soloist 播放时的 PSS 和 CPU，是否强制响度均衡、seek 延迟 | 记录数据，写进 `docs/BENCHMARK.md` |
-| P8 | Apple Silicon 的 Mac 上重复 P1、P4 | 通过 |
+| P8 ✅ | Apple Silicon 的 Mac 上重复 P1、P4 | 通过 |
 | P9 ❌ 见 POC.md | API key 怎么交给 Soloist 才不出现在 `ps` 里 | 找到一种可行方式 |
 
-**退出条件**：P1–P4、P6、P7 通过；P5、P8、P9 有结论。进展见 [docs/POC.md](docs/POC.md)。
+**退出条件**：P1–P4、P6、P7 通过；P5、P8、P9 有结论。进展见 [docs/POC.md](docs/POC.md)。**M0 已完成（2026-10-30）**：P5 推迟，P9 不通过但有对策，其余通过。
 
 ---
 
