@@ -7,7 +7,7 @@ tool github.com/egoist/mygo/cmd/mygo
 require (
 	github.com/coder/websocket v1.8.14
 	github.com/ebitengine/purego v0.11.1
-	github.com/egoist/mygo v0.7.1-0.20261027023711-da3657e7f86a
+	github.com/egoist/mygo v0.7.4-0.20261030064541-2b66322aa335
 	golang.org/x/image v0.46.0
 )
 
