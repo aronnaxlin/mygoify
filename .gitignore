@@ -3,3 +3,6 @@
 mygo_windows_*.syso
 /mygoify
 /node_modules/
+
+# Local credentials for development (see .env.example)
+/.env
