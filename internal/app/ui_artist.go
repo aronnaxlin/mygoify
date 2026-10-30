@@ -209,17 +209,15 @@ func (a *app) empty(c *ui.Context, msg string) {
 	ui.Text(c, msg).FontSize(13).TextColor(a.pal.muted).Padding(40, 0).AlignSelf(ui.Center)
 }
 
-// artistPhotoSize is the width of an artist's round photo on their page.
-const artistPhotoSize = 212
-
 func (a *app) artistHeader(c *ui.Context, d *artistData) {
 	p := a.pal
 	ar := d.profile
 	// What the buttons play: the most popular songs.
 	songs := ar.Songs
 	ui.Row(c).Gap(28).AlignItems(ui.End).Padding(0, 0, 8, 0).Children(func() {
-		ui.Box(c).Size(artistPhotoSize, artistPhotoSize).Radius(artistPhotoSize/2).Shadow(0, 18, 40, -10, p.cardShade).Children(func() {
-			a.coverFill(c, ar.Images, 600, artistPhotoSize/2)
+		photo := headerArt(c)
+		ui.Box(c).Size(photo, photo).Radius(photo/2).Shadow(0, 18, 40, -10, p.cardShade).Children(func() {
+			a.coverFill(c, ar.Images, 600, photo/2)
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
 			ui.Text(c, "歌手").FontSize(12).FontWeight(600).TextColor(p.accent)
@@ -227,7 +225,7 @@ func (a *app) artistHeader(c *ui.Context, d *artistData) {
 			if len(ar.Genres) > 0 {
 				ui.Text(c, strings.Join(ar.Genres, " · ")).FontSize(13).TextColor(p.muted)
 			}
-			ui.Row(c).Gap(10).Margin(10, 0, 0, 0).Children(func() {
+			ui.Row(c).Gap(10).Wrap().Margin(10, 0, 0, 0).Children(func() {
 				if pillButton(c.Key("play"), iconPlay, "播放", p.accent, p.onAccent).Clicked() {
 					if a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
@@ -263,7 +261,7 @@ var artistTabTitles = [...]string{"热门歌曲", "专辑"}
 
 func (a *app) artistHeaderSkeleton(c *ui.Context, s shimmer) {
 	ui.Row(c).Gap(28).AlignItems(ui.End).Padding(0, 0, 8, 0).Children(func() {
-		s.bone(c, artistPhotoSize/2).Size(artistPhotoSize, artistPhotoSize)
+		s.bone(c, headerArt(c)/2).Size(headerArt(c), headerArt(c))
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
 			s.text(c, 12, 1.3).Width(24)
 			s.text(c, 30, 1.2).WidthPercent(32)
@@ -272,7 +270,7 @@ func (a *app) artistHeaderSkeleton(c *ui.Context, s shimmer) {
 				s.text(c, 12.5, 1.45).WidthPercent(78)
 				s.text(c, 12.5, 1.45).WidthPercent(52)
 			})
-			ui.Row(c).Gap(10).Margin(10, 0, 0, 0).Children(func() {
+			ui.Row(c).Gap(10).Wrap().Margin(10, 0, 0, 0).Children(func() {
 				s.bone(c, 18).Size(92, 36)
 				s.bone(c, 18).Size(120, 36)
 			})
