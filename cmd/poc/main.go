@@ -5,6 +5,7 @@
 //
 //	go run ./cmd/poc login   logs in, in the browser
 //	go run ./cmd/poc p4      plays the third track of a playlist on Soloist
+//	go run ./cmd/poc p6      plays a minute, measuring the position and Soloist's cost
 package main
 
 import (
@@ -50,13 +51,15 @@ func main() {
 		log.Fatal(err)
 	}
 	if len(os.Args) < 2 {
-		log.Fatal("usage: poc login | p4")
+		log.Fatal("usage: poc login | p4 | p6")
 	}
 	switch os.Args[1] {
 	case "login":
 		err = login()
 	case "p4":
 		err = p4()
+	case "p6":
+		err = p6()
 	default:
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	}
@@ -348,17 +351,9 @@ func p4() error {
 	want := items.Items[2].Item
 	fmt.Printf("playlist %q, its third track: %q %s\n", pl.Name, want.Name, want.URI)
 
-	addr, err := os.ReadFile(filepath.Join(dataDir, "soloist/ws.addr"))
-	if err != nil {
-		return err
-	}
-	port, err := os.ReadFile(filepath.Join(dataDir, "soloist/ws.port"))
-	if err != nil {
-		return err
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	ws, _, err := websocket.Dial(ctx, "ws://"+strings.TrimSpace(string(addr))+":"+strings.TrimSpace(string(port)), nil)
+	ws, err := dialSoloist(ctx)
 	if err != nil {
 		return err
 	}
