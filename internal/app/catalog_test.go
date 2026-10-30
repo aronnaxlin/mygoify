@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -11,25 +12,24 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
-// searchRequest is a search asked of NetEase.
+// searchRequest is a search asked of Spotify.
 type searchRequest struct {
 	query  string
-	kind   netease.SearchType
+	kind   music.SearchType
 	offset int
 }
 
-// fakeSearch replaces searching NetEase with one that reports what it was
-// asked, and finds nothing, which lands nowhere without a window.
-func fakeSearch(t *testing.T) chan searchRequest {
+// fakeSearch makes a's searches report what they were asked, and find
+// nothing, which lands nowhere without a window.
+func fakeSearch(a *app) chan searchRequest {
 	asked := make(chan searchRequest, 8)
-	searchResults = func(q string, kind netease.SearchType, _, offset int) (netease.SearchResult, error) {
+	stub(a).search = func(q string, kind music.SearchType, _, offset int) (music.SearchResult, error) {
 		asked <- searchRequest{q, kind, offset}
-		return netease.SearchResult{}, errors.New("offline")
+		return music.SearchResult{}, errors.New("offline")
 	}
-	t.Cleanup(func() { searchResults = netease.SearchPage })
 	return asked
 }
 
@@ -47,8 +47,8 @@ func wait[T any](t *testing.T, ch chan T, what string) T {
 // Enter searches songs for the query typed; a tab searches it for another
 // kind, which the next search keeps, and back leaves the search.
 func TestSearchKinds(t *testing.T) {
-	asked := fakeSearch(t)
 	a := newTestApp()
+	asked := fakeSearch(a)
 	a.settings = defaultSettings()
 	tt := ui.NewTester(a.view, 1200, 800)
 	tt.Frame()
@@ -58,7 +58,7 @@ func TestSearchKinds(t *testing.T) {
 	tt.Type("春日影")
 	tt.Key(0, ui.KeyEnter)
 	tt.Frame()
-	if got := wait(t, asked, "the search"); got != (searchRequest{"春日影", netease.SearchSongs, 0}) {
+	if got := wait(t, asked, "the search"); got != (searchRequest{"春日影", music.SearchTracks, 0}) {
 		t.Fatalf("searched %+v", got)
 	}
 
@@ -66,11 +66,11 @@ func TestSearchKinds(t *testing.T) {
 		t.Fatal(err)
 	}
 	tt.Frame()
-	if got := wait(t, asked, "the artists"); got != (searchRequest{"春日影", netease.SearchArtists, 0}) {
+	if got := wait(t, asked, "the artists"); got != (searchRequest{"春日影", music.SearchArtists, 0}) {
 		t.Fatalf("searched %+v", got)
 	}
 	a.search("迷星叫")
-	if got := wait(t, asked, "the next search"); got.kind != netease.SearchArtists {
+	if got := wait(t, asked, "the next search"); got.kind != music.SearchArtists {
 		t.Errorf("the next search looked for kind %d", got.kind)
 	}
 	if !slices.Equal(a.settings.SearchHistory, []string{"迷星叫", "春日影"}) {
@@ -87,16 +87,16 @@ func TestSearchKinds(t *testing.T) {
 // The tabs over a search's songs switch it to another kind: it crashed,
 // the list's state reset as the list built the tabs in its header.
 func TestSearchKindFromSongs(t *testing.T) {
-	asked := fakeSearch(t)
 	a := catalogApp()
-	a.open(route{page: pageSearch, query: "MyGO", kind: netease.SearchSongs})
+	asked := fakeSearch(a)
+	a.open(route{page: pageSearch, query: "MyGO", kind: music.SearchTracks})
 	tt := ui.NewTester(a.view, 1200, 800)
 	tt.Frame()
 	if err := tt.Click("歌手"); err != nil {
 		t.Fatal(err)
 	}
 	tt.Frame()
-	if a.route.kind != netease.SearchArtists {
+	if a.route.kind != music.SearchArtists {
 		t.Fatalf("on %+v", a.route)
 	}
 	if len(asked) > 0 {
@@ -107,19 +107,19 @@ func TestSearchKindFromSongs(t *testing.T) {
 // A search's next page loads once its foot comes into view, from where the
 // last ended, and a search done again loads from its start.
 func TestSearchLoadsMore(t *testing.T) {
-	asked := fakeSearch(t)
 	a := newTestApp()
+	asked := fakeSearch(a)
 	a.settings = defaultSettings()
-	r := route{page: pageSearch, query: "春日影", kind: netease.SearchUsers}
+	r := route{page: pageSearch, query: "春日影", kind: music.SearchPlaylists}
 	a.searches[r] = &searchData{
-		res:  netease.SearchResult{Users: []netease.User{{UserID: 1, Nickname: "甲"}, {UserID: 2, Nickname: "乙"}}, Total: 5},
+		res:  music.SearchResult{Playlists: []music.Playlist{{ID: "1", Name: "甲"}, {ID: "2", Name: "乙"}}, More: true},
 		page: paged{loaded: true, more: true},
 	}
 	a.open(r)
 	tt := ui.NewTester(a.view, 1200, 800)
 	tt.Frame()
 	tt.Frame()
-	if got := wait(t, asked, "the next page"); got != (searchRequest{"春日影", netease.SearchUsers, 2}) {
+	if got := wait(t, asked, "the next page"); got != (searchRequest{"春日影", music.SearchPlaylists, 2}) {
 		t.Fatalf("asked for %+v", got)
 	}
 
@@ -133,8 +133,8 @@ func TestSearchLoadsMore(t *testing.T) {
 // or chosen with the arrows; it was lost when its option was keyed anew.
 func TestSearchHistoryChoice(t *testing.T) {
 	for _, keys := range []bool{false, true} {
-		asked := fakeSearch(t)
 		a := newTestApp()
+		asked := fakeSearch(a)
 		a.settings = defaultSettings()
 		a.settings.SearchHistory = []string{"春日影", "迷星叫"}
 		tt := ui.NewTester(a.view, 1200, 800)
@@ -160,28 +160,27 @@ func TestSearchHistoryChoice(t *testing.T) {
 	}
 }
 
-// 关注 follows an artist at once, and asks NetEase to; a second click
+// 关注 follows an artist at once, and asks Spotify to; a second click
 // waits for the first.
 func TestFollowArtist(t *testing.T) {
 	asked := make(chan bool, 4)
-	followArtist = func(id int64, follow bool) error { asked <- follow; return nil }
-	defer func() { followArtist = netease.FollowArtist }()
 	a := newTestApp()
+	stub(a).follow = func(id string, follow bool) error { asked <- follow; return nil }
 	a.settings = defaultSettings()
-	a.profile = &netease.Profile{UserID: 1}
-	a.artists[12] = &artistData{profile: &netease.ArtistProfile{Artist: netease.Artist{ID: 12, Name: "乙"}}}
-	a.open(route{page: pageArtist, id: 12})
+	a.profile = &music.User{ID: "1"}
+	a.artists["12"] = &artistData{profile: &music.ArtistProfile{Artist: music.Artist{ID: "12", Name: "乙"}}}
+	a.open(route{page: pageArtist, id: "12"})
 	tt := ui.NewTester(a.view, 1200, 800)
 	tt.Frame()
 	if err := tt.Click("关注"); err != nil {
 		t.Fatal(err)
 	}
 	tt.Frame()
-	if !a.artists[12].profile.Followed || !wait(t, asked, "the follow") {
+	if !a.artists["12"].profile.Followed || !wait(t, asked, "the follow") {
 		t.Fatal("not followed")
 	}
 	tt.Click("已关注")
-	if len(asked) > 0 || !a.artists[12].profile.Followed {
+	if len(asked) > 0 || !a.artists["12"].profile.Followed {
 		t.Error("unfollowed before the follow landed")
 	}
 }
@@ -189,13 +188,12 @@ func TestFollowArtist(t *testing.T) {
 // A song row's album opens its page, not playing the song as the row's
 // click would.
 func TestAlbumLinkInRow(t *testing.T) {
-	albumDetail = func(int64) (*netease.AlbumProfile, error) { return nil, errors.New("offline") }
-	defer func() { albumDetail = netease.AlbumDetail }()
 	a := newTestApp()
+	stub(a).album = func(string) (*music.AlbumProfile, error) { return nil, errors.New("offline") }
 	a.settings = defaultSettings()
-	song := netease.Track{ID: 2, Name: "起风了", Artists: []netease.Artist{{ID: 13, Name: "丙"}}, Album: netease.Album{ID: 8, Name: "迷跡波"}, Duration: 200000}
-	a.artists[13] = &artistData{profile: &netease.ArtistProfile{Artist: netease.Artist{ID: 13, Name: "丙"}, Songs: []netease.Track{song}}}
-	a.open(route{page: pageArtist, id: 13})
+	song := music.Track{ID: "2", Name: "起风了", Artists: []music.Artist{{ID: "13", Name: "丙"}}, Album: music.Album{ID: "8", Name: "迷跡波"}, Duration: 200000}
+	a.artists["13"] = &artistData{profile: &music.ArtistProfile{Artist: music.Artist{ID: "13", Name: "丙"}, Songs: []music.Track{song}}}
+	a.open(route{page: pageArtist, id: "13"})
 	tt := ui.NewTester(a.view, 1200, 800)
 	tt.Frame()
 	// Its name, at the start of the column it fills.
@@ -205,39 +203,38 @@ func TestAlbumLinkInRow(t *testing.T) {
 	}
 	tt.ClickAt(r.X+8, r.Y+r.H/2)
 	tt.Frame()
-	if a.route != (route{page: pageAlbum, id: 8}) || a.pl.Current() != nil {
+	if a.route != (route{page: pageAlbum, id: "8"}) || a.pl.Current() != nil {
 		t.Fatalf("opened %+v, playing %+v", a.route, a.pl.Current())
 	}
 }
 
-// catalogApp is an app with an artist, album, user and podcast loaded, and
-// searches for each kind, to look at.
+// catalogApp is an app with an artist and an album loaded, and searches
+// for each kind, to look at.
 func catalogApp() *app {
 	a := newTestApp()
 	a.settings = defaultSettings()
-	day := time.Date(2026, 10, 1, 20, 0, 0, 0, time.Local).UnixMilli()
-	band := netease.Artist{ID: 7, Name: "MyGO!!!!!"}
-	al := netease.Album{ID: 8, Name: "迷跡波"}
-	var songs []netease.Track
+	band := music.Artist{ID: "7", Name: "MyGO!!!!!"}
+	al := music.Album{ID: "8", Name: "迷跡波"}
+	var songs []music.Track
 	for i, name := range []string{"春日影", "迷星叫", "壱雫空", "碧天伴走", "音一会", "栞"} {
-		songs = append(songs, netease.Track{ID: int64(i + 1), Name: name, Artists: []netease.Artist{band}, Album: al, Duration: int64(210000 + 16000*i)})
+		songs = append(songs, music.Track{ID: fmt.Sprint(i + 1), Name: name, Artists: []music.Artist{band}, Album: al, Duration: int64(210000 + 16000*i)})
 	}
-	var albums []netease.AlbumProfile
+	var albums []music.AlbumProfile
 	for i, name := range []string{"迷跡波", "跡暖空", "壱雫空", "音一会", "迷星叫", "焚音打"} {
-		albums = append(albums, netease.AlbumProfile{Album: netease.Album{ID: int64(20 + i), Name: name}, Artists: []netease.Artist{band}, PublishTime: day})
+		albums = append(albums, music.AlbumProfile{Album: music.Album{ID: fmt.Sprint(20 + i), Name: name}, Artists: []music.Artist{band}, Released: "2023-12-13"})
 	}
-	a.artists[7] = &artistData{
-		profile: &netease.ArtistProfile{Artist: band, Alias: []string{"マイゴ"}, MusicSize: 38, AlbumSize: 9, BriefDesc: "迷いながらでも、前へ。", AccountID: 70, Songs: songs},
+	a.artists["7"] = &artistData{
+		profile: &music.ArtistProfile{Artist: band, Genres: []string{"j-rock", "anime"}, Songs: songs},
 		albums:  albums, albumsPage: paged{loaded: true},
 	}
-	a.albums[8] = &albumData{album: &netease.AlbumProfile{Album: al, Artists: []netease.Artist{band}, PublishTime: day, Description: "MyGO!!!!! 的第一张专辑。", Songs: songs}}
+	a.albums["8"] = &albumData{album: &music.AlbumProfile{Album: al, Artists: []music.Artist{band}, Released: "2023-12-13", Label: "BanG Dream!", Songs: songs}}
 	for _, res := range []struct {
-		kind netease.SearchType
-		res  netease.SearchResult
+		kind music.SearchType
+		res  music.SearchResult
 	}{
-		{netease.SearchSongs, netease.SearchResult{Songs: songs, Total: 38}},
-		{netease.SearchArtists, netease.SearchResult{Artists: []netease.ArtistProfile{*a.artists[7].profile, {Artist: netease.Artist{ID: 10, Name: "Ave Mujica"}}}, Total: 2}},
-		{netease.SearchAlbums, netease.SearchResult{Albums: albums, Total: 6}},
+		{music.SearchTracks, music.SearchResult{Tracks: songs, More: true}},
+		{music.SearchArtists, music.SearchResult{Artists: []music.ArtistProfile{*a.artists["7"].profile, {Artist: music.Artist{ID: "10", Name: "Ave Mujica"}}}}},
+		{music.SearchAlbums, music.SearchResult{Albums: albums}},
 	} {
 		a.searches[route{page: pageSearch, query: "MyGO", kind: res.kind}] = &searchData{res: res.res, page: paged{loaded: true}}
 	}
@@ -250,12 +247,12 @@ var catalogScenes = []struct {
 	r    route
 	tab  int
 }{
-	{"search-songs", route{page: pageSearch, query: "MyGO", kind: netease.SearchSongs}, 0},
-	{"search-artists", route{page: pageSearch, query: "MyGO", kind: netease.SearchArtists}, 0},
-	{"search-albums", route{page: pageSearch, query: "MyGO", kind: netease.SearchAlbums}, 0},
-	{"artist", route{page: pageArtist, id: 7}, artistHot},
-	{"artist-albums", route{page: pageArtist, id: 7}, artistAlbums},
-	{"album", route{page: pageAlbum, id: 8}, 0},
+	{"search-songs", route{page: pageSearch, query: "MyGO", kind: music.SearchTracks}, 0},
+	{"search-artists", route{page: pageSearch, query: "MyGO", kind: music.SearchArtists}, 0},
+	{"search-albums", route{page: pageSearch, query: "MyGO", kind: music.SearchAlbums}, 0},
+	{"artist", route{page: pageArtist, id: "7"}, artistHot},
+	{"artist-albums", route{page: pageArtist, id: "7"}, artistAlbums},
+	{"album", route{page: pageAlbum, id: "8"}, 0},
 }
 
 // With NM_FRAMES set, saves the pages of searches, artists and albums in

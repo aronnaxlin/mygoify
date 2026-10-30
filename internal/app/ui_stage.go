@@ -92,7 +92,7 @@ func spaceWords(shapes []wordShape, widths []float32, gap float32) {
 // stage shows the lyrics of the track playing on the whole stage.
 func (a *app) stage(c *ui.Context, accent ui.Color) {
 	pl := a.pl
-	lines, loaded := pl.Lyrics()
+	lines, loaded := a.currentLyrics()
 	w, h := c.Size()
 	f := min(64, max(36, w*0.045))
 	box := ui.Box(c.Key("stage")).Grow(1)
@@ -103,7 +103,7 @@ func (a *app) stage(c *ui.Context, accent ui.Color) {
 					stageSkeleton(c, npShimmer(c), f, w)
 					return
 				}
-				ui.Text(c, "纯音乐，请欣赏").FontSize(28).FontWeight(800).TextColor(white.Alpha(0.4))
+				ui.Text(c, "暂无歌词").FontSize(28).FontWeight(800).TextColor(white.Alpha(0.4))
 			})
 		})
 		return

@@ -6,23 +6,20 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // likes are the songs the listener likes, which hearts show filled.
 
-// likeSong likes or unlikes a song with NetEase; tests replace it.
-var likeSong = netease.Like
-
 // loadLiked loads the listener's liked songs.
-func (a *app) loadLiked(uid int64) {
+func (a *app) loadLiked(uid string) {
 	go func() {
-		ids, err := netease.LikedIDs(uid)
+		ids, err := a.lib.LikedIDs()
 		a.post(func() {
-			if err != nil || a.profile == nil || a.profile.UserID != uid {
+			if err != nil || a.profile == nil || a.profile.ID != uid {
 				return
 			}
-			a.liked = make(map[int64]bool, len(ids))
+			a.liked = make(map[string]bool, len(ids))
 			for _, id := range ids {
 				a.liked[id] = true
 			}
@@ -31,21 +28,21 @@ func (a *app) loadLiked(uid int64) {
 }
 
 // toggleLike likes a song, or unlikes it, at once in the app
-// and then with NetEase, which may refuse: the heart goes back then. Signed
+// and then with Spotify, which may refuse: the heart goes back then. Signed
 // out, it asks the listener to sign in.
-func (a *app) toggleLike(tr *netease.Track) {
+func (a *app) toggleLike(tr *music.Track) {
 	if a.profile == nil {
 		a.showMain()
 		a.openLogin()
 		return
 	}
 	if a.liked == nil {
-		a.liked = map[int64]bool{}
+		a.liked = map[string]bool{}
 	}
 	id, like := tr.ID, !a.liked[tr.ID]
 	a.setLiked(id, like)
 	go func() {
-		err := likeSong(id, like)
+		err := a.lib.Like(id, like)
 		a.post(func() {
 			if err != nil {
 				a.setLiked(id, !like)
@@ -54,7 +51,7 @@ func (a *app) toggleLike(tr *netease.Track) {
 			}
 			// The liked songs' playlist changed: load it anew when shown.
 			for _, pl := range a.mine {
-				if pl.SpecialType == 5 {
+				if pl.Liked {
 					delete(a.playlists, pl.ID)
 					if a.route.page == pagePlaylist && a.route.id == pl.ID {
 						a.loadPlaylist(pl.ID, false)
@@ -66,7 +63,7 @@ func (a *app) toggleLike(tr *netease.Track) {
 }
 
 // isLiked reports whether the listener likes tr.
-func (a *app) isLiked(tr *netease.Track) bool {
+func (a *app) isLiked(tr *music.Track) bool {
 	return a.liked[tr.ID]
 }
 
@@ -88,7 +85,7 @@ func (a *app) likeCurrent() {
 	}
 }
 
-func (a *app) setLiked(id int64, like bool) {
+func (a *app) setLiked(id string, like bool) {
 	if like {
 		a.liked[id] = true
 	} else {
@@ -99,7 +96,7 @@ func (a *app) setLiked(id int64, like bool) {
 // likeButton is a heart that likes tr: filled in red once liked. Liking
 // pops it in on a spring while a ring swells around it and confetti flies
 // out; unliking lets it give a little.
-func (a *app) likeButton(c *ui.Context, tr *netease.Track, size float32, color ui.Color) ui.Element {
+func (a *app) likeButton(c *ui.Context, tr *music.Track, size float32, color ui.Color) ui.Element {
 	liked := a.isLiked(tr)
 	icon, label := iconHeart, "喜欢"
 	if liked {

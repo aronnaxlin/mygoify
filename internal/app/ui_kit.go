@@ -6,8 +6,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
-	"mygoify/internal/player"
+	"mygoify/internal/music"
+	"mygoify/internal/playback"
 )
 
 // palette holds the app's colors, for the light and the dark appearance.
@@ -136,10 +136,10 @@ func pillButton(c *ui.Context, icon *ui.SVG, label string, bg, fg ui.Color) ui.E
 }
 
 // cover shows an artwork, or a placeholder of the same size while it loads.
-func (a *app) cover(c *ui.Context, url string, px int, size, radius float32) ui.Element {
+func (a *app) cover(c *ui.Context, cover music.Images, px int, size, radius float32) ui.Element {
 	p := a.pal
 	box := ui.Box(c).Size(size, size).Radius(radius).Center()
-	bmp := bitmap(a.art.get(netease.Sized(url, px), false))
+	bmp := bitmap(a.art.get(cover.URL(px), false))
 	in := artIn(box, bmp)
 	if in < 1 {
 		box.Background(p.hover)
@@ -203,18 +203,6 @@ func clock(d time.Duration) string {
 	return fmt.Sprintf("%d:%02d", s/60, s%60)
 }
 
-// plays formats a play count as people in China read it.
-func plays(n float64) string {
-	switch {
-	case n >= 1e8:
-		return fmt.Sprintf("%.1f亿", n/1e8)
-	case n >= 1e4:
-		return fmt.Sprintf("%.0f万", n/1e4)
-	default:
-		return fmt.Sprintf("%.0f", n)
-	}
-}
-
 // greeting returns what to say at this hour.
 func greeting(now time.Time) string {
 	switch h := now.Hour(); {
@@ -234,11 +222,11 @@ func greeting(now time.Time) string {
 // bars draws n bars of an equalizer in r, from the levels of what plays,
 // smoothed in st between frames; idle bars rest low.
 type barState struct {
-	h    [player.Bands]float32
+	h    [playback.Bands]float32
 	last time.Time
 }
 
-func (st *barState) step(now time.Time, target [player.Bands]float32, live bool) {
+func (st *barState) step(now time.Time, target [playback.Bands]float32, live bool) {
 	dt := float32(now.Sub(st.last).Seconds())
 	if st.last.IsZero() || dt > 0.2 {
 		dt = 0.016
@@ -269,7 +257,7 @@ func (st *barState) group(from, to int) float32 {
 func drawBars(p *ui.Painter, r ui.Rect, st *barState, n int, color ui.Color, minH float32) {
 	gap := r.W / float32(n) * 0.38
 	w := (r.W - gap*float32(n-1)) / float32(n)
-	per := player.Bands / n
+	per := playback.Bands / n
 	for i := range n {
 		// Shape the response: low bands are loud already.
 		v := st.group(i*per, (i+1)*per)
@@ -366,8 +354,8 @@ func b2f(b bool) float32 {
 }
 
 // avatar shows a round picture of someone, from url, size across.
-func (a *app) avatar(c *ui.Context, url string, size float32, empty ui.Color) {
-	bmp := bitmap(a.art.get(netease.Sized(url, int(size*3)), false))
+func (a *app) avatar(c *ui.Context, im music.Images, size float32, empty ui.Color) {
+	bmp := bitmap(a.art.get(im.URL(int(size*3)), false))
 	box := ui.Box(c).Size(size, size).Radius(size / 2).Shrink(0)
 	in := artIn(box, bmp)
 	if in < 1 {

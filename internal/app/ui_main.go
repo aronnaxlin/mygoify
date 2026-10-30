@@ -7,7 +7,7 @@ import (
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 const sidebarWidth = 232
@@ -174,8 +174,7 @@ func (a *app) sidebar(c *ui.Context) {
 		a.searchField(c)
 
 		ui.Scroll(c.Key("nav")).TrackScroll(&a.navScroll).Grow(1).Margin(0, -6).Padding(0, 6).Gap(4).Children(func() {
-			a.navItem(c, iconHome, "为你推荐", route{page: pageHome})
-			a.navItem(c, iconCharts, "排行榜", route{page: pageCharts})
+			a.navItem(c, iconHome, "首页", route{page: pageHome})
 			if a.searched.query != "" {
 				a.navItem(c, iconSearch, "搜索结果", a.searched)
 			}
@@ -216,7 +215,7 @@ func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route) {
 	}
 }
 
-func (a *app) sidebarNowPlaying(c *ui.Context, tr *netease.Track) {
+func (a *app) sidebarNowPlaying(c *ui.Context, tr *music.Track) {
 	p := a.pal
 	card := ui.ButtonBase(c.Key("np-card")).Gap(10).Padding(8).Radius(12).AlignItems(ui.Center).FocusRing(false).Label("正在播放")
 	bg := p.hover
@@ -225,7 +224,7 @@ func (a *app) sidebarNowPlaying(c *ui.Context, tr *netease.Track) {
 	}
 	card.Background(card.AnimateColor("bg", bg, ui.Animation{Duration: 120 * time.Millisecond}))
 	card.Children(func() {
-		a.cover(c, tr.Album.PicURL, 96, 40, 6).Shadow(0, 2, 6, 0, p.cardShade)
+		a.cover(c, tr.Album.Images, 96, 40, 6).Shadow(0, 2, 6, 0, p.cardShade)
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(2).Children(func() {
 			ui.Text(c, tr.Name).FontSize(12.5).FontWeight(600).SingleLine()
 			a.artistLinks(c, tr, p.muted, p.text).FontSize(11.5).SingleLine()
@@ -342,8 +341,6 @@ func (a *app) content(c *ui.Context) {
 	switch a.route.page {
 	case pageHome:
 		a.homePage(c)
-	case pageCharts:
-		a.chartsPage(c)
 	case pagePlaylist:
 		a.playlistPage(c)
 	case pageSearch:
@@ -371,57 +368,39 @@ func (a *app) centered(c *ui.Context, err string, retry func()) {
 
 func (a *app) loadHome() {
 	a.homeLoading, a.homeErr = true, ""
-	signedIn := a.profile != nil
 	at := time.Now()
 	go func() {
-		featured, err1 := netease.FeaturedPlaylists(30)
-		charts, err2 := netease.Charts()
-		var rec []netease.Playlist
-		if signedIn {
-			rec, _ = netease.RecommendedPlaylists()
-		}
+		home, err := a.lib.Home()
 		a.post(func() {
 			a.homeLoading = false
-			if err1 != nil && err2 != nil {
-				// Loading the new day's again, what shows stays, to try
-				// once more.
-				if len(a.featured) == 0 && len(a.charts) == 0 {
-					a.homeErr = "无法连接网易云音乐，请检查网络"
+			if err != nil {
+				// What shows stays, to try once more.
+				if len(a.home.Recent) == 0 && len(a.home.TopTracks) == 0 {
+					a.homeErr = "无法连接 Spotify，请检查网络"
 				}
 				return
 			}
-			a.featured, a.charts, a.recPlaylists = featured, charts, rec
-			a.homeAt = at
+			a.home, a.homeAt = home, at
 		})
 	}()
 }
 
-// freshenHome loads the home page again once NetEase has picked the day's
-// songs anew since it last did: the app may stay open overnight.
+// homeStale is how long the home page shows what it loaded before it loads
+// again as it is shown: what the listener played lately changes as they
+// play.
+const homeStale = 10 * time.Minute
+
+// freshenHome loads the home page again once what it shows is stale.
 func (a *app) freshenHome() {
-	if !a.homeLoading && !a.homeAt.IsZero() && dailyRenewed(a.homeAt, time.Now()) {
+	if !a.homeLoading && !a.homeAt.IsZero() && time.Since(a.homeAt) > homeStale {
 		a.loadHome()
 	}
 }
 
-// beijing is NetEase's time, without daylight saving.
-var beijing = time.FixedZone("CST", 8*60*60)
-
-// dailyRenewed reports whether NetEase has picked new daily songs between
-// loaded and now. It does at 6:00, Beijing time.
-func dailyRenewed(loaded, now time.Time) bool {
-	b := now.In(beijing)
-	six := time.Date(b.Year(), b.Month(), b.Day(), 6, 0, 0, 0, beijing)
-	if b.Before(six) {
-		six = six.AddDate(0, 0, -1)
-	}
-	return loaded.Before(six)
-}
-
-func (a *app) loadPlaylist(id int64, thenPlay bool) {
+func (a *app) loadPlaylist(id string, thenPlay bool) {
 	if pl := a.playlists[id]; pl != nil {
 		if thenPlay {
-			a.pl.PlayQueue(pl.Tracks, firstPlayable(pl.Tracks))
+			a.pl.PlayQueue(pl.URI(), pl.Tracks, firstPlayable(pl.Tracks))
 		}
 		return
 	}
@@ -431,7 +410,7 @@ func (a *app) loadPlaylist(id int64, thenPlay bool) {
 	a.loadingPl[id] = true
 	delete(a.plErr, id)
 	go func() {
-		pl, err := netease.PlaylistDetail(id)
+		pl, err := a.lib.Playlist(id)
 		a.post(func() {
 			delete(a.loadingPl, id)
 			if err != nil {
@@ -440,13 +419,13 @@ func (a *app) loadPlaylist(id int64, thenPlay bool) {
 			}
 			a.playlists[id] = pl
 			if thenPlay {
-				a.pl.PlayQueue(pl.Tracks, firstPlayable(pl.Tracks))
+				a.pl.PlayQueue(pl.URI(), pl.Tracks, firstPlayable(pl.Tracks))
 			}
 		})
 	}()
 }
 
-func firstPlayable(tracks []netease.Track) int {
+func firstPlayable(tracks []music.Track) int {
 	for i := range tracks {
 		if tracks[i].Playable() {
 			return i

@@ -7,7 +7,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/lyrics"
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // playingApp is an app playing a track with lyrics, at a position the test
@@ -15,8 +15,8 @@ import (
 func playingApp() (*app, *ui.Tester, *int) {
 	a := newTestApp()
 	a.settings = defaultSettings()
-	tr := netease.Track{ID: 7, Name: "宝船", Artists: []netease.Artist{{Name: "DOUDOU"}}, Duration: 200000}
-	a.pl.Cue([]netease.Track{tr})
+	tr := music.Track{ID: "7", Name: "宝船", Artists: []music.Artist{{Name: "DOUDOU"}}, Duration: 200000}
+	a.pl.Cue([]music.Track{tr})
 	// A line every 10 seconds, sung over the first 5 of them.
 	var lrc string
 	for i := range 12 {
@@ -28,7 +28,7 @@ func playingApp() (*app, *ui.Tester, *int) {
 		l.End = l.At + 5*time.Second
 		l.Words = lyrics.SpreadWords(l.Text, l.At, l.End)
 	}
-	a.pl.SetLyrics(lines)
+	a.setLyrics(lines)
 	a.pl.Hold(0)
 	builds := 0
 	tt := ui.NewTester(func(c *ui.Context) { builds++; a.view(c) }, 1200, 800)
@@ -86,10 +86,10 @@ func TestNowPlayingFrameBudget(t *testing.T) {
 // go, so that the backdrop stops asking for frames.
 func TestBackdropFadeEnds(t *testing.T) {
 	a, tt, _ := coverApp(t)
-	a.art.art[netease.Sized("a", 600)+"#backdrop"] = &artwork{tint: ui.RGB(200, 40, 40)}
-	a.art.art[netease.Sized("b", 600)+"#backdrop"] = &artwork{tint: ui.RGB(40, 40, 200)}
+	a.art.art["a#backdrop"] = &artwork{tint: ui.RGB(200, 40, 40)}
+	a.art.art["b#backdrop"] = &artwork{tint: ui.RGB(40, 40, 200)}
 	q := a.pl.Queue()
-	q[1].Album.PicURL, q[2].Album.PicURL = "a", "b"
+	q[1].Album.Images, q[2].Album.Images = music.Images{{URL: "a"}}, music.Images{{URL: "b"}}
 	tt.Frame()
 	a.pl.Next()
 	tt.Frame()

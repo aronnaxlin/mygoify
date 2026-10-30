@@ -23,9 +23,6 @@ type settings struct {
 	// NotchGreeted says the notch showed itself, once, as the first song
 	// played (greet).
 	NotchGreeted bool `json:"notchGreeted"`
-	// Quality is the level of the streams: standard, higher, exhigh,
-	// lossless or hires.
-	Quality string `json:"quality"`
 	// Appearance is light, dark, or system to follow the system.
 	Appearance string `json:"appearance"`
 	// Smoke makes the progress bars comets trailing smoke as music plays,
@@ -42,9 +39,6 @@ type settings struct {
 	StageSparks bool `json:"stageSparks,omitempty"`
 	// Volume is where the volume was left, from 0 to 1.
 	Volume float64 `json:"volume"`
-	// Normalize evens out the loudness of tracks, by what NetEase
-	// measured of each.
-	Normalize bool `json:"normalize"`
 	// Fog fills Now Playing's backdrop with fog of the cover's color,
 	// rising and swelling with the bass: an experiment the listener turns
 	// on.
@@ -52,9 +46,6 @@ type settings struct {
 	// AppIcon is where the app's icon shows on macOS (appIcons); elsewhere
 	// it is always in the notification area.
 	AppIcon string `json:"appIcon"`
-	// CacheMB is how many megabytes the songs kept on disk may take; 0
-	// keeps none.
-	CacheMB int `json:"cacheMB"`
 	// SearchHistory keeps submitted keywords, most recent first.
 	SearchHistory []string `json:"searchHistory,omitempty"`
 
@@ -62,7 +53,7 @@ type settings struct {
 }
 
 func defaultSettings() settings {
-	return settings{NotchActivity: true, Quality: "exhigh", Appearance: "system", Volume: 0.8, Normalize: true, AppIcon: "dock-and-menubar", CacheMB: 2048}
+	return settings{NotchActivity: true, Appearance: "system", Volume: 0.8, AppIcon: "dock-and-menubar"}
 }
 
 func settingsPath() (string, error) {
@@ -71,43 +62,6 @@ func settingsPath() (string, error) {
 		return "", err
 	}
 	return filepath.Join(dir, "settings.json"), nil
-}
-
-// oldName is what the app was called before it took its bundle's name, and
-// kept its data under.
-const oldName = "网易云音乐"
-
-// moveOldData moves the user data and the song cache kept under oldName to
-// the directories of the app's name, unless those hold something already:
-// the login, settings and where playback was left go on. It must run before
-// anything reads them.
-func moveOldData() {
-	for _, name := range []mygo.PathName{mygo.PathUserData, mygo.PathCache} {
-		dir, err := mygo.App.Path(name)
-		if err != nil {
-			continue
-		}
-		moveDir(filepath.Join(filepath.Dir(dir), oldName), dir)
-	}
-}
-
-// moveDir moves the directory old to dir when dir is empty, as Path made
-// it, and old exists.
-func moveDir(old, dir string) {
-	if old == dir {
-		return
-	}
-	if entries, err := os.ReadDir(dir); err != nil || len(entries) > 0 {
-		return
-	}
-	if _, err := os.Stat(old); err != nil {
-		return
-	}
-	if os.Remove(dir) == nil {
-		if err := os.Rename(old, dir); err != nil {
-			os.MkdirAll(dir, 0o700)
-		}
-	}
 }
 
 // loadSettings reads the settings, or returns the defaults.
@@ -149,25 +103,4 @@ func (s settings) applyAppearance() {
 	default:
 		mygo.Theme.SetSource(mygo.ThemeSystem)
 	}
-}
-
-// qualityLevel is the stream level NetEase names a quality by.
-var qualityLevels = []struct{ level, label string }{
-	{"standard", "标准（128k）"},
-	{"higher", "较高（192k）"},
-	{"exhigh", "极高（320k）"},
-	{"lossless", "无损（FLAC）"},
-	{"hires", "Hi-Res"},
-}
-
-// cacheLimits are the sizes the song cache may take, in megabytes.
-var cacheLimits = []struct {
-	mb    int
-	label string
-}{
-	{0, "关闭"},
-	{1024, "1 GB"},
-	{2048, "2 GB"},
-	{5120, "5 GB"},
-	{10240, "10 GB"},
 }

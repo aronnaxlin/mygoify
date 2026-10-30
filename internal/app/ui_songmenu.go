@@ -5,16 +5,16 @@ import (
 	"github.com/egoist/mygo/transfer"
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // copyText puts text on the clipboard; tests replace it.
 var copyText = func(text string) error { return mygo.Clipboard.Write(transfer.TextData(text)) }
 
 // songMenu is three dots that open the menu of tr.
-func (a *app) songMenu(c *ui.Context, tr *netease.Track, size float32, color ui.Color) ui.Element {
+func (a *app) songMenu(c *ui.Context, tr *music.Track, size float32, color ui.Color) ui.Element {
 	b := iconButton(c, iconMore, size, color, "更多")
-	b.Menu(a.songItems(tr, 0))
+	b.Menu(a.songItems(tr, ""))
 	return b
 }
 
@@ -23,7 +23,7 @@ func (a *app) songMenu(c *ui.Context, tr *netease.Track, size float32, color ui.
 // artists, or the link to its page, opening its artists' or album's, and,
 // signed in, adding it to a playlist or taking it out of pid, the playlist
 // it is listed in, if set.
-func (a *app) songItems(tr *netease.Track, pid int64) func(m *ui.Menu) {
+func (a *app) songItems(tr *music.Track, pid string) func(m *ui.Menu) {
 	return func(m *ui.Menu) {
 		if m.Item("复制歌名").Chosen() {
 			copyText(tr.Name)
@@ -35,20 +35,20 @@ func (a *app) songItems(tr *netease.Track, pid int64) func(m *ui.Menu) {
 		if m.Item("复制链接").Chosen() {
 			copyText(tr.URL())
 		}
-		// Its artists' and album's pages, those NetEase has.
-		linked := tr.Album.ID != 0
+		// Its artists' and album's pages, those Spotify has.
+		linked := tr.Album.ID != ""
 		for _, ar := range tr.Artists {
-			linked = linked || ar.ID != 0
+			linked = linked || ar.ID != ""
 		}
 		if linked {
 			m.Separator()
 		}
 		for _, ar := range tr.Artists {
-			if ar.ID != 0 && m.Item("查看歌手："+ar.Name).Chosen() {
+			if ar.ID != "" && m.Item("查看歌手："+ar.Name).Chosen() {
 				a.openArtist(ar.ID)
 			}
 		}
-		if tr.Album.ID != 0 && m.Item("查看专辑："+tr.Album.Name).Chosen() {
+		if tr.Album.ID != "" && m.Item("查看专辑："+tr.Album.Name).Chosen() {
 			a.openPage(route{page: pageAlbum, id: tr.Album.ID})
 		}
 		a.playlistItems(m, tr, pid)

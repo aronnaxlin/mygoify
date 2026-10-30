@@ -4,7 +4,7 @@
 
 MyGoify is a third-party Spotify desktop client, forked from [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) (remote `upstream`). Read [docs/DESIGN.md](docs/DESIGN.md) and [ROADMAP.md](ROADMAP.md) before changing architecture. Version 1 covers music only: no podcasts. Never implement PlayPlay, audio download or export, or anything that works around Spotify's restrictions.
 
-Until milestone M1 finishes, `internal/netease`, `internal/player` and `internal/speech` are still the upstream code, waiting to be replaced or removed.
+The app (`internal/app`) asks `library.Library` for music and plays through `playback.Player`, whose `Backend` does the playing. Both have fakes (`library.Fake`, `playback.Fake`), which the app runs on until Spotify answers (M2, M3). `go tool mygo dev` with no setup shows made-up music.
 
 ## Tests
 
@@ -27,8 +27,8 @@ Only write a test for behaviour that can actually break. If the code under test 
 **How:**
 
 - Build views with `ui.NewTester` and set up the app with `newTestApp` (in `internal/app/helpers_test.go`). Find elements by their accessibility label, then `Click`, `RightClick`, `Press`/`Move`/`Release` or `Key`, and check the app's state afterwards.
-- Swap out the network and the clipboard through package variables such as `likeSong` and `copyText`, and restore the real one with `defer`.
-- Live tests that call NetEase skip unless `LIVE` is set.
+- The app of `newTestApp` asks a `stubLib` (in `helpers_test.go`), which answers as `library.Fake` does: set one of its functions, as `stub(a).like`, to see what the app asks or to answer otherwise. Swap out the clipboard through `copyText`, and restore it with `defer`.
+- Set up what plays with the player's fixtures (`Cue`, `Hold`, `Start`) and lyrics with `a.setLyrics`.
 - Look at visuals instead of asserting on them. The `NM_FRAMES` tests save PNGs into that directory and skip when it isn't set. Check pixels only for coverage, such as whether a layer still covers the window.
 - Start each test with a one-sentence comment saying the behaviour it checks, in the style of the code.
 - Run `go test ./internal/...` before committing, and run a new UI test with `-count=5`. Fix or delete a flaky test; don't retry it.

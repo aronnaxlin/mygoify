@@ -8,7 +8,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/lyrics"
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 var white = ui.RGB(255, 255, 255)
@@ -58,7 +58,7 @@ func (a *app) nowPlayingLayer(c *ui.Context, open, settled bool) {
 	if !open && settled || a.pl.Current() == nil {
 		// Closed: nothing to paint or click.
 		layer.Invisible()
-		a.queueAt, a.wallState.track = -1, 0
+		a.queueAt, a.wallState.track = -1, ""
 		return
 	}
 	if !open {
@@ -74,11 +74,11 @@ func (a *app) nowPlayingView(c *ui.Context) {
 	pl := a.pl
 	tr := pl.Current()
 	w, h := c.Size()
-	art := a.art.get(netease.Sized(tr.Album.PicURL, 600), true)
+	art := a.art.get(tr.Album.Images.URL(600), true)
 	// The colors stay the last song's while its cover loads, rather than
 	// going gray between the two.
 	shown := art
-	if art == nil && tr.Album.PicURL != "" {
+	if art == nil && len(tr.Album.Images) > 0 {
 		shown = a.npArt
 	}
 	a.npArt = shown
@@ -100,13 +100,13 @@ func (a *app) nowPlayingView(c *ui.Context) {
 	})
 }
 
-func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, accent ui.Color, w, h float32, pointerIn bool) {
+func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accent ui.Color, w, h float32, pointerIn bool) {
 	pl := a.pl
 	if a.npPane != paneQueue {
 		a.queueAt = -1
 	}
 	if a.npPane != paneWall {
-		a.wallState.track = 0
+		a.wallState.track = ""
 	}
 	{
 		// The top strip drags the window; the chevron closes the view,
@@ -160,12 +160,8 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 					a.songMenu(c.Key("more"), tr, 22, white.Alpha(0.7)).Margin(0, -8, 0, 0)
 				})
 				a.scrubber(c.Key("np-scrub"), &a.npScrub, white.Alpha(0.18), white.Alpha(0.9), 16, accent.Mix(white, 0.35))
-				// As tall with the quality's badge as without it: the badge goes
-				// while the next song loads, and the column would move with it.
 				ui.Row(c).Height(16).AlignItems(ui.Center).Children(func() {
 					ui.Text(c, clock(pl.Position())).FontSize(11).FontFeatures("tnum").TextColor(white.Alpha(0.5))
-					ui.Spacer(c)
-					qualityBadge(c, pl.Stream())
 					ui.Spacer(c)
 					status := "-" + clock(pl.Duration()-pl.Position())
 					if pl.Loading() {
@@ -285,22 +281,9 @@ func (a *app) choosePane(i int) {
 	}
 }
 
-// qualityBadge marks a lossless stream, as it plays.
-func qualityBadge(c *ui.Context, st *netease.Stream) {
-	if st == nil || !netease.Lossless(st.Level) {
-		return
-	}
-	label := "无损"
-	if st.Level == "hires" {
-		label = "Hi-Res"
-	}
-	ui.Text(c, label).FontSize(9.5).FontWeight(800).LetterSpacing(0.6).TextColor(ui.Hex("#f5d58a")).
-		Padding(1, 6).Radius(4).Border(1, ui.Hex("#f5d58a").Alpha(0.55))
-}
-
 // stageBar is the slim bar along the foot of the stage: what plays, where
 // it is, and the controls.
-func (a *app) stageBar(c *ui.Context, tr *netease.Track, art *artwork, accent ui.Color) {
+func (a *app) stageBar(c *ui.Context, tr *music.Track, art *artwork, accent ui.Color) {
 	pl := a.pl
 	ui.Column(c).Padding(0, 48, 28, 48).Gap(10).Children(func() {
 		a.scrubber(c.Key("stage-scrub"), &a.npScrub, white.Alpha(0.18), white.Alpha(0.9), 14, accent.Mix(white, 0.35))
@@ -343,9 +326,9 @@ func (a *app) paneTab(c *ui.Context, i int, label string) {
 	}
 }
 
-func (a *app) lyricsPane(c *ui.Context, tr *netease.Track, h float32) {
+func (a *app) lyricsPane(c *ui.Context, tr *music.Track, h float32) {
 	pl := a.pl
-	lines, loaded := pl.Lyrics()
+	lines, loaded := a.currentLyrics()
 	if len(lines) == 0 {
 		col := ui.Column(c).Grow(1)
 		if loaded {
@@ -356,7 +339,7 @@ func (a *app) lyricsPane(c *ui.Context, tr *netease.Track, h float32) {
 				lyricsSkeleton(c, npShimmer(c))
 				return
 			}
-			ui.Text(c, "纯音乐，请欣赏").FontSize(24).FontWeight(700).TextColor(white.Alpha(0.4))
+			ui.Text(c, "暂无歌词").FontSize(24).FontWeight(700).TextColor(white.Alpha(0.4))
 		})
 		return
 	}
@@ -559,7 +542,7 @@ func (a *app) queuePane(c *ui.Context) {
 		tr := &pl.Queue()[i]
 		playing := r == at
 		row := ui.ButtonBase(c.Key(i)).Height(58).PaddingX(10).Gap(14).Radius(12).AlignItems(ui.Center).FocusRing(false).Label(tr.Name).
-			ContextMenu(a.songItems(tr, 0))
+			ContextMenu(a.songItems(tr, ""))
 		switch {
 		case playing:
 			row.Background(white.Alpha(0.12))
@@ -570,7 +553,7 @@ func (a *app) queuePane(c *ui.Context) {
 			row.Opacity(0.4)
 		}
 		row.Children(func() {
-			a.cover(c, tr.Album.PicURL, 96, 42, 7)
+			a.cover(c, tr.Album.Images, 96, 42, 7)
 			ui.Column(c).Grow(1).MinWidth(0).Gap(3).Children(func() {
 				ui.Text(c, tr.Name).FontSize(14).FontWeight(600).SingleLine()
 				a.artistLinks(c, tr, white.Alpha(0.55), white).FontSize(12.5).SingleLine()

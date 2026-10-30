@@ -11,8 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
-	"mygoify/internal/player"
+	"mygoify/internal/playback"
 )
 
 // The drift eases in as the music plays and glides to a stop as it
@@ -20,7 +19,7 @@ import (
 func TestBackdropDrifts(t *testing.T) {
 	var bd backdropCache
 	now := time.Unix(0, 0)
-	var quiet [player.Bands]float32
+	var quiet [playback.Bands]float32
 	for range 120 {
 		now = now.Add(backdropFrame)
 		bd.step(now, true, quiet, true)
@@ -28,7 +27,7 @@ func TestBackdropDrifts(t *testing.T) {
 	if bd.speed != 1 || bd.drift <= 0 {
 		t.Fatalf("playing: speed %v, drift %v", bd.speed, bd.drift)
 	}
-	var loud [player.Bands]float32
+	var loud [playback.Bands]float32
 	for i := range loud {
 		loud[i] = 1
 	}
@@ -63,11 +62,11 @@ func TestBackdropDriftFrames(t *testing.T) {
 	const w, h = 300, 420
 	var rows []*image.RGBA
 	for _, q := range []string{"春日影 MyGO", "晴天 周杰伦", "夜に駆ける"} {
-		hits, err := netease.Search(q, 1)
+		hits, err := searchFake(q, 1)
 		if err != nil || len(hits) == 0 {
 			t.Fatal(q, err)
 		}
-		img, err := fetchImage(netease.Sized(hits[0].Album.PicURL, 600))
+		img, err := fetchImage(hits[0].Album.Images.URL(600))
 		if err != nil {
 			t.Fatal(err)
 		}

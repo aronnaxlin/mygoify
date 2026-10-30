@@ -1,27 +1,25 @@
 package app
 
 import (
-	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // artistLinks shows a track's artists as its credits read, each a link to
 // their page in color, brightening to hover under the pointer, and then,
-// with album, a link to its album. An artist NetEase has no page for,
+// with album, a link to its album. An artist Spotify has no page for,
 // credited by name alone, is plain text.
-func (a *app) artistLinks(c *ui.Context, tr *netease.Track, color, hover ui.Color, album ...bool) ui.Element {
+func (a *app) artistLinks(c *ui.Context, tr *music.Track, color, hover ui.Color, album ...bool) ui.Element {
 	return ui.RichText(c).TextColor(color).Children(func() {
 		for i, ar := range tr.Artists {
 			if i > 0 {
 				ui.Text(c, ", ")
 			}
 			switch {
-			case ar.ID != 0:
+			case ar.ID != "":
 				a.link(c.Key(i), ar.Name, color, hover, route{page: pageArtist, id: ar.ID})
 			default:
 				ui.Text(c, ar.Name)
@@ -30,7 +28,7 @@ func (a *app) artistLinks(c *ui.Context, tr *netease.Track, color, hover ui.Colo
 		if len(album) > 0 && album[0] && tr.Album.Name != "" {
 			ui.Text(c, " — ")
 			switch {
-			case tr.Album.ID != 0:
+			case tr.Album.ID != "":
 				a.link(c.Key("album"), tr.Album.Name, color, hover, route{page: pageAlbum, id: tr.Album.ID})
 			default:
 				ui.Text(c, tr.Album.Name)
@@ -58,47 +56,29 @@ func (a *app) openPage(r route) {
 }
 
 // openArtist opens an artist's page in the main window.
-func (a *app) openArtist(id int64) { a.openPage(route{page: pageArtist, id: id}) }
-
-// These load an artist, their songs and albums from NetEase, and
-// follow them; tests replace them.
-var (
-	artistDetail      = netease.ArtistDetail
-	artistLatestSongs = netease.ArtistLatestSongs
-	albumsBy          = netease.ArtistAlbums
-	followArtist      = netease.FollowArtist
-)
+func (a *app) openArtist(id string) { a.openPage(route{page: pageArtist, id: id}) }
 
 // artistData is what the app has of an artist: who they are, with their
-// most popular songs, and their newest songs and albums once asked for.
+// most popular songs, and their albums once asked for.
 type artistData struct {
-	profile       *netease.ArtistProfile
-	loading       bool
-	err           string
-	latest        []netease.Track
-	latestLoading bool
-	latestErr     string
-	albums        []netease.AlbumProfile
-	albumsPage    paged
-	following     bool // a follow or unfollow is on its way
+	profile    *music.ArtistProfile
+	loading    bool
+	err        string
+	albums     []music.AlbumProfile
+	albumsPage paged
+	following  bool // a follow or unfollow is on its way
 }
 
-// What an artist's page lists: their songs, the most popular or the
-// newest, or their albums.
+// What an artist's page lists: their most popular songs, or their albums.
 const (
 	artistHot = iota
-	artistLatest
 	artistAlbums
 )
 
-// latestCount is how many of an artist's newest songs their page lists;
-// albumsPage how many albums load at a time.
-const (
-	latestCount = 100
-	albumsPage  = 30
-)
+// albumsPage is how many albums load at a time.
+const albumsPage = 30
 
-func (a *app) artist(id int64) *artistData {
+func (a *app) artist(id string) *artistData {
 	d := a.artists[id]
 	if d == nil {
 		d = &artistData{}
@@ -108,22 +88,17 @@ func (a *app) artist(id int64) *artistData {
 }
 
 // loadArtist loads an artist's page, and what it lists.
-func (a *app) loadArtist(id int64) {
+func (a *app) loadArtist(id string) {
 	d := a.artist(id)
-	switch a.artistTab {
-	case artistLatest:
-		a.loadLatest(id)
-	case artistAlbums:
-		if !d.albumsPage.loaded {
-			a.loadAlbums(id)
-		}
+	if a.artistTab == artistAlbums && !d.albumsPage.loaded {
+		a.loadAlbums(id)
 	}
 	if d.profile != nil || d.loading {
 		return
 	}
 	d.loading, d.err = true, ""
 	go func() {
-		ar, err := artistDetail(id)
+		ar, err := a.lib.Artist(id)
 		a.post(func() {
 			d.loading = false
 			if err != nil {
@@ -135,27 +110,8 @@ func (a *app) loadArtist(id int64) {
 	}()
 }
 
-func (a *app) loadLatest(id int64) {
-	d := a.artist(id)
-	if d.latest != nil || d.latestLoading {
-		return
-	}
-	d.latestLoading, d.latestErr = true, ""
-	go func() {
-		songs, err := artistLatestSongs(id, latestCount)
-		a.post(func() {
-			d.latestLoading = false
-			if err != nil {
-				d.latestErr = "歌曲加载失败"
-				return
-			}
-			d.latest = songs
-		})
-	}()
-}
-
 // loadAlbums loads the next page of an artist's albums.
-func (a *app) loadAlbums(id int64) {
+func (a *app) loadAlbums(id string) {
 	d := a.artist(id)
 	if d.albumsPage.loading {
 		return
@@ -163,7 +119,7 @@ func (a *app) loadAlbums(id int64) {
 	d.albumsPage.loading, d.albumsPage.err = true, ""
 	offset := len(d.albums)
 	go func() {
-		albums, more, err := albumsBy(id, albumsPage, offset)
+		albums, more, err := a.lib.ArtistAlbums(id, albumsPage, offset)
 		a.post(func() {
 			d.albumsPage.loading = false
 			if err != nil {
@@ -177,8 +133,8 @@ func (a *app) loadAlbums(id int64) {
 }
 
 // toggleFollow follows an artist, or unfollows them, at once, going back if
-// NetEase refuses. Signed out, it asks the listener to sign in.
-func (a *app) toggleFollow(id int64) {
+// Spotify refuses. Signed out, it asks the listener to sign in.
+func (a *app) toggleFollow(id string) {
 	d := a.artist(id)
 	if d.profile == nil || d.following {
 		return
@@ -191,7 +147,7 @@ func (a *app) toggleFollow(id int64) {
 	follow := !ar.Followed
 	ar.Followed, d.following = follow, true
 	go func() {
-		err := followArtist(id, follow)
+		err := a.lib.FollowArtist(id, follow)
 		a.post(func() {
 			d.following = false
 			switch {
@@ -207,8 +163,8 @@ func (a *app) toggleFollow(id int64) {
 	}()
 }
 
-// artistPage shows who an artist is over their songs, the most popular or
-// the newest, their albums or their events.
+// artistPage shows who an artist is over their most popular songs, or
+// their albums.
 func (a *app) artistPage(c *ui.Context) {
 	id := a.route.id
 	d := a.artist(id)
@@ -234,28 +190,7 @@ func (a *app) artistPage(c *ui.Context) {
 		})
 		return
 	}
-	songs := d.profile.Songs
-	if a.artistTab == artistLatest {
-		switch {
-		case d.latest != nil:
-			songs = d.latest
-		case d.latestLoading:
-			a.trackSkeleton(c, a.pageShimmer(c), true, header)
-			return
-		default:
-			songs = nil
-			header = func(c *ui.Context) {
-				a.artistHeader(c, d)
-				ui.Column(c).Padding(40, 0).Gap(12).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, d.latestErr).TextColor(a.pal.muted).FontSize(13)
-					if ui.Button(c.Key("retry"), "重试").Clicked() {
-						a.loadLatest(d.profile.ID)
-					}
-				})
-			}
-		}
-	}
-	a.trackRows(c, songs, true, header)
+	a.trackRows(c, d.profile.Songs, true, header)
 }
 
 // scrollPage scrolls a page of cards and rows, inset as one of tracks is:
@@ -280,48 +215,30 @@ const artistPhotoSize = 212
 func (a *app) artistHeader(c *ui.Context, d *artistData) {
 	p := a.pal
 	ar := d.profile
-	// What the buttons play: the songs listed, or else the most popular.
+	// What the buttons play: the most popular songs.
 	songs := ar.Songs
-	if a.artistTab == artistLatest && d.latest != nil {
-		songs = d.latest
-	}
 	ui.Row(c).Gap(28).AlignItems(ui.End).Padding(0, 0, 8, 0).Children(func() {
-		photo := ar.Avatar
-		if photo == "" {
-			photo = ar.PicURL
-		}
 		ui.Box(c).Size(artistPhotoSize, artistPhotoSize).Radius(artistPhotoSize/2).Shadow(0, 18, 40, -10, p.cardShade).Children(func() {
-			a.coverFill(c, photo, 600, artistPhotoSize/2)
+			a.coverFill(c, ar.Images, 600, artistPhotoSize/2)
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
 			ui.Text(c, "歌手").FontSize(12).FontWeight(600).TextColor(p.accent)
 			ui.Text(c, ar.Name).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
-			var meta []string
-			if aka := distinct(append([]string{ar.Trans}, ar.Alias...)); len(aka) > 0 {
-				meta = append(meta, strings.Join(aka, " / "))
-			}
-			if ar.MusicSize > 0 {
-				meta = append(meta, fmt.Sprintf("%d 首歌曲", ar.MusicSize))
-			}
-			if ar.AlbumSize > 0 {
-				meta = append(meta, fmt.Sprintf("%d 张专辑", ar.AlbumSize))
-			}
-			ui.Text(c, strings.Join(meta, " · ")).FontSize(13).TextColor(p.muted)
-			if d := strings.TrimSpace(ar.BriefDesc); d != "" {
-				ui.Text(c, strings.ReplaceAll(d, "\n", " ")).FontSize(12.5).TextColor(p.muted).MaxLines(2).LineHeight(1.45).Margin(2, 0, 0, 0)
+			if len(ar.Genres) > 0 {
+				ui.Text(c, strings.Join(ar.Genres, " · ")).FontSize(13).TextColor(p.muted)
 			}
 			ui.Row(c).Gap(10).Margin(10, 0, 0, 0).Children(func() {
 				if pillButton(c.Key("play"), iconPlay, "播放", p.accent, p.onAccent).Clicked() {
 					if a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}
-					a.pl.PlayQueue(songs, firstPlayable(songs))
+					a.pl.PlayQueue("", songs, firstPlayable(songs))
 				}
 				if pillButton(c.Key("shuffle"), iconShuffle, "随机播放", p.hover.Over(p.bg), p.text).Clicked() {
 					if !a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}
-					a.pl.PlayQueue(songs, firstPlayable(songs))
+					a.pl.PlayQueue("", songs, firstPlayable(songs))
 				}
 				icon, label := iconPlus, "关注"
 				if ar.Followed {
@@ -336,13 +253,13 @@ func (a *app) artistHeader(c *ui.Context, d *artistData) {
 	ui.Row(c).AlignItems(ui.Center).Margin(34, 0, 14, 0).Children(func() {
 		ui.Text(c, artistTabTitles[a.artistTab]).FontSize(19).FontWeight(700).LetterSpacing(-0.3)
 		ui.Spacer(c)
-		if segmented(c.Key("tab"), &a.artistTab, "热门", "最新", "专辑") {
+		if segmented(c.Key("tab"), &a.artistTab, "热门", "专辑") {
 			a.loadArtist(ar.ID)
 		}
 	})
 }
 
-var artistTabTitles = [...]string{"歌曲", "歌曲", "专辑"}
+var artistTabTitles = [...]string{"热门歌曲", "专辑"}
 
 func (a *app) artistHeaderSkeleton(c *ui.Context, s shimmer) {
 	ui.Row(c).Gap(28).AlignItems(ui.End).Padding(0, 0, 8, 0).Children(func() {
@@ -362,16 +279,4 @@ func (a *app) artistHeaderSkeleton(c *ui.Context, s shimmer) {
 		})
 	})
 	a.section(c, "歌曲")
-}
-
-// distinct returns ss without empty strings, nor any after its first: an
-// artist's translated name is often among their aliases too.
-func distinct(ss []string) []string {
-	var out []string
-	for _, s := range ss {
-		if s != "" && !slices.Contains(out, s) {
-			out = append(out, s)
-		}
-	}
-	return out
 }
