@@ -12,17 +12,17 @@
 
 | # | 验证内容 | 通过标准 |
 |---|---|---|
-| P1 | Omarchy 上运行 Soloist，`--ws 127.0.0.1:0`，用 Go 连上 WebSocket | 能收到 `auth_state` 和 `playback_state` |
-| P2 | 首次配对：手机 App 选中 Soloist 后，重启 Soloist 会话仍在 | 重启后 `logged_in: true` |
-| P3 | Web API PKCE，用自己的 client ID 登录 | 拿到 token，能调 `/me/playlists` 和 `/search` |
-| P4 | Web API `PUT /me/player/play`，带 `context_uri` + `offset` + Soloist 的 `device_id` | 从歌单第 N 首开始播放，WebSocket 收到对应事件 |
-| P5 | 不用手机完成配对：App 作为 zeroconf 发送方交给 Soloist 凭据 | 可选，失败也不阻塞，退回手机配对 |
+| P1 ✅ | Omarchy 上运行 Soloist，`--ws 127.0.0.1:0`，用 Go 连上 WebSocket | 能收到 `auth_state` 和 `playback_state` |
+| P2 ✅ | 首次配对：手机 App 选中 Soloist 后，重启 Soloist 会话仍在 | 重启后 `logged_in: true` |
+| P3 ✅ | Web API PKCE，用自己的 client ID 登录 | 拿到 token，能调 `/me/playlists` 和 `/search` |
+| P4 ✅ | Web API `PUT /me/player/play`，带 `context_uri` + `offset` + Soloist 的 `device_id` | 从歌单第 N 首开始播放，WebSocket 收到对应事件 |
+| P5 ⏸ 推迟 | 不用手机完成配对：App 作为 zeroconf 发送方交给 Soloist 凭据 | 可选，失败也不阻塞，退回手机配对 |
 | P6 | 用 `position_sync` 在本地插值进度，和实际声音对比 | 误差 ≤ 100 ms，歌词同步够用 |
 | P7 | 资源：Soloist 播放时的 PSS 和 CPU，是否强制响度均衡、seek 延迟 | 记录数据，写进 `docs/BENCHMARK.md` |
 | P8 | Apple Silicon 的 Mac 上重复 P1、P4 | 通过 |
-| P9 | API key 怎么交给 Soloist 才不出现在 `ps` 里 | 找到一种可行方式 |
+| P9 ❌ 见 POC.md | API key 怎么交给 Soloist 才不出现在 `ps` 里 | 找到一种可行方式 |
 
-**退出条件**：P1–P4、P6、P7 通过；P5、P8、P9 有结论。
+**退出条件**：P1–P4、P6、P7 通过；P5、P8、P9 有结论。进展见 [docs/POC.md](docs/POC.md)。
 
 ---
 
