@@ -37,7 +37,7 @@
 - [x] 界面全部改为只依赖接口，能在假数据下运行和测试
 - [ ] 音频可视化（播放条音柱、刘海音柱、背景随低音起伏的雾）：Soloist 不提供音频数据，`Levels()` 暂无数据，界面退回空闲动画；以后考虑按节奏模拟
 - [x] 测试规范沿用 cloudmusic 的 `AGENTS.md`（测试改用 `stubLib` 和播放器夹具）
-- [ ] CI：`go test ./...`，Linux 和 macOS 都要 `CGO_ENABLED=0` 交叉编译通过
+- [x] CI：`go test ./...`，Linux 和 macOS 都要 `CGO_ENABLED=0` 交叉编译通过（`.github/workflows/ci.yml`）
 - [ ] 在假数据上重建截图工具（原 `debug_shots.go` 依赖网易云日推，已删除）
 
 **退出条件**：`go tool mygo dev` 能在假数据下打开完整外壳；测试全部通过。
