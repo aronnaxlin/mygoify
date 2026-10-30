@@ -353,10 +353,17 @@ func (a *app) playerBar(c *ui.Context) {
 	// The controls keep the middle, between sides that share what is left:
 	// narrower, the middle gives up to 140 DIPs, and what plays keeps room
 	// for its cover, some of its title and its heart.
+	// Compact, as tiled on half a screen, what plays keeps its cover and
+	// its heart, its title cut short, and the controls give up their width.
 	const controls = 3*32 + 2*4 // lyrics, queue and the speaker
-	ui.Row(c).Absolute().Left(0).Right(0).Bottom(0).Height(playerBarHeight).PaddingX(20).Gap(20).AlignItems(ui.Center).Children(func() {
+	pad, gap, playing, middle := float32(20), float32(20), float32(150), float32(300)
+	compact := narrow(c)
+	if compact {
+		pad, gap, playing, middle = 16, 12, 80, 220
+	}
+	ui.Row(c).Absolute().Left(0).Right(0).Bottom(0).Height(playerBarHeight).PaddingX(pad).Gap(gap).AlignItems(ui.Center).Children(func() {
 		// What plays.
-		ui.Row(c).Grow(1).Basis(0).MinWidth(150).Children(func() {
+		ui.Row(c).Grow(1).Basis(0).MinWidth(playing).Children(func() {
 			if tr == nil {
 				ui.Row(c).Gap(12).AlignItems(ui.Center).Children(func() {
 					ui.Box(c).Size(48, 48).Radius(8).Background(p.hover).Center().Children(func() {
@@ -366,7 +373,7 @@ func (a *app) playerBar(c *ui.Context) {
 				})
 				return
 			}
-			info := ui.ButtonBase(c.Key("info")).Gap(12).AlignItems(ui.Center).FocusRing(false).Shrink(1).MinWidth(0).Label("打开正在播放")
+			info := ui.ButtonBase(c.Key("info")).Gap(12).AlignItems(ui.Center).FocusRing(false).Shrink(1).MinWidth(48).Label("打开正在播放")
 			hovered := info.Hovered()
 			info.Children(func() {
 				ui.Box(c).Size(48, 48).Shrink(0).Children(func() {
@@ -378,7 +385,13 @@ func (a *app) playerBar(c *ui.Context) {
 						})
 					}
 				})
-				ui.Column(c).Shrink(1).MinWidth(0).Gap(3).Children(func() {
+				// Compact, it would show little more than an ellipsis: the
+				// sidebar's card names what plays.
+				about := ui.Column(c).Shrink(1).MinWidth(0).Gap(3)
+				if compact {
+					about.Invisible()
+				}
+				about.Children(func() {
 					ui.Text(c, tr.Name).FontSize(13.5).FontWeight(600).SingleLine()
 					// What it is waiting on shows in place of the artists.
 					var sub string
@@ -403,7 +416,7 @@ func (a *app) playerBar(c *ui.Context) {
 		})
 
 		// Controls over the progress.
-		ui.Column(c).Width(440).Shrink(1).MinWidth(300).Gap(0).AlignItems(ui.Stretch).Children(func() {
+		ui.Column(c).Width(440).Shrink(1).MinWidth(middle).Gap(0).AlignItems(ui.Stretch).Children(func() {
 			a.transport(c, p.text, p.muted, p.accent, 18)
 			ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(-4, 0, 0, 0).Children(func() {
 				ui.Text(c, clock(pl.Position())).FontSize(10.5).FontFeatures("tnum").TextColor(p.faint).Width(34).TextAlign(ui.End)

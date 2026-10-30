@@ -12,6 +12,27 @@ import (
 
 const sidebarWidth = 232
 
+// narrowWidth is the width of the content, right of the sidebar, under
+// which the pages and the player bar draw themselves compact: a tiling
+// window manager gives a window half a screen, which may be as little as
+// MinWidth.
+const narrowWidth = 640
+
+// narrow reports whether the content is narrower than narrowWidth.
+func narrow(c *ui.Context) bool {
+	w, _ := c.Size()
+	return w-sidebarWidth < narrowWidth
+}
+
+// headerArt is how wide a page's cover, or an artist's photo, is in its
+// header.
+func headerArt(c *ui.Context) float32 {
+	if narrow(c) {
+		return 160
+	}
+	return 212
+}
+
 func (a *app) view(c *ui.Context) {
 	t := *c.Theme()
 	a.pal = paletteFor(&t)
