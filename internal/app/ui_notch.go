@@ -7,8 +7,8 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
-	"netease-music-mygo/internal/netease"
-	"netease-music-mygo/internal/player"
+	"mygoify/internal/netease"
+	"mygoify/internal/player"
 )
 
 // notch is the quick player around the camera housing at the top of the

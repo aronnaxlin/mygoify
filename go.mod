@@ -1,4 +1,4 @@
-module netease-music-mygo
+module mygoify
 
 go 1.27.3
 

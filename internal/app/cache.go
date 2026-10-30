@@ -6,7 +6,7 @@ import (
 
 	"github.com/egoist/mygo"
 
-	"netease-music-mygo/internal/player"
+	"mygoify/internal/player"
 )
 
 // newSongCache returns the cache of songs played, in the app's cache

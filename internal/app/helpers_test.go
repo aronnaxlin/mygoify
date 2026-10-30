@@ -1,8 +1,8 @@
 package app
 
 import (
-	"netease-music-mygo/internal/netease"
-	"netease-music-mygo/internal/player"
+	"mygoify/internal/netease"
+	"mygoify/internal/player"
 )
 
 func newTestApp() *app {

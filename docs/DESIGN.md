@@ -1,0 +1,217 @@
+# mygo-spotify 设计文档
+
+> 状态：草案 v0.1（2026-10-30）。App 名称已定为 **MyGoify**（仓库 `aronnaxlin/mygoify`）
+> 范围：第一版（v1.0）只做音乐：播放、歌单、搜索、曲库、歌词。不做播客、有声书。
+
+## 1. 目标与非目标
+
+**目标**
+
+- 一个原生界面的第三方 Spotify 桌面客户端，界面和交互沿用 [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)，用 [MyGo](https://github.com/egoist/mygo) 原生 UI，不用 WebView。
+- 低内存：Linux 上窗口打开时界面进程 PSS ≤ 200 MB；只在后台播放时，常驻内存只有播放引擎（约 60 MB）。对照：官方桌面客户端约 912 MB。
+- 平台：**Omarchy（Hyprland / Wayland）为主**，**Apple Silicon 的 macOS** 为辅。
+- 合规：只用 Spotify 官方提供的播放引擎和公开 API，不碰 DRM。
+
+**非目标（v1 不做）**
+
+- 播客、有声书、评论、动态、用户主页。
+- 下载、导出、离线缓存音频文件。**永远不做**，见 §9。
+- 自己解码和播放音频。v1 不做，go-librespot 只作为 v1 之后的备用后端，见 §4.4。
+- Intel Mac。Soloist 没有 Intel Mac 版本。
+- Windows。Soloist 和 MyGo 都支持 Windows，但 v1 不测试、不发布。
+
+## 2. 背景：为什么是这套架构
+
+调研结论（详见对话记录，以下只记结论）：
+
+| 方案 | 结论 |
+|---|---|
+| go-librespot 放进同一进程播放 | **不选作主力**。2025 年底起，新账号和部分曲目取不到旧的 AES 音频密钥（[go-librespot #279](https://github.com/devgianlu/go-librespot/issues/279)、[librespot #1649](https://github.com/librespot-org/librespot/issues/1649)，2026-10 仍未解决）。唯一的修法是 PlayPlay DRM，有 DMCA 风险。 |
+| **Spotify Soloist**（2026-08 官方发布） | **选为播放后端**。官方无头 Connect 播放器，和官方 App 同一个引擎，支持无损，Linux、Apple Silicon Mac、Windows 都有版本，带本地 WebSocket API。 |
+| 官方 Web API（开发模式） | **选为数据层**。2026 年 2 月起限制很多（§5.3），但搜索、曲库、歌单、播放控制都还能用。 |
+| Omarchy-Spotify（QML 插件） | 作为参考，借鉴它的限流、授权、Connect 处理经验。它只支持 Omarchy；我们的定位是跨平台的独立 App。 |
+
+## 3. 总体架构
+
+```
+┌──────────────────────────── mygo-spotify（Go，单个二进制）───────────────────────────┐
+│  internal/app       界面（沿用 cloudmusic）：页面、播放条、正在播放、歌词、设置        │
+│        │ 只依赖下面两个接口                                                           │
+│  internal/library   数据：Web API 客户端 + 限流 + 缓存 + 模型                          │
+│  internal/playback  播放：Backend 接口 ── soloist 实现（v1）/ librespot 实现（v1 之后） │
+│  internal/lyrics    歌词：解析器沿用 cloudmusic；数据源 LRCLIB                          │
+│  internal/auth      PKCE 登录、token 刷新、凭据存进系统钥匙串                           │
+└───────────────┬──────────────────────────────────────┬────────────────────────────┘
+                │ HTTPS（Web API）                     │ WebSocket ws://127.0.0.1:<port>
+                ▼                                      ▼
+        api.spotify.com                       soloist（官方二进制，独立进程，用户级服务）
+                                                       │ PipeWire / CoreAudio
+                                                       ▼
+                                                      声卡
+```
+
+**关键原则**
+
+1. **播放和界面分属两个进程。** Soloist 常驻，界面随用随开。关掉界面，音乐继续放。这是低内存的来源。
+2. **界面不直接碰 Web API 或 WebSocket**，只通过 `library` 和 `playback` 两个接口。测试时替换这两个接口，沿用 cloudmusic 用包级变量替换网络的测试写法。
+3. **播放状态以 Soloist 为准。** 队列、进度、随机和循环都在 Soloist 那边，界面只做显示和发命令，自己不维护队列。这一点和 cloudmusic 不同。
+
+## 4. 播放层（internal/playback）
+
+### 4.1 接口
+
+```go
+type Backend interface {
+	// PlayContext 从 context（专辑、歌单、艺人）里 offset 指定的那首开始播。
+	// offset 为空时从头播。
+	PlayContext(ctx context.Context, contextURI, offsetURI string) error
+	// PlayTracks 播放一组曲目（筛选、排序后的列表；Web API 一次最多 100 首）。
+	PlayTracks(ctx context.Context, uris []string, offset int) error
+	Resume() error
+	Pause() error
+	Next() error
+	Previous() error
+	Seek(pos time.Duration) error
+	SetVolume(v float64) error // 0–1
+	SetShuffle(on bool) error
+	SetRepeat(mode RepeatMode) error
+	AddToQueue(uri string) error
+
+	// State 返回最新状态；Changed 在状态变化时（主线程上）通知界面。
+	State() State
+	Queue() Queue
+	Changed(func())
+}
+```
+
+`State` 里的 `Position` 由 Soloist 推送的 `position_ms` + `timestamp_ms` + `speed` 在本地插值，歌词和进度条都读它，不轮询。
+
+### 4.2 Soloist 实现
+
+**进程管理**
+- Soloist 作为**用户级服务**运行：Linux 用 systemd user unit，macOS 用 launchd agent。由 App 安装，默认不开机自启，App 启动时拉起，这一点参考 Omarchy-Spotify。
+- 启动参数：`--device-name`、`--api-key`、`--data-dir`、`--cache-dir`、`--ws 127.0.0.1:0`。端口用 0 让系统分配，实际地址从 data-dir 里的 `ws.addr` / `ws.port` 读。
+- API key 存在系统钥匙串里，用 mygo 的凭据存储，不写进 unit 文件和命令行历史。启动方式待定，见 §10 问题 4。
+- 版本 90 天过期，过期时进程以退出码 `10` 退出。App 识别这个退出码，提示更新。
+- **获取 Soloist：** Spotify 不允许再分发二进制。App 内的引导页提供"从 Spotify 官方 CDN 下载"按钮，下载前需要用户确认；也可以让用户自己指定已下载的二进制路径。App 安装包里不带 Soloist。
+
+**命令分工**（根据 WebSocket API 的能力决定）
+
+| 操作 | 通道 | 原因 |
+|---|---|---|
+| 播放 context 里的某一首 | Web API `PUT /me/player/play`（`context_uri` + `offset` + `device_id`） | WebSocket 的 `play` 只能传一个 URI，不能指定 offset |
+| 播放一组曲目 | Web API `PUT /me/player/play`（`uris`，最多 100 首） | 同上 |
+| 暂停、继续、上一首、下一首、seek、音量、随机、循环、加入队列 | WebSocket | 本地通道，不消耗 Web API 配额，延迟低 |
+| 状态、进度、队列 | WebSocket 事件（`playback_state`、`position_sync`、`queue_changed`） | 推送，不轮询 |
+
+`device_id` 来自 `GET /me/player/devices`，按设备名匹配 Soloist。命令发出后的结果以后续的 `playback_changed` 事件为准；`command_result` 只表示命令已派发。
+
+**首次配对**
+- Soloist 要先在 Spotify Connect 里登录一次。默认流程：引导用户在同一局域网的手机 App 里选中这个设备播放一次，之后会话保存在 `--data-dir`。
+- 待验证的改进：App 自己当 zeroconf 发送方，把 Web API 的 access token 交给 Soloist 完成配对，不需要手机（Omarchy-Spotify 对 access-token 类型的接收端就是这样做的）。见 PoC P4。
+
+**WebSocket 安全**
+- WebSocket 没有任何认证，只绑定 `127.0.0.1`。
+- 连接时校验 data-dir 里的 `ws.port`，并确认端口属于我们拉起的那个 Soloist 进程。
+
+### 4.3 后台控制（v1.1）
+
+界面关掉以后，媒体键、Waybar、`playerctl` 需要 MPRIS 才能控制，但 Soloist 本身不提供 MPRIS。
+
+- v1：关窗口默认**缩到托盘**，界面进程仍在，MPRIS 由 mygo 的 Now Playing 提供。代价是常驻约 190 MB。
+- v1.1：加一个极小的 `mygo-spotify-agent`（纯 Go、无界面）。它连 Soloist 的 WebSocket，导出 MPRIS（macOS 上是 Now Playing）。之后关窗口就让界面进程直接退出，常驻目标 ≤ 80 MB（Soloist + agent）。
+
+### 4.4 备用后端（v1 之后）
+
+把 go-librespot 裁剪成纯 Go：切掉 `session → events/impl → player` 引入的 cgo 解码器，用 mygo 的 `audio/vorbis` 解码。实现同一个 `Backend` 接口，给 Intel Mac、不想装 Soloist 的用户用，明确标注"部分账号或曲目可能无法播放"。
+
+## 5. 数据层（internal/library）
+
+### 5.1 授权（internal/auth）
+
+- Authorization Code + **PKCE**，回调地址是 `http://127.0.0.1:<固定端口>/callback`，需要用户在 Dashboard 里登记。
+- **用户自己的 client ID**：用户本来就要注册 Spotify for Developers 来拿 Soloist 的 key，引导页顺便带着建一个应用。这样不和别人共用配额，也避开了共享 ID 被限流的问题。**不内置共享 client ID。**
+- 不用 librespot 的内部 token 调 Web API，有人遇到过 `Retry-After: 86400`，也就是要等一整天。
+- refresh token 存在系统钥匙串里；access token 只放内存，过期前刷新。
+- scope 只申请用到的：`user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-recently-played user-top-read user-library-read user-library-modify playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public`。不申请 email 和 profile。
+
+### 5.2 请求管线
+
+```
+调用方 → 去重（相同请求共用一个 pending）→ 缓存（内存 LRU + 磁盘）→ 限流器 → HTTP
+```
+
+- **429 处理**：在 `Retry-After` 的基础上加 10–30% 抖动再重试，最多 4 次；body 里 `reason: QUOTA_EXCEEDED` 时**不重试**，界面提示配额已用完。全局冷却期间，所有新请求排队，不并发重试。
+- **合并请求**：拖动音量、seek 走 WebSocket，不占 Web API；需要走 Web API 的连续操作合并成一次，间隔不低于 250 ms。
+- **缓存**：专辑、艺人、曲目元数据缓存 24 小时；歌单按 `snapshot_id` 判断是否失效；空结果也缓存，避免反复请求。
+- **批量接口已删除**：只能逐个按 ID 取，所以并发上限设为 4，能用列表接口里带的字段就不再单独请求。
+
+### 5.3 2026 年开发模式的限制，以及界面怎么应对
+
+依据[官方迁移指南](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide)和 [7 月配额更新](https://developer.spotify.com/blog/2026-07-23-web-api-quota-updates)：
+
+| 限制 | 界面上的处理 |
+|---|---|
+| 搜索每页最多 10 条 | 每类结果先显示 10 条，"显示更多"用 offset 翻页 |
+| 别人的歌单（包括 Daily Mix 等官方生成的歌单）不返回曲目 | 歌单页显示封面、名称、描述和**播放按钮**，曲目区域说明原因；播放走 `context_uri` |
+| `artists/{id}/top-tracks` 已删除 | 艺人页的"热门"用 `search?q=artist:"名字"&type=track` 拼出来，并注明来源 |
+| `browse/new-releases`、`browse/categories` 已删除 | 首页不做"浏览"区，改成：最近播放、常听艺人和曲目、我的歌单 |
+| `GET /users/{id}`、`/users/{id}/playlists` 已删除 | 不做用户主页 |
+| `/me` 不返回 `product` | 无法判断是否 Premium，以 Soloist 能不能播为准 |
+| 库操作改成 `PUT/DELETE /me/library`，参数是 URI | 喜欢、取消喜欢统一走它 |
+| 所有 client ID 共用开发者账号的配额 | 设置页显示最近一次 429 的时间和原因 |
+
+## 6. 界面：从 cloudmusic 迁移
+
+| cloudmusic 文件 | 处理 | 说明 |
+|---|---|---|
+| `ui_kit` `ui_main` `ui_skeleton` `ui_pages` `menu` `icons` `tray` `updates` `settings` | **保留** | 外壳、组件、导航、托盘、自动更新 |
+| `ui_player` `ui_nowplaying` `ui_cover` `backdrop` `artwork` | **保留**，数据源换成 `playback.State` | 播放条、正在播放、封面、背景 |
+| `ui_wall` | **保留**，队列来自 Soloist 的 `queue_changed` | 队列封面墙 |
+| `ui_stage` `ui_stage_styles` | **保留**（M5） | 歌词舞台 |
+| `ui_album` `ui_artist` | **改造** | 艺人页去掉动态，热门改用搜索拼出来 |
+| `ui_search` | **改造** | 去掉"用户、播客"两类；按回车才搜，不做输入时实时搜索（省配额） |
+| `ui_like` `ui_songmenu` `ui_playlistedit` | **改造** | 歌单只有自己的或协作的才能编辑 |
+| `ui_account` | **重写** | 换成引导页：client ID → 登录 → Soloist 下载和 key → 配对 |
+| `session` | **简化** | 只保存最后打开的页面；播放进度由 Soloist 自己恢复 |
+| `notch_darwin` `ui_notch` | **保留**（仅 macOS） | 刘海播放器 |
+| `ui_comments` `ui_quiet` `ui_events` `ui_user` `ui_podcast` `ui_captions` `captions` `ui_radio` `ui_daily` `ui_suggest` `pickup` | **删除** | 没有对应的数据，或者属于播客 |
+| `internal/netease` `internal/speech` | **删除** | |
+| `internal/player` | **删除**，只把队列显示相关的逻辑挪进 `playback` | 解码、流、缓存、淡入淡出都由 Soloist 负责 |
+| `internal/lyrics` | **保留**解析器，换数据源 | |
+
+## 7. 歌词（internal/lyrics）
+
+- 数据源：[LRCLIB](https://lrclib.net)（开放的歌词库，无需 key），用 `track_name + artist_name + album_name + duration` 精确匹配，匹配不到再搜索；优先用逐行同步的 `syncedLyrics`。
+- 不使用 Spotify 内部的 color-lyrics 接口（非公开，需要内部 token）。
+- 逐字高亮只在 LRC 带增强时间戳时启用；否则舞台按整行动画。
+- 歌词按曲目 ID 缓存到磁盘，查不到的结果也缓存，7 天后重试。
+
+## 8. 平台
+
+| | Omarchy / Linux | macOS（Apple Silicon） |
+|---|---|---|
+| 界面 | MyGo 原生 UI，GTK3 + OpenGL | MyGo 原生 UI，Metal |
+| 播放 | Soloist（x86_64 / aarch64，PipeWire） | Soloist（osx_arm64，macOS 13+） |
+| Soloist 服务 | systemd user unit | launchd agent |
+| 系统媒体控制 | MPRIS（mygo 内置；v1.1 由 agent 提供） | Now Playing（同上） |
+| 特有功能 | Hyprland 快捷键说明；跟随 Omarchy 主题（v1 之后） | 刘海播放器 |
+| 凭据存储 | libsecret / GNOME Keyring | 钥匙串 |
+| 安装 | mygo 的 `install.sh`（用户级）、`.tar.gz` | `.dmg`（签名和公证需要 Apple 开发者账号） |
+
+## 9. 合规与风险
+
+- **许可证**：沿用 cloudmusic 的代码，所以整个项目是 **AGPL-3.0**，保留原作者署名。备用后端用到的 go-librespot 是 GPL-3.0，与 AGPL-3.0 兼容。
+- **命名**：Spotify 的开发者条款和品牌规范不允许 App 名称里包含 "Spotify"。App 名称为 MyGoify。
+- **红线**：不实现 PlayPlay，不做任何形式的音频下载或导出，不缓存明文音频。Spotify 下架过的 SpotiFLAC、EeveeSpotify、SpotifyDL 都越过了这些线。
+- **外部依赖风险**：
+  - Soloist 是新产品，Spotify 可能改条款或停止提供 → 播放层用接口隔离，保留 §4.4 的备用后端。
+  - Web API 开发模式可能继续收紧 → 数据层集中在 `library` 一个包里，方便应对。
+  - Soloist 社区反馈有强制响度均衡、偶尔卡顿 → 在 PoC 阶段实测。
+
+## 10. 待决定的问题
+
+1. ~~App 显示名~~：已定为 MyGoify。
+2. ~~代码来源~~：已 fork 为 aronnaxlin/mygoify，保留 git 历史，`upstream` 指向原仓库。
+3. **Soloist 下载**：App 内一键从官方 CDN 下载算不算"再分发"？我的理解是不算，因为二进制直接从 Spotify 下载。但条款原文只说了 "link to Downloads and updates"。保守做法是 v1 只给链接，加上"选择已下载的文件"。
+4. **API key 怎么交给 Soloist**：作为命令行参数传入时，同机用户能在 `ps` 里看到。要确认 Soloist 是否直接读取 `SOLOIST_API_KEY` 环境变量，或者支持从文件读取。PoC 阶段确认。

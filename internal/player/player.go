@@ -9,8 +9,8 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/audio"
 
-	"netease-music-mygo/internal/lyrics"
-	"netease-music-mygo/internal/netease"
+	"mygoify/internal/lyrics"
+	"mygoify/internal/netease"
 )
 
 type RepeatMode int
