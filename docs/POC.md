@@ -13,8 +13,8 @@ ROADMAP M0 各项验证的结果。代码在 `cmd/poc`。
 | P3 | Web API PKCE，用自己的 client ID 登录 | **通过**。DESIGN §5.1 的 11 个 scope 全部授予；`/me/playlists`、`/playlists/{id}/items`、`/search` 可用 |
 | P4 | `PUT /me/player/play`（`context_uri` + `offset` + `device_id`）让 Soloist 从歌单第 N 首开始播 | **通过**，确认有声音。Web API 0.5 s 接受，约 2.0 s 后 Soloist 推送 `playing`，context 是整个歌单。Soloist 不是当前设备时也能直接用 `device_id` 播 |
 | P5 | 不用手机配对 | **推迟**。Soloist 的 zeroconf `tokenType` 是 `default`，不是 access token，要先有 librespot 那样的可复用凭据才能交给它 |
-| P6 | 进度插值的精度 | 待测 |
-| P7 | 资源占用 | 空闲且已登录：主进程 PSS 42 MB + crashpad 辅助进程 14 MB ≈ **56 MB**。播放时待测 |
+| P6 | 进度插值的精度 | **基本通过**。连续播放 60 s，61 次进度推送：相邻推送之间外推的偏差 ≤ 1 ms；`timestamp_ms` 与本机时钟之差中位数 0.8 ms（最大 40.6 ms，为送达延迟），可直接用本机时钟插值。到耳朵的音频输出延迟没有测，M5 做歌词时用耳朵核对，必要时加固定补偿 |
+| P7 | 资源占用 | **通过**。空闲且已登录：PSS ≈ **56 MB**（主进程 42 + crashpad 辅助进程 14）。播放时：PSS **62.5 MB**，60 s 内不增长；CPU **0.85%** 单核。PipeWire 输出流名 `spotify`，44.1 kHz。响度均衡和 seek 延迟未测 |
 | P8 | Apple Silicon 的 Mac | 待测，需要 Mac |
 | P9 | API key 不出现在 `ps` 里 | **不通过**。Soloist 只接受 `-k` 参数，不读环境变量，key 会出现在 `/proc/<pid>/cmdline` 里，同机其他用户可见 |
 
