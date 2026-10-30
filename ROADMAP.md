@@ -31,10 +31,12 @@
 - [x] Fork `egoist/mygo-cloudmusic` 为 `aronnaxlin/mygoify`，保留历史；改模块名、`mygo.json`（显示名、identifier、slug、更新公钥）
 - [ ] 新图标；官网（`website/`）改造或删除
 - [x] 删除评论、热评、播客、字幕和语音识别（`speech`）、私人 FM 和心动模式、日推、用户页、动态、搜索建议的界面和代码（DESIGN §6）
-- [ ] 删除 `netease`、`player`（随下面的接口替换完成）
-- [ ] 新建 `internal/playback`（接口 + 测试用假实现）、`internal/library`、`internal/auth`
-- [ ] 界面全部改为只依赖接口，能在假数据下运行和测试
-- [ ] 测试规范沿用 cloudmusic 的 `AGENTS.md`
+- [x] 删除 `netease`、`player`（随下面的接口替换完成）
+- [x] 新建 `internal/music`（数据模型）、`internal/library`、`internal/playback`（接口 + 假实现）
+- [ ] 新建 `internal/auth`（PKCE，从 `cmd/poc` 挪入）
+- [x] 界面全部改为只依赖接口，能在假数据下运行和测试
+- [ ] 音频可视化（播放条音柱、刘海音柱、背景随低音起伏的雾）：Soloist 不提供音频数据，`Levels()` 暂无数据，界面退回空闲动画；以后考虑按节奏模拟
+- [x] 测试规范沿用 cloudmusic 的 `AGENTS.md`（测试改用 `stubLib` 和播放器夹具）
 - [ ] CI：`go test ./...`，Linux 和 macOS 都要 `CGO_ENABLED=0` 交叉编译通过
 - [ ] 在假数据上重建截图工具（原 `debug_shots.go` 依赖网易云日推，已删除）
 
