@@ -33,7 +33,7 @@
 - [x] 删除评论、热评、播客、字幕和语音识别（`speech`）、私人 FM 和心动模式、日推、用户页、动态、搜索建议的界面和代码（DESIGN §6）
 - [x] 删除 `netease`、`player`（随下面的接口替换完成）
 - [x] 新建 `internal/music`（数据模型）、`internal/library`、`internal/playback`（接口 + 假实现）
-- [ ] 新建 `internal/auth`（PKCE，从 `cmd/poc` 挪入）
+- [x] 新建 `internal/auth`（PKCE，从 `cmd/poc` 挪入；接入 App 和存进钥匙串在 M2）
 - [x] 界面全部改为只依赖接口，能在假数据下运行和测试
 - [ ] 音频可视化（播放条音柱、刘海音柱、背景随低音起伏的雾）：Soloist 不提供音频数据，`Levels()` 暂无数据，界面退回空闲动画；以后考虑按节奏模拟
 - [x] 测试规范沿用 cloudmusic 的 `AGENTS.md`（测试改用 `stubLib` 和播放器夹具）
