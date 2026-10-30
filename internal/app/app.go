@@ -7,15 +7,15 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
-	"mygoify/internal/player"
+	"mygoify/internal/library"
+	"mygoify/internal/music"
+	"mygoify/internal/playback"
 )
 
 type pageKind int
 
 const (
 	pageHome pageKind = iota
-	pageCharts
 	pagePlaylist
 	pageSearch
 	pageArtist
@@ -25,10 +25,10 @@ const (
 type route struct {
 	page pageKind
 	// id is the playlist, artist or album the page shows.
-	id int64
+	id string
 	// query and kind are what a search page searched for.
 	query string
-	kind  netease.SearchType
+	kind  music.SearchType
 }
 
 // app is the state both windows show. Everything in it is read and changed
@@ -38,35 +38,34 @@ type app struct {
 	notch *notch
 	tray  *mygo.Tray // the icon in the menu bar or notification area, while it shows
 	art   *artCache
-	pl    *player.Player
+	lib   library.Library
+	pl    *playback.Player
 	pal   palette
 
 	route   route
 	history []route
 	forward []route // the pages gone back from, the last first to go to
 
-	profile      *netease.Profile
-	mine, saved  []netease.Playlist // the listener's playlists: made, and saved
-	recPlaylists []netease.Playlist // the day's playlists picked for the listener
-	login        loginState
-	accountOpen  bool           // the dropdown of the account row shows
-	naming       nameDialog     // the name of a playlist asked for
-	deleting     deleteDialog   // whether to delete a playlist, asked
-	liked        map[int64]bool // the songs the listener likes
-	toast        string         // a message to show once
+	profile     *music.User
+	mine, saved []music.Playlist // the listener's playlists: made, and saved
+	login       loginState
+	accountOpen bool            // the dropdown of the account row shows
+	naming      nameDialog      // the name of a playlist asked for
+	deleting    deleteDialog    // whether to delete a playlist, asked
+	liked       map[string]bool // the songs the listener likes
+	toast       string          // a message to show once
 
-	featured    []netease.Playlist
-	charts      []netease.Playlist
+	home        music.Home
 	homeErr     string
 	homeLoading bool
 	homeAt      time.Time // when what the home page shows was asked for
 
-	playlists map[int64]*netease.Playlist
-	loadingPl map[int64]bool
-	plErr     map[int64]string
-	artists   map[int64]*artistData
+	playlists map[string]*music.Playlist
+	loadingPl map[string]bool
+	plErr     map[string]string
+	artists   map[string]*artistData
 	artistTab int // what an artist's page lists: artistHot, artistLatest or artistAlbums
-	albums    map[int64]*albumData
+	albums    map[string]*albumData
 	trackList ui.ListState
 	// Where the page and the sidebar are scrolled, kept while Now Playing
 	// covers them, unbuilt.
@@ -89,7 +88,8 @@ type app struct {
 	lyricScroll ui.ScrollState
 	lyricGlide  lyricGlide
 	lyricAt     int
-	lyricTrack  int64
+	lyricTrack  string
+	lyr         lyricsState // the lyrics of the track playing
 	queueList   ui.ListState
 	queueAt     int // the row of the queue pane last scrolled to, -1 while it is hidden
 
@@ -114,12 +114,7 @@ type app struct {
 
 	settings    settings
 	settingsWin *mygo.Window
-	cacheUsed   int64 // the bytes the song cache takes, -1 until measured
-	updates     bool  // the update plugin is used (useUpdater)
-
-	restored     bool   // playback picked up where it was left
-	savedSession string // the session as last kept
-	sessionDue   bool   // a save of the session is due
+	updates     bool // the update plugin is used (useUpdater)
 }
 
 // post runs fn on the main thread and redraws both windows. Without a
@@ -161,17 +156,17 @@ func (a *app) showMain() {
 // Run runs the app until it quits.
 func Run() error {
 	a := &app{
-		playlists: map[int64]*netease.Playlist{},
-		loadingPl: map[int64]bool{},
-		plErr:     map[int64]string{},
-		artists:   map[int64]*artistData{},
-		albums:    map[int64]*albumData{},
+		playlists: map[string]*music.Playlist{},
+		loadingPl: map[string]bool{},
+		plErr:     map[string]string{},
+		artists:   map[string]*artistData{},
+		albums:    map[string]*albumData{},
 		searches:  map[route]*searchData{},
 		lyricAt:   -1,
 		queueAt:   -1,
-		cacheUsed: -1,
+		// Spotify answers in M2 and M3: until then, made-up music.
+		lib: library.NewFake(),
 	}
-	moveOldData()
 	a.useUpdater()
 	mygo.App.WhenReady(func() {
 		a.settings = loadSettings()
@@ -180,11 +175,9 @@ func Run() error {
 		// Before the window: on Windows it lays out its content as it is
 		// made, and the view asks the player what plays.
 		a.art = newArtCache(a.post)
-		a.pl = player.New(a.post)
-		a.pl.Quality = func() string { return a.settings.Quality }
-		a.pl.Normalize = func() bool { return a.settings.Normalize }
-		a.pl.Cache = newSongCache(a.settings.CacheMB)
-		a.pl.Changed = a.keepSession
+		a.pl = playback.New(a.post, playback.NewFake())
+		a.pl.Artwork = fetchArt
+		a.pl.Changed = a.playbackChanged
 		a.volume = a.settings.Volume
 		a.pl.SetVolume(a.volume)
 		a.win = mygo.NewWindow(mygo.WindowOptions{
@@ -241,7 +234,6 @@ func Run() error {
 		a.quitting = true
 		a.settings.Volume = a.volume
 		a.settings.save()
-		a.saveSession()
 	})
 	// Windows leaves an icon in the notification area after its app until
 	// the pointer passes over it.

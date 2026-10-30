@@ -10,10 +10,9 @@ import (
 	"time"
 
 	"github.com/egoist/mygo"
-	"github.com/egoist/mygo/audio"
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // The notch, turned off, shows itself as the first song plays, and only
@@ -26,15 +25,12 @@ func TestNotchGreetsOnce(t *testing.T) {
 	a.settings = defaultSettings()
 	n := &notch{a: a, w0: 200, h0: 32, winW: notchOpenW + 60, winH: 240}
 	a.notch = n
-	a.pl.Cue([]netease.Track{{ID: 7, Name: "宝船", Duration: 200000}})
+	a.pl.Cue([]music.Track{{ID: "7", Name: "宝船", Duration: 200000}})
 	a.syncWindows()
 	if n.hello {
 		t.Fatal("greeted before the song played")
 	}
-	out := audio.NewPlayer(&silence{})
-	out.SetVolume(0)
-	a.pl.Attach(out)
-	defer out.Close()
+	a.pl.Start()
 	a.syncWindows()
 	if !n.hello || !a.settings.NotchGreeted {
 		t.Fatal("did not greet as the song played")
@@ -52,8 +48,8 @@ func TestNotchGreetsOnce(t *testing.T) {
 
 	// Turned off again, it does not greet the next song.
 	a.settings.Notch = false
-	a.pl.Cue([]netease.Track{{ID: 8, Name: "下一首", Duration: 200000}})
-	a.pl.Attach(out)
+	a.pl.Cue([]music.Track{{ID: "8", Name: "下一首", Duration: 200000}})
+	a.pl.Start()
 	a.syncWindows()
 	if n.hello {
 		t.Error("greeted twice")
@@ -71,7 +67,7 @@ func TestNotchGreetingKeptUnderPointer(t *testing.T) {
 	a.settings = defaultSettings()
 	n := &notch{a: a, real: true, w0: 185, h0: 32, winW: notchOpenW + 60, winH: 240}
 	a.notch = n
-	a.pl.Cue([]netease.Track{{ID: 7, Name: "宝船", Duration: 200000}})
+	a.pl.Cue([]music.Track{{ID: "7", Name: "宝船", Duration: 200000}})
 	n.greet()
 	if !n.hello {
 		t.Fatal("did not greet")
@@ -114,7 +110,7 @@ func TestFirstUseFrames(t *testing.T) {
 	a.settings = defaultSettings()
 	n := &notch{a: a, real: true, w0: 185, h0: 32, winW: notchOpenW + 60, winH: 240}
 	a.notch = n
-	a.pl.Cue([]netease.Track{{ID: 7, Name: "NAINAINAI", Artists: []netease.Artist{{Name: "ATARASHII GAKKO!"}}, Duration: 193877}})
+	a.pl.Cue([]music.Track{{ID: "7", Name: "NAINAINAI", Artists: []music.Artist{{Name: "ATARASHII GAKKO!"}}, Duration: 193877}})
 	main := ui.NewTester(a.view, 1200, 800) // for the app's colors
 	main.Frame()
 	tt := ui.NewTester(n.view, int(n.winW), int(n.winH))

@@ -11,7 +11,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // wallApp is an app showing the wall of a queue of n songs, the at-th
@@ -19,15 +19,15 @@ import (
 func wallApp(t *testing.T, n, at int) (*app, *ui.Tester) {
 	a := newTestApp()
 	a.settings = defaultSettings()
-	var tracks []netease.Track
+	var tracks []music.Track
 	for i := range n {
-		tracks = append(tracks, netease.Track{ID: int64(i + 1), Name: fmt.Sprintf("歌%03d", i), Duration: 200000})
+		tracks = append(tracks, music.Track{ID: fmt.Sprint(i + 1), Name: fmt.Sprintf("歌%03d", i), Duration: 200000})
 	}
 	a.pl.Cue(tracks)
 	if at > 0 {
 		a.pl.Jump(at)
 	}
-	a.pl.SetLyrics(nil)
+	a.setLyrics(nil)
 	a.nowPlaying, a.npPane = true, paneWall
 	tt := ui.NewTester(a.view, 1200, 800)
 	tt.Frame()
@@ -161,8 +161,8 @@ func TestWallFrames(t *testing.T) {
 		colors := []ui.Color{ui.RGB(220, 120, 160), ui.RGB(90, 140, 220), ui.RGB(240, 200, 110), ui.RGB(120, 200, 170), ui.RGB(170, 120, 230)}
 		for i := range a.pl.Queue() {
 			url := fmt.Sprintf("art%d", i)
-			a.pl.Queue()[i].Album.PicURL = url
-			a.art.art[netease.Sized(url, 240)] = &artwork{bmp: solidBitmap(colors[i%len(colors)]), tint: colors[i%len(colors)]}
+			a.pl.Queue()[i].Album.Images = music.Images{{URL: url}}
+			a.art.art[url] = &artwork{bmp: solidBitmap(colors[i%len(colors)]), tint: colors[i%len(colors)]}
 		}
 		tt.Advance(time.Second)
 		tt.Frame()

@@ -7,7 +7,7 @@ import (
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/player"
+	"mygoify/internal/playback"
 )
 
 // scrubState is a progress bar's own: the value dragged, while it is, and
@@ -87,10 +87,6 @@ func (a *app) scrubber(c *ui.Context, st *scrubState, track, fill ui.Color, heig
 		y := r.Y + (r.H-thick)/2
 		head, cy := r.X+r.W*frac, r.Y+r.H/2
 		p.Fill(ui.Rect{X: r.X, Y: y, W: r.W, H: thick}, track, thick/2)
-		// What has downloaded, a shade lighter.
-		if got, ok := pl.Downloaded(); ok && float32(got) < 1 {
-			p.Fill(ui.Rect{X: r.X, Y: y, W: r.W * float32(got), H: thick}, track, thick/2)
-		}
 		played := ui.Rect{X: r.X, Y: y, W: max(thick, head-r.X), H: thick}
 		if smoking > 0.01 {
 			// A streak of light, brightest at the head.
@@ -331,9 +327,9 @@ func (a *app) transport(c *ui.Context, color, dim, on ui.Color, size float32) {
 		}
 		repeat, ricon := dim, iconRepeat
 		switch pl.Repeat() {
-		case player.RepeatAll:
+		case playback.RepeatAll:
 			repeat = on
-		case player.RepeatOne:
+		case playback.RepeatOne:
 			repeat, ricon = on, iconRepeat1
 		}
 		if iconButton(c.Key("repeat"), ricon, size*0.62, repeat, "循环").Clicked() {
@@ -374,7 +370,7 @@ func (a *app) playerBar(c *ui.Context) {
 			hovered := info.Hovered()
 			info.Children(func() {
 				ui.Box(c).Size(48, 48).Shrink(0).Children(func() {
-					a.cover(c, tr.Album.PicURL, 120, 48, 8).Shadow(0, 2, 8, 0, p.cardShade)
+					a.cover(c, tr.Album.Images, 120, 48, 8).Shadow(0, 2, 8, 0, p.cardShade)
 					if hovered {
 						ui.Box(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Radius(8).Center().
 							Background(ui.RGBA(0, 0, 0, 0.35)).TextColor(ui.RGB(255, 255, 255)).Children(func() {

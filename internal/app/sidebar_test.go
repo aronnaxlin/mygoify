@@ -5,7 +5,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // Each playlist header hides only its own rows without changing the page
@@ -13,15 +13,15 @@ import (
 func TestSidebarPlaylistCollapse(t *testing.T) {
 	for _, tc := range []struct {
 		name, header, row, other string
-		playlist                 int64
+		playlist                 string
 	}{
-		{"mine", "我的歌单", "睡前", "飙升榜", 11},
-		{"saved", "收藏的歌单", "飙升榜", "睡前", 20},
+		{"mine", "我的歌单", "睡前", "飙升榜", "11"},
+		{"saved", "收藏的歌单", "飙升榜", "睡前", "20"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			a := editTestApp()
-			a.playlists[tc.playlist] = &netease.Playlist{ID: tc.playlist, Name: tc.row}
-			a.pl.Cue(a.playlists[10].Tracks)
+			a.playlists[tc.playlist] = &music.Playlist{ID: tc.playlist, Name: tc.row}
+			a.pl.Cue(a.playlists["10"].Tracks)
 			before := a.route
 			tt := ui.NewTester(a.view, 1200, 800)
 			tt.Frame()
@@ -47,7 +47,7 @@ func TestSidebarPlaylistCollapse(t *testing.T) {
 			}
 			tt.Frame()
 			if a.route != (route{page: pagePlaylist, id: tc.playlist}) {
-				t.Errorf("opened %+v, want playlist %d", a.route, tc.playlist)
+				t.Errorf("opened %+v, want playlist %s", a.route, tc.playlist)
 			}
 		})
 	}

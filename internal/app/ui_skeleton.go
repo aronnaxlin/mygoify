@@ -91,41 +91,28 @@ var boneWidths = [...]float32{62, 44, 78, 53, 70, 38, 66, 49, 82, 57, 41, 73}
 
 func boneWidth(i int) float32 { return boneWidths[i%len(boneWidths)] }
 
-// Skeletons of the pages, shaped as homePage, chartsPage, trackRows and
-// the cards they show.
+// Skeletons of the pages, shaped as homePage, trackRows and the cards
+// they show.
 
 func (a *app) homeSkeleton(c *ui.Context, s shimmer) {
-	cards := a.columns(c, 168)
-	if a.profile != nil {
-		a.section(c, "今日为你推荐")
-		a.playlistCardsSkeleton(c.Key("rec"), s, cards, 168, false)
-	}
-	a.section(c, "官方榜单")
-	a.chartCardsSkeleton(c, s)
-	a.section(c, "推荐歌单")
-	a.playlistCardsSkeleton(c.Key("featured"), s, cards*2, 168, false)
-}
-
-func (a *app) chartCardsSkeleton(c *ui.Context, s shimmer) {
-	cols := min(4, max(2, a.columns(c, 260)))
-	ui.Grid(c).Columns(cols).Gap(20).Children(func() {
-		for i := range 4 {
-			ui.Row(c.Key(i)).Gap(14).Padding(12).Radius(14).AlignItems(ui.Center).Background(a.pal.hover).Children(func() {
-				s.bone(c, 9).Size(84, 84)
-				ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(5).Children(func() {
-					s.text(c, 14, 1.3).WidthPercent(46)
-					for j := range 3 {
-						s.text(c, 12, 1.3).WidthPercent(boneWidth(i*3 + j))
-					}
-				})
+	a.section(c, "最近播放")
+	a.playlistCardsSkeleton(c.Key("recent"), s, a.columns(c, 168), 168)
+	a.section(c, "常听的艺人")
+	ui.Grid(c.Key("artists")).Columns(a.columns(c, 150)).GapX(20).GapY(28).Children(func() {
+		for i := range a.columns(c, 150) {
+			ui.Column(c.Key(i)).Gap(10).AlignItems(ui.Center).Children(func() {
+				s.bone(c, 999).AspectRatio(1).AlignSelf(ui.Stretch)
+				s.text(c, 13, 1.35).WidthPercent(boneWidth(i))
 			})
 		}
 	})
+	a.section(c, "常听的歌曲")
+	a.playlistCardsSkeleton(c.Key("top"), s, a.columns(c, 168), 168)
 }
 
 // playlistCardsSkeleton is n of playlistCard's cards, in columns at least
-// min DIPs wide, with a line for how often they update if freq.
-func (a *app) playlistCardsSkeleton(c *ui.Context, s shimmer, n int, min float32, freq bool) {
+// min DIPs wide.
+func (a *app) playlistCardsSkeleton(c *ui.Context, s shimmer, n int, min float32) {
 	ui.Grid(c).Columns(a.columns(c, min)).GapX(20).GapY(28).Children(func() {
 		for i := range n {
 			ui.Column(c.Key(i)).Gap(10).AlignItems(ui.Stretch).Children(func() {
@@ -134,9 +121,6 @@ func (a *app) playlistCardsSkeleton(c *ui.Context, s shimmer, n int, min float32
 					s.text(c, 13, 1.35).WidthPercent(92)
 					s.text(c, 13, 1.35).WidthPercent(boneWidth(i))
 				})
-				if freq {
-					s.text(c, 12, 1.3).WidthPercent(40).Margin(-6, 0, 0, 0)
-				}
 			})
 		}
 	})
@@ -231,42 +215,6 @@ func stageSkeleton(c *ui.Context, s shimmer, f, w float32) {
 	ui.Row(c).Wrap().Justify(ui.Center).AlignItems(ui.Center).Padding(0, w*0.1).Gap(f * 0.35).Children(func() {
 		for i, n := range []float32{2.2, 1.3, 3.1, 1.8} {
 			s.bone(c.Key(i), f*0.22).Size(f*n, f*0.85)
-		}
-	})
-}
-
-// qrSkeleton fills a QR code's room with what looks like one, at its
-// size, its quiet zone pad: three finders, and modules between them.
-func qrSkeleton(c *ui.Context, s shimmer, pad float32) ui.Element {
-	return ui.Box(c).Draw(func(p *ui.Painter, r ui.Rect) {
-		const n = 25
-		cell := (min(r.W, r.H) - 2*pad) / n
-		x0, y0 := r.X+(r.W-cell*n)/2, r.Y+(r.H-cell*n)/2
-		at := func(x, y, w, h int) ui.Rect {
-			return ui.Rect{X: x0 + float32(x)*cell, Y: y0 + float32(y)*cell, W: float32(w) * cell, H: float32(h) * cell}
-		}
-		finder := func(x, y int) bool { return (x < 8 || x >= n-8) && y < 8 || x < 8 && y >= n-8 }
-		for _, f := range [][2]int{{0, 0}, {n - 7, 0}, {0, n - 7}} {
-			x, y := f[0], f[1]
-			for _, e := range []ui.Rect{at(x, y, 7, 1), at(x, y+6, 7, 1), at(x, y+1, 1, 5), at(x+6, y+1, 1, 5)} {
-				s.paint(p, e, 0)
-			}
-			s.paint(p, at(x+2, y+2, 3, 3), cell*0.4)
-		}
-		// Modules, a run of them at a time, in a fixed pattern.
-		for y := range n {
-			run := -1
-			for x := 0; x <= n; x++ {
-				h := uint32(x*73856093^y*19349663) * 2654435761
-				on := x < n && !finder(x, y) && h>>29 < 4
-				switch {
-				case on && run < 0:
-					run = x
-				case !on && run >= 0:
-					s.paint(p, at(run, y, x-run, 1), cell*0.3)
-					run = -1
-				}
-			}
 		}
 	})
 }

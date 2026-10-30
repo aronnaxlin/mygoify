@@ -3,18 +3,22 @@ package app
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"image"
 	"image/color"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"math"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 	_ "golang.org/x/image/webp"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/library"
 )
 
 // artwork is a cover, decoded and ready to draw, with what the player
@@ -120,10 +124,30 @@ func (c *artCache) get(url string, backdrop bool) *artwork {
 // frame that first shows it, and the smaller copies it shows from there.
 const artRelease = 2 * time.Second
 
+// artClient fetches covers: a cover that takes longer is left blank.
+var artClient = &http.Client{Timeout: 20 * time.Second}
+
+// fetchArt returns the picture at url: Spotify's image CDN serves covers,
+// and the fake library draws its own.
+func fetchArt(url string) ([]byte, error) {
+	if strings.HasPrefix(url, library.FakeImageScheme) {
+		return library.FakeImage(url)
+	}
+	res, err := artClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetching %s: %s", url, res.Status)
+	}
+	return io.ReadAll(io.LimitReader(res.Body, 16<<20))
+}
+
 // loadArt fetches the cover at url, as a bitmap to draw and an image to
 // measure.
 func loadArt(url string) (*ui.Bitmap, image.Image, error) {
-	b, err := netease.Fetch(url)
+	b, err := fetchArt(url)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -143,7 +167,7 @@ func decodeArt(b []byte) (*ui.Bitmap, image.Image, error) {
 }
 
 func fetchImage(url string) (image.Image, error) {
-	b, err := netease.Fetch(url)
+	b, err := fetchArt(url)
 	if err != nil {
 		return nil, err
 	}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // skeletonScenes are the views that load, as they show while they do.
@@ -18,17 +18,16 @@ var skeletonScenes = []struct {
 	set  func(a *app)
 }{
 	{"home", func(a *app) {}},
-	{"charts", func(a *app) { a.route = route{page: pageCharts} }},
 	{"playlist", func(a *app) {
-		a.route = route{page: pagePlaylist, id: 7}
-		a.loadingPl[7] = true
+		a.route = route{page: pagePlaylist, id: "7"}
+		a.loadingPl["7"] = true
 	}},
 	{"search", func(a *app) {
-		a.route = route{page: pageSearch, query: "春日影", kind: netease.SearchSongs}
+		a.route = route{page: pageSearch, query: "春日影", kind: music.SearchTracks}
 		a.searches[a.route] = &searchData{page: paged{loading: true}}
 	}},
 	{"artists", func(a *app) {
-		a.route = route{page: pageSearch, query: "春日影", kind: netease.SearchArtists}
+		a.route = route{page: pageSearch, query: "春日影", kind: music.SearchArtists}
 		a.searches[a.route] = &searchData{page: paged{loading: true}}
 	}},
 	{"login", func(a *app) { a.login = loginState{open: true} }},
@@ -40,7 +39,7 @@ func skeletonApp(set func(a *app)) *app {
 	a := newTestApp()
 	a.settings = defaultSettings()
 	a.homeLoading = true
-	a.pl.Cue([]netease.Track{{ID: 1, Name: "春日影"}})
+	a.pl.Cue([]music.Track{{ID: "1", Name: "春日影"}})
 	set(a)
 	return a
 }

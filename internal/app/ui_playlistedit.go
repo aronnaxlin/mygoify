@@ -7,42 +7,34 @@ import (
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/library"
+	"mygoify/internal/music"
 )
 
 // The listener's own playlists: making them, renaming them, deleting them,
 // and adding songs to them or taking songs out.
 
-// These edit playlists with NetEase; tests replace them.
-var (
-	createPlaylist     = netease.CreatePlaylist
-	renamePlaylist     = netease.RenamePlaylist
-	addToPlaylist      = netease.AddToPlaylist
-	removeFromPlaylist = netease.RemoveFromPlaylist
-	deletePlaylist     = netease.DeletePlaylist
-)
-
 // nameDialog asks for a playlist's name: a new one's, or one's new name.
 type nameDialog struct {
 	open   bool
 	name   string
-	rename int64          // the playlist renamed, or 0 to make one
-	add    *netease.Track // the song to add to the playlist made, if any
-	busy   bool           // NetEase is making the playlist
+	rename string       // the playlist renamed, or 0 to make one
+	add    *music.Track // the song to add to the playlist made, if any
+	busy   bool         // Spotify is making the playlist
 }
 
 // deleteDialog asks whether to delete one of the listener's playlists.
 type deleteDialog struct {
 	open bool
-	id   int64
+	id   string
 	name string
 }
 
 // editable returns the listener's playlist id if they may edit its songs
 // and name, or nil: the liked songs' are their hearts'.
-func (a *app) editable(id int64) *netease.Playlist {
+func (a *app) editable(id string) *music.Playlist {
 	for i := range a.mine {
-		if a.mine[i].ID == id && a.mine[i].SpecialType != 5 {
+		if a.mine[i].ID == id && !a.mine[i].Liked {
 			return &a.mine[i]
 		}
 	}
@@ -50,32 +42,32 @@ func (a *app) editable(id int64) *netease.Playlist {
 }
 
 // loadMine loads the playlists the listener uid made and saved.
-func (a *app) loadMine(uid int64) {
+func (a *app) loadMine(uid string) {
 	go func() {
-		made, saved, err := netease.UserPlaylists(uid)
+		made, saved, err := a.lib.MyPlaylists()
 		a.post(func() {
-			if err == nil && a.profile != nil && a.profile.UserID == uid {
+			if err == nil && a.profile != nil && a.profile.ID == uid {
 				a.mine, a.saved = made, saved
 			}
 		})
 	}()
 }
 
-// playlistChanged forgets what was loaded of playlist id, which NetEase
+// playlistChanged forgets what was loaded of playlist id, which Spotify
 // changed: loaded anew if shown, and the sidebar's covers with it.
-func (a *app) playlistChanged(id int64) {
+func (a *app) playlistChanged(id string) {
 	delete(a.playlists, id)
 	if a.route.page == pagePlaylist && a.route.id == id {
 		a.loadPlaylist(id, false)
 	}
 	if a.profile != nil {
-		a.loadMine(a.profile.UserID)
+		a.loadMine(a.profile.ID)
 	}
 }
 
 // newPlaylist asks for the name of a playlist to make, then adds tr to it
 // if set. Signed out, it asks the listener to sign in.
-func (a *app) newPlaylist(tr *netease.Track) {
+func (a *app) newPlaylist(tr *music.Track) {
 	if a.profile == nil {
 		a.showMain()
 		a.openLogin()
@@ -85,19 +77,19 @@ func (a *app) newPlaylist(tr *netease.Track) {
 }
 
 // startRename asks for a new name for the listener's playlist pl.
-func (a *app) startRename(pl *netease.Playlist) {
+func (a *app) startRename(pl *music.Playlist) {
 	a.naming = nameDialog{open: true, name: pl.Name, rename: pl.ID}
 }
 
 // submitName makes the playlist named, or renames one: at once in the app,
-// as NetEase may refuse, when renaming.
+// as Spotify may refuse, when renaming.
 func (a *app) submitName() {
 	d := &a.naming
 	name := strings.TrimSpace(d.name)
 	if name == "" || d.busy {
 		return
 	}
-	if d.rename != 0 {
+	if d.rename != "" {
 		id := d.rename
 		d.open = false
 		pl := a.editable(id)
@@ -107,7 +99,7 @@ func (a *app) submitName() {
 		old := pl.Name
 		a.setPlaylistName(id, name)
 		go func() {
-			err := renamePlaylist(id, name)
+			err := a.lib.RenamePlaylist(id, name)
 			a.post(func() {
 				if err != nil {
 					a.setPlaylistName(id, old)
@@ -120,7 +112,7 @@ func (a *app) submitName() {
 	d.busy = true
 	add := d.add
 	go func() {
-		pl, err := createPlaylist(name)
+		pl, err := a.lib.CreatePlaylist(name)
 		a.post(func() {
 			a.naming.busy = false
 			if err != nil {
@@ -128,9 +120,9 @@ func (a *app) submitName() {
 				return
 			}
 			a.naming.open = false
-			// Under the liked songs, as NetEase lists the newest.
+			// Under the liked songs, the newest first.
 			at := 0
-			if len(a.mine) > 0 && a.mine[0].SpecialType == 5 {
+			if len(a.mine) > 0 && a.mine[0].Liked {
 				at = 1
 			}
 			a.mine = slices.Insert(a.mine, at, *pl)
@@ -145,18 +137,18 @@ func (a *app) submitName() {
 }
 
 // confirmDelete asks whether to delete the listener's playlist pl.
-func (a *app) confirmDelete(pl *netease.Playlist) {
+func (a *app) confirmDelete(pl *music.Playlist) {
 	a.deleting = deleteDialog{open: true, id: pl.ID, name: pl.Name}
 }
 
 // deleteChosen deletes the playlist the dialog asked about: at once from
-// the sidebar, leaving its page, and then with NetEase, which may refuse:
+// the sidebar, leaving its page, and then with Spotify, which may refuse:
 // it comes back then.
 func (a *app) deleteChosen() {
 	id := a.deleting.id
 	a.deleting.open = false
-	i := slices.IndexFunc(a.mine, func(pl netease.Playlist) bool { return pl.ID == id })
-	if i < 0 || a.mine[i].SpecialType == 5 {
+	i := slices.IndexFunc(a.mine, func(pl music.Playlist) bool { return pl.ID == id })
+	if i < 0 || a.mine[i].Liked {
 		return
 	}
 	pl := a.mine[i]
@@ -173,7 +165,7 @@ func (a *app) deleteChosen() {
 		a.show(r)
 	}
 	go func() {
-		err := deletePlaylist(id)
+		err := a.lib.DeletePlaylist(id)
 		a.post(func() {
 			if err != nil {
 				a.mine = slices.Insert(a.mine, min(i, len(a.mine)), pl)
@@ -186,7 +178,7 @@ func (a *app) deleteChosen() {
 	}()
 }
 
-func (a *app) setPlaylistName(id int64, name string) {
+func (a *app) setPlaylistName(id string, name string) {
 	if pl := a.editable(id); pl != nil {
 		pl.Name = name
 	}
@@ -196,13 +188,13 @@ func (a *app) setPlaylistName(id int64, name string) {
 }
 
 // addTo adds tr to the listener's playlist pid; a toast says how it went.
-func (a *app) addTo(pid int64, tr *netease.Track) {
+func (a *app) addTo(pid string, tr *music.Track) {
 	id := tr.ID
 	go func() {
-		err := addToPlaylist(pid, id)
+		err := a.lib.AddToPlaylist(pid, id)
 		a.post(func() {
 			switch {
-			case errors.Is(err, netease.ErrInPlaylist):
+			case errors.Is(err, library.ErrInPlaylist):
 				a.toast = "歌曲已在歌单中"
 			case err != nil:
 				a.toast = "添加失败，请稍后再试"
@@ -215,18 +207,18 @@ func (a *app) addTo(pid int64, tr *netease.Track) {
 }
 
 // removeFrom takes tr out of the listener's playlist pid, at once in the
-// app and then with NetEase, which may refuse: the song comes back then.
-func (a *app) removeFrom(pid int64, tr *netease.Track) {
+// app and then with Spotify, which may refuse: the song comes back then.
+func (a *app) removeFrom(pid string, tr *music.Track) {
 	id := tr.ID
 	pl := a.playlists[pid]
-	var before []netease.Track
+	var before []music.Track
 	if pl != nil {
 		// A new list: the player may be playing the old one.
 		before = pl.Tracks
-		pl.Tracks = slices.DeleteFunc(slices.Clone(before), func(t netease.Track) bool { return t.ID == id })
+		pl.Tracks = slices.DeleteFunc(slices.Clone(before), func(t music.Track) bool { return t.ID == id })
 	}
 	go func() {
-		err := removeFromPlaylist(pid, id)
+		err := a.lib.RemoveFromPlaylist(pid, id)
 		a.post(func() {
 			if err != nil {
 				if pl != nil && a.playlists[pid] == pl {
@@ -238,7 +230,7 @@ func (a *app) removeFrom(pid int64, tr *netease.Track) {
 			// The songs listed are right: only the sidebar's covers may
 			// have changed.
 			if a.profile != nil {
-				a.loadMine(a.profile.UserID)
+				a.loadMine(a.profile.ID)
 			}
 		})
 	}()
@@ -247,7 +239,7 @@ func (a *app) removeFrom(pid int64, tr *netease.Track) {
 // playlistItems are the items of a song's menu that put it in the
 // listener's playlists, or take it out of pid, the one it is listed in, if
 // set.
-func (a *app) playlistItems(m *ui.Menu, tr *netease.Track, pid int64) {
+func (a *app) playlistItems(m *ui.Menu, tr *music.Track, pid string) {
 	if a.profile == nil {
 		return
 	}
@@ -256,9 +248,9 @@ func (a *app) playlistItems(m *ui.Menu, tr *netease.Track, pid int64) {
 		if m.Item("新建歌单…").Chosen() {
 			a.newPlaylist(tr)
 		}
-		var to []*netease.Playlist
+		var to []*music.Playlist
 		for i := range a.mine {
-			if pl := &a.mine[i]; pl.SpecialType != 5 && pl.ID != pid {
+			if pl := &a.mine[i]; !pl.Liked && pl.ID != pid {
 				to = append(to, pl)
 			}
 		}
@@ -287,7 +279,7 @@ func (a *app) playlistNameDialog(c *ui.Context) {
 			Background(p.bg).Border(1, p.hairline).Shadow(0, 24, 60, -12, ui.RGBA(0, 0, 0, 0.4)).
 			Transition(ui.ElementTransition{Animation: &ui.Snappy, Enter: &ui.Motion{Scale: 0.94}, Exit: &ui.Motion{Scale: 0.96}})
 		title, action := "新建歌单", "创建"
-		if d.rename != 0 {
+		if d.rename != "" {
 			title, action = "重命名歌单", "保存"
 		}
 		if d.busy {

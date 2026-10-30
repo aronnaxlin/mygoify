@@ -13,10 +13,8 @@ func (a *app) openSettings() {
 	if a.settingsWin != nil {
 		a.settingsWin.Show()
 		a.settingsWin.Focus()
-		a.measureCache()
 		return
 	}
-	a.measureCache()
 	a.settingsWin = mygo.NewWindow(mygo.WindowOptions{
 		Title:           "设置",
 		Width:           560,
@@ -122,60 +120,6 @@ func (a *app) settingsView(c *ui.Context) {
 			})
 		}
 
-		group("播放", func() {
-			row("音质", "无损与 Hi-Res 需要黑胶 VIP，没有时播放所能播放的最高音质；下一首歌曲开始生效", func() {
-				labels := make([]string, len(qualityLevels))
-				chosen := qualityLevels[2].label
-				for i, q := range qualityLevels {
-					labels[i] = q.label
-					if q.level == s.Quality {
-						chosen = q.label
-					}
-				}
-				if ui.Select(c.Key("quality"), &chosen, labels).Label("音质").Width(150).Changed() {
-					for _, q := range qualityLevels {
-						if q.label == chosen {
-							s.Quality = q.level
-						}
-					}
-					a.changed()
-				}
-			})
-			row("音量均衡", "按网易云音乐测得的响度调整每首歌的音量，让歌曲听起来一样响", func() {
-				if ui.Switch(c.Key("normalize"), &s.Normalize).Label("音量均衡").Changed() {
-					a.pl.SetVolume(a.volume)
-					a.changed()
-				}
-			})
-		})
-
-		group("缓存", func() {
-			row("歌曲缓存", "听过的歌曲保存在本机，再次播放无需等待，也不耗流量；"+a.cacheUsage(), func() {
-				labels := make([]string, len(cacheLimits))
-				chosen := cacheLimits[2].label
-				for i, l := range cacheLimits {
-					labels[i] = l.label
-					if l.mb == s.CacheMB {
-						chosen = l.label
-					}
-				}
-				if ui.Select(c.Key("cache"), &chosen, labels).Label("歌曲缓存").Width(150).Changed() {
-					for _, l := range cacheLimits {
-						if l.label == chosen {
-							s.CacheMB = l.mb
-						}
-					}
-					a.changed()
-					a.applyCacheLimit()
-				}
-			})
-			row("清除缓存", "删除保存在本机的全部歌曲", func() {
-				if ui.Button(c.Key("clear-cache"), "清除").Disabled(a.cacheUsed <= 0).Clicked() {
-					a.clearCache()
-				}
-			})
-		})
-
 		group("外观", func() {
 			row("外观", "", func() {
 				modes := []string{"system", "light", "dark"}
@@ -218,10 +162,10 @@ func (a *app) settingsView(c *ui.Context) {
 			}
 			prof := a.profile
 			ui.Row(c).Padding(12, 16).Gap(12).AlignItems(ui.Center).Children(func() {
-				a.avatar(c, prof.AvatarURL, 36, p.press)
+				a.avatar(c, prof.Images, 36, p.press)
 				ui.Column(c).Grow(1).Gap(2).Children(func() {
-					ui.Text(c, prof.Nickname).FontSize(13.5).FontWeight(600)
-					ui.Text(c, "已登录网易云音乐").FontSize(12).TextColor(p.muted)
+					ui.Text(c, prof.Name).FontSize(13.5).FontWeight(600)
+					ui.Text(c, "已登录 Spotify").FontSize(12).TextColor(p.muted)
 				})
 				if ui.Button(c.Key("logout"), "退出登录").Clicked() {
 					a.signOut()

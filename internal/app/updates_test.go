@@ -1,14 +1,12 @@
 package app
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/egoist/mygo/ui"
 
-	"mygoify/internal/netease"
+	"mygoify/internal/music"
 )
 
 // fakeUpdater swaps the update plugin's preferences for ones in memory,
@@ -75,7 +73,7 @@ func TestCheckForUpdatesFromSettings(t *testing.T) {
 	a := newTestApp()
 	a.settings = defaultSettings()
 	a.updates = true
-	a.profile = &netease.Profile{UserID: 1}
+	a.profile = &music.User{ID: "1"}
 	tt := ui.NewTester(a.settingsView, 560, 2000)
 	tt.Frame()
 	if err := tt.Click("检查更新"); err != nil {
@@ -83,26 +81,5 @@ func TestCheckForUpdatesFromSettings(t *testing.T) {
 	}
 	if checked != 1 {
 		t.Fatalf("checked %d times", checked)
-	}
-}
-
-// The data kept under the app's old name moves to the directory of its
-// name, which Path made empty, but not over data kept there already.
-func TestMoveOldData(t *testing.T) {
-	root := t.TempDir()
-	old, dir := filepath.Join(root, oldName), filepath.Join(root, "MyGo 云音乐")
-	os.MkdirAll(old, 0o700)
-	os.WriteFile(filepath.Join(old, "settings.json"), []byte("old"), 0o600)
-	os.MkdirAll(dir, 0o700)
-	moveDir(old, dir)
-	if b, _ := os.ReadFile(filepath.Join(dir, "settings.json")); string(b) != "old" {
-		t.Fatalf("settings %q after moving", b)
-	}
-
-	os.MkdirAll(old, 0o700)
-	os.WriteFile(filepath.Join(old, "settings.json"), []byte("older"), 0o600)
-	moveDir(old, dir)
-	if b, _ := os.ReadFile(filepath.Join(dir, "settings.json")); string(b) != "old" {
-		t.Fatalf("settings %q, moved over what was there", b)
 	}
 }

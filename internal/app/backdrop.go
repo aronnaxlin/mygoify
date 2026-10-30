@@ -8,7 +8,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/shader"
 
-	"mygoify/internal/player"
+	"mygoify/internal/playback"
 )
 
 // The backdrop of Now Playing paints the cover's colors behind it, as
@@ -184,7 +184,7 @@ func (a *app) backdrop(c *ui.Context, art *artwork, tint ui.Color) {
 
 // step moves the drift and the pulse on to now, and reports whether
 // either still moves.
-func (bd *backdropCache) step(now time.Time, playing bool, lv [player.Bands]float32, live bool) bool {
+func (bd *backdropCache) step(now time.Time, playing bool, lv [playback.Bands]float32, live bool) bool {
 	dt := now.Sub(bd.last).Seconds()
 	if bd.last.IsZero() || dt > 0.2 {
 		dt = 1.0 / 30
