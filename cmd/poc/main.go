@@ -4,6 +4,7 @@
 // reads its settings from .env and keeps its token in the data directory.
 //
 //	go run ./cmd/poc login   logs in, in the browser
+//	go run ./cmd/poc me      says who is logged in, refreshing the login
 //	go run ./cmd/poc p4      plays the third track of a playlist on Soloist
 //	go run ./cmd/poc p6      plays a minute, measuring the position and Soloist's cost
 package main
@@ -12,17 +13,12 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -31,12 +27,9 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-)
 
-// The scopes of DESIGN.md §5.1: only what the app uses.
-const scopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing " +
-	"user-read-recently-played user-top-read user-library-read user-library-modify " +
-	"playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public"
+	"mygoify/internal/auth"
+)
 
 var (
 	env       map[string]string
@@ -51,11 +44,19 @@ func main() {
 		log.Fatal(err)
 	}
 	if len(os.Args) < 2 {
-		log.Fatal("usage: poc login | p4 | p6")
+		log.Fatal("usage: poc login | me | p4 | p6")
 	}
 	switch os.Args[1] {
 	case "login":
 		err = login()
+	case "me":
+		var me struct {
+			ID          string
+			DisplayName string `json:"display_name"`
+		}
+		if err = api("GET", "/me", nil, &me); err == nil {
+			fmt.Printf("logged in as %s (%s)\n", me.DisplayName, me.ID)
+		}
 	case "p4":
 		err = p4()
 	case "p6":
@@ -96,92 +97,35 @@ func readEnv(path string) (map[string]string, error) {
 	return m, s.Err()
 }
 
-type token struct {
-	AccessToken  string    `json:"access_token"`
-	RefreshToken string    `json:"refresh_token"`
-	ExpiresIn    int       `json:"expires_in"`
-	Scope        string    `json:"scope"`
-	Expiry       time.Time `json:"expiry"`
+// fileStore keeps the token in a private file of the data directory.
+type fileStore string
+
+func (f fileStore) Load() ([]byte, error) { return os.ReadFile(string(f)) }
+func (f fileStore) Save(b []byte) error {
+	if err := os.MkdirAll(filepath.Dir(string(f)), 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(string(f), b, 0o600)
+}
+func (f fileStore) Delete() error { return os.Remove(string(f)) }
+
+func session() *auth.Session {
+	return auth.NewSession(auth.Config{ClientID: env["SPOTIFY_CLIENT_ID"], RedirectURI: env["SPOTIFY_REDIRECT_URI"]}, fileStore(tokenPath))
 }
 
-func randomString(n int) string {
-	b := make([]byte, n)
-	rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(b)
-}
-
-// login runs the authorization code flow with PKCE: the browser asks the
-// listener, Spotify sends the code to the loopback address, and the code
-// and the verifier buy the token.
+// login logs in through internal/auth, in the browser, within 5 minutes.
 func login() error {
-	redirect, err := url.Parse(env["SPOTIFY_REDIRECT_URI"])
-	if err != nil {
-		return err
-	}
-	verifier := randomString(64)
-	sum := sha256.Sum256([]byte(verifier))
-	state := randomString(16)
-	q := url.Values{
-		"response_type":         {"code"},
-		"client_id":             {env["SPOTIFY_CLIENT_ID"]},
-		"redirect_uri":          {redirect.String()},
-		"scope":                 {scopes},
-		"state":                 {state},
-		"code_challenge_method": {"S256"},
-		"code_challenge":        {base64.RawURLEncoding.EncodeToString(sum[:])},
-	}
-	authURL := "https://accounts.spotify.com/authorize?" + q.Encode()
-
-	ln, err := net.Listen("tcp4", redirect.Host)
-	if err != nil {
-		return err
-	}
-	codes := make(chan string, 1)
-	errs := make(chan error, 1)
-	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != redirect.Path {
-			http.NotFound(w, r)
-			return
-		}
-		q := r.URL.Query()
-		switch {
-		case q.Get("state") != state:
-			errs <- errors.New("the callback's state does not match")
-		case q.Get("error") != "":
-			errs <- fmt.Errorf("authorization refused: %s", q.Get("error"))
-		default:
-			fmt.Fprintln(w, "MyGoify: logged in. You can close this tab.")
-			codes <- q.Get("code")
-			return
-		}
-		fmt.Fprintln(w, "MyGoify: login failed, see the terminal.")
-	})}
-	go srv.Serve(ln)
-	defer srv.Close()
-
-	fmt.Println("Opening the browser to log in. If it doesn't open, visit:\n" + authURL)
-	openBrowser(authURL)
-
-	var code string
-	select {
-	case code = <-codes:
-	case err := <-errs:
-		return err
-	case <-time.After(5 * time.Minute):
-		return errors.New("no login within 5 minutes")
-	}
-	tok, err := requestToken(url.Values{
-		"grant_type":    {"authorization_code"},
-		"code":          {code},
-		"redirect_uri":  {redirect.String()},
-		"client_id":     {env["SPOTIFY_CLIENT_ID"]},
-		"code_verifier": {verifier},
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	err := session().Login(ctx, func(u string) error {
+		fmt.Println("Opening the browser to log in. If it doesn't open, visit:\n" + u)
+		openBrowser(u)
+		return nil
 	})
-	if err != nil {
-		return err
+	if err == nil {
+		fmt.Println("Logged in.")
 	}
-	fmt.Printf("Logged in. Granted scopes: %s\n", tok.Scope)
-	return nil
+	return err
 }
 
 func openBrowser(u string) {
@@ -192,56 +136,14 @@ func openBrowser(u string) {
 	exec.Command(cmd, u).Start()
 }
 
-// requestToken posts to the token endpoint and saves what it returns,
-// keeping the refresh token when a refresh returns none.
-func requestToken(form url.Values) (*token, error) {
-	res, err := http.PostForm("https://accounts.spotify.com/api/token", form)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("token endpoint: %s: %s", res.Status, body)
-	}
-	var tok token
-	if err := json.Unmarshal(body, &tok); err != nil {
-		return nil, err
-	}
-	if tok.RefreshToken == "" {
-		tok.RefreshToken = form.Get("refresh_token")
-	}
-	tok.Expiry = time.Now().Add(time.Duration(tok.ExpiresIn) * time.Second)
-	data, _ := json.MarshalIndent(tok, "", "  ")
-	if err := os.MkdirAll(dataDir, 0o700); err != nil {
-		return nil, err
-	}
-	return &tok, os.WriteFile(tokenPath, data, 0o600)
-}
-
-// accessToken returns a token valid for a minute at least, refreshing the
+// accessToken returns a token good for a minute at least, refreshing the
 // saved one if it isn't.
 func accessToken() (string, error) {
-	data, err := os.ReadFile(tokenPath)
-	if err != nil {
-		return "", fmt.Errorf("not logged in: run poc login (%w)", err)
+	s := session()
+	if !s.Restore() {
+		return "", errors.New("not logged in: run poc login")
 	}
-	var tok token
-	if err := json.Unmarshal(data, &tok); err != nil {
-		return "", err
-	}
-	if time.Until(tok.Expiry) > time.Minute {
-		return tok.AccessToken, nil
-	}
-	t, err := requestToken(url.Values{
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {tok.RefreshToken},
-		"client_id":     {env["SPOTIFY_CLIENT_ID"]},
-	})
-	if err != nil {
-		return "", err
-	}
-	return t.AccessToken, nil
+	return s.AccessToken(context.Background())
 }
 
 // api calls the Web API, decoding the answer into out if it has one.
