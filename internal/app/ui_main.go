@@ -129,12 +129,6 @@ func (a *app) load(r route) {
 		a.loadArtist(r.id)
 	case pageAlbum:
 		a.loadAlbum(r.id)
-	case pageUser:
-		a.loadUser(r.id)
-	case pagePodcast:
-		a.loadPodcast(r.id)
-	case pagePodcasts:
-		a.loadPodcastTab()
 	}
 }
 
@@ -181,10 +175,7 @@ func (a *app) sidebar(c *ui.Context) {
 
 		ui.Scroll(c.Key("nav")).TrackScroll(&a.navScroll).Grow(1).Margin(0, -6).Padding(0, 6).Gap(4).Children(func() {
 			a.navItem(c, iconHome, "为你推荐", route{page: pageHome})
-			a.navItem(c, iconDaily, "每日推荐", route{page: pageDaily})
-			a.navItem(c, iconRadio, "私人 FM", route{page: pageFM})
 			a.navItem(c, iconCharts, "排行榜", route{page: pageCharts})
-			a.navItem(c, iconPodcast, "播客", route{page: pagePodcasts})
 			if a.searched.query != "" {
 				a.navItem(c, iconSearch, "搜索结果", a.searched)
 			}
@@ -351,26 +342,16 @@ func (a *app) content(c *ui.Context) {
 	switch a.route.page {
 	case pageHome:
 		a.homePage(c)
-	case pageDaily:
-		a.dailyPage(c)
 	case pageCharts:
 		a.chartsPage(c)
 	case pagePlaylist:
 		a.playlistPage(c)
 	case pageSearch:
 		a.searchPage(c)
-	case pageFM:
-		a.fmPage(c)
 	case pageArtist:
 		a.artistPage(c)
 	case pageAlbum:
 		a.albumPage(c)
-	case pageUser:
-		a.userPage(c)
-	case pagePodcast:
-		a.podcastPage(c)
-	case pagePodcasts:
-		a.podcastsPage(c)
 	}
 }
 
@@ -395,7 +376,6 @@ func (a *app) loadHome() {
 	go func() {
 		featured, err1 := netease.FeaturedPlaylists(30)
 		charts, err2 := netease.Charts()
-		daily, _ := netease.DailySongs()
 		var rec []netease.Playlist
 		if signedIn {
 			rec, _ = netease.RecommendedPlaylists()
@@ -410,7 +390,7 @@ func (a *app) loadHome() {
 				}
 				return
 			}
-			a.featured, a.charts, a.daily, a.recPlaylists = featured, charts, daily, rec
+			a.featured, a.charts, a.recPlaylists = featured, charts, rec
 			a.homeAt = at
 		})
 	}()

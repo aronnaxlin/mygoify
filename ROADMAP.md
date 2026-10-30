@@ -30,11 +30,13 @@
 
 - [x] Fork `egoist/mygo-cloudmusic` 为 `aronnaxlin/mygoify`，保留历史；改模块名、`mygo.json`（显示名、identifier、slug、更新公钥）
 - [ ] 新图标；官网（`website/`）改造或删除
-- [ ] 删除 `netease`、`speech`、`player`，以及评论、播客、电台、日推、用户页、动态相关的界面（DESIGN §6）
+- [x] 删除评论、热评、播客、字幕和语音识别（`speech`）、私人 FM 和心动模式、日推、用户页、动态、搜索建议的界面和代码（DESIGN §6）
+- [ ] 删除 `netease`、`player`（随下面的接口替换完成）
 - [ ] 新建 `internal/playback`（接口 + 测试用假实现）、`internal/library`、`internal/auth`
 - [ ] 界面全部改为只依赖接口，能在假数据下运行和测试
 - [ ] 测试规范沿用 cloudmusic 的 `AGENTS.md`
 - [ ] CI：`go test ./...`，Linux 和 macOS 都要 `CGO_ENABLED=0` 交叉编译通过
+- [ ] 在假数据上重建截图工具（原 `debug_shots.go` 依赖网易云日推，已删除）
 
 **退出条件**：`go tool mygo dev` 能在假数据下打开完整外壳；测试全部通过。
 

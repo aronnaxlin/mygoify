@@ -19,7 +19,6 @@ var skeletonScenes = []struct {
 }{
 	{"home", func(a *app) {}},
 	{"charts", func(a *app) { a.route = route{page: pageCharts} }},
-	{"daily", func(a *app) { a.route = route{page: pageDaily} }},
 	{"playlist", func(a *app) {
 		a.route = route{page: pagePlaylist, id: 7}
 		a.loadingPl[7] = true
@@ -33,14 +32,6 @@ var skeletonScenes = []struct {
 		a.searches[a.route] = &searchData{page: paged{loading: true}}
 	}},
 	{"login", func(a *app) { a.login = loginState{open: true} }},
-	{"comments", func(a *app) {
-		a.nowPlaying, a.npPane = true, paneComments
-		a.comments = commentState{track: 1, loading: true}
-	}},
-	{"more-comments", func(a *app) {
-		a.nowPlaying, a.npPane = true, paneComments
-		a.comments = commentState{track: 1, loading: true, loaded: true, total: 1, latest: []netease.Comment{{ID: 1, Content: "好听"}}}
-	}},
 	{"lyrics", func(a *app) { a.nowPlaying, a.npPane = true, paneLyrics }},
 	{"stage", func(a *app) { a.nowPlaying, a.npPane = true, paneStage }},
 }

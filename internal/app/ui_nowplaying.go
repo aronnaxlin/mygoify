@@ -102,22 +102,6 @@ func (a *app) nowPlayingView(c *ui.Context) {
 
 func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, accent ui.Color, w, h float32, pointerIn bool) {
 	pl := a.pl
-	a.commentsFor(tr)
-	// An episode has what it is about and its captions in place of lyrics;
-	// a song, lyrics in place of those.
-	switch program := tr.ProgramID != 0; {
-	case program && a.npPane == paneWall:
-		a.npPane = paneQueue
-	case program && (a.npPane == paneLyrics || a.npPane == paneStage):
-		a.npPane = paneProgram
-		if a.captionsOn() {
-			a.npPane = paneCaptions
-		}
-	case program && a.npPane == paneCaptions && !a.captionsShown():
-		a.npPane = paneProgram
-	case !program && (a.npPane == paneProgram || a.npPane == paneCaptions):
-		a.npPane = a.lyricsPaneChosen()
-	}
 	if a.npPane != paneQueue {
 		a.queueAt = -1
 	}
@@ -141,7 +125,7 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 				a.paneTabs(c)
 				a.stageStyleButton(c)
 			})
-			a.stage(c, tr, accent)
+			a.stage(c, accent)
 			a.stageBar(c, tr, art, accent)
 			return
 		}
@@ -169,9 +153,6 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 
 				ui.Row(c).Gap(8).AlignItems(ui.Center).Margin(36, 0, 18, 0).Children(func() {
 					ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(4).Children(func() {
-						if r := pl.Radio(); r != "" {
-							a.radioChip(c, r)
-						}
 						ui.Text(c, tr.Name).FontSize(22).FontWeight(700).LetterSpacing(-0.3).SingleLine()
 						a.artistLinks(c, tr, white.Alpha(0.6), white, true).FontSize(15).SingleLine()
 					})
@@ -218,12 +199,6 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *netease.Track, art *artwork, acc
 				switch a.npPane {
 				case paneLyrics:
 					a.lyricsPane(c, tr, h)
-				case paneComments:
-					a.commentsPane(c, tr)
-				case paneProgram:
-					a.programPane(c, tr)
-				case paneCaptions:
-					a.captionsPane(c, tr, h)
 				default:
 					a.queuePane(c)
 				}
@@ -279,9 +254,6 @@ const (
 	paneLyrics = iota
 	paneQueue
 	paneStage
-	paneComments
-	paneProgram
-	paneCaptions
 	paneWall
 )
 
@@ -294,23 +266,12 @@ type npTab struct {
 // npTabs returns the tabs of Now Playing, in order, for what plays: ⌘1
 // chooses the first, ⌘2 the second, and on.
 func (a *app) npTabs() []npTab {
-	if tr := a.pl.Current(); tr != nil && tr.ProgramID != 0 {
-		tabs := []npTab{{paneProgram, "简介"}}
-		if a.captionsShown() {
-			tabs = append(tabs, npTab{paneCaptions, "字幕"})
-		}
-		return append(tabs, npTab{paneQueue, "待播清单"}, npTab{paneComments, "评论"})
-	}
-	return []npTab{{paneLyrics, "歌词"}, {paneStage, "律动"}, {paneQueue, "待播清单"}, {paneWall, "选歌"}, {paneComments, "评论"}}
+	return []npTab{{paneLyrics, "歌词"}, {paneStage, "律动"}, {paneQueue, "待播清单"}, {paneWall, "选歌"}}
 }
 
 func (a *app) paneTabs(c *ui.Context) {
 	for _, t := range a.npTabs() {
-		label := t.label
-		if t.pane == paneComments {
-			label = a.commentsTab()
-		}
-		a.paneTab(c, t.pane, label)
+		a.paneTab(c, t.pane, t.label)
 	}
 }
 
@@ -321,30 +282,6 @@ func (a *app) choosePane(i int) {
 	if (i == paneLyrics || i == paneStage) && a.settings.LyricsStage != (i == paneStage) {
 		a.settings.LyricsStage = i == paneStage
 		a.settings.save()
-	}
-}
-
-// radioChip says which radio plays, over the title: a click on it, or on
-// its cross, leaves the radio, playing on the song.
-func (a *app) radioChip(c *ui.Context, name string) {
-	icon, exit := iconRadio, "退出私人 FM"
-	if name == heartRadio {
-		icon, exit = iconHeartFill, "退出心动模式"
-	}
-	chip := ui.ButtonBase(c.Key("radio-chip")).Gap(5).Padding(3, 6, 3, 8).Margin(0, 0, 4, -8).Radius(999).
-		AlignItems(ui.Center).AlignSelf(ui.Start).FocusRing(false).Label(exit).Tooltip(exit)
-	bg, fg, cross := ui.Transparent, white.Alpha(0.6), float32(0.5)
-	if chip.Hovered() {
-		bg, fg, cross = white.Alpha(0.12), white.Alpha(0.85), 1
-	}
-	chip.Background(chip.AnimateColor("bg", bg, ui.Animation{Duration: 120 * time.Millisecond})).TextColor(fg)
-	chip.Children(func() {
-		ui.Icon(c, icon).Size(12, 12)
-		ui.Text(c, radioLabel(name)).FontSize(11.5).FontWeight(700).LetterSpacing(0.3)
-		ui.Icon(c, iconX).Size(11, 11).Opacity(cross)
-	})
-	if chip.Clicked() {
-		a.exitRadio()
 	}
 }
 
@@ -399,17 +336,7 @@ func (a *app) paneTab(c *ui.Context, i int, label string) {
 	}
 	b.Background(b.AnimateColor("bg", bg, ui.Animation{Duration: 120 * time.Millisecond}))
 	b.Children(func() {
-		if i != paneComments {
-			ui.Text(c, label).FontSize(13).FontWeight(600).TextColor(fg)
-			return
-		}
-		// The count rolls as it changes, from one song's to the next.
-		n, text := a.commentCount(), ""
-		if n > 0 {
-			text = " " + count(n)
-		}
-		ui.Text(c, "评论").FontSize(13).FontWeight(600).TextColor(fg)
-		rollCount(c, &a.tabCount, n, text, fg)
+		ui.Text(c, label).FontSize(13).FontWeight(600).TextColor(fg)
 	})
 	if b.Clicked() {
 		a.choosePane(i)
@@ -424,8 +351,6 @@ func (a *app) lyricsPane(c *ui.Context, tr *netease.Track, h float32) {
 		if loaded {
 			col.Center()
 		}
-		dim, _ := a.quietShown(c, col, tr, lines, loaded)
-		quietUnder(col, dim)
 		col.Children(func() {
 			if !loaded {
 				lyricsSkeleton(c, npShimmer(c))
@@ -433,7 +358,6 @@ func (a *app) lyricsPane(c *ui.Context, tr *netease.Track, h float32) {
 			}
 			ui.Text(c, "纯音乐，请欣赏").FontSize(24).FontWeight(700).TextColor(white.Alpha(0.4))
 		})
-		a.quietCard(c, dim, h*0.18)
 		return
 	}
 	pos := pl.Position()
@@ -449,22 +373,15 @@ func (a *app) lyricsPane(c *ui.Context, tr *netease.Track, h float32) {
 	lag := a.lyricGlide.step(c, &a.lyricScroll)
 
 	scroll := ui.Scroll(c.Key("lyrics")).Grow(1).TrackScroll(&a.lyricScroll).Padding(0, 8, h*0.5, 0)
-	dim, quiet := a.quietShown(c, scroll, tr, lines, loaded)
-	if dim > 0.98 {
-		// Under the hot comment, gone, not drawn faint.
-		scroll.Invisible()
-	}
-	defer a.quietCard(c, dim, h*0.18)
-	a.timedLines(c, scroll, lines, pos, cur, lag, linesStyle{size: 30, weight: 800, lineHeight: 1.25, quiet: quiet}, nil)
+	a.timedLines(c, scroll, lines, pos, cur, lag, linesStyle{size: 30, weight: 800, lineHeight: 1.25}, nil)
 }
 
 // linesStyle is how timedLines sets its lines: the size, weight and
-// leading of their type; quiet nearly hides them, under a hot comment.
+// leading of their type.
 type linesStyle struct {
 	size       float32
 	weight     int
 	lineHeight float32
-	quiet      bool
 }
 
 // timedLines fills scroll with lines that follow the track playing at
@@ -485,10 +402,6 @@ func (a *app) timedLines(c *ui.Context, scroll ui.Element, lines []lyrics.Line, 
 					alpha = 1
 				} else if line.Hovered() {
 					alpha = 0.55
-				}
-				if st.quiet {
-					// Nearly gone under a hot comment.
-					alpha *= quietFaded
 				}
 				if line.Hovered() {
 					line.Background(white.Alpha(0.06))

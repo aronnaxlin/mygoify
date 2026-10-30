@@ -25,10 +25,6 @@ func (a *app) songMenu(c *ui.Context, tr *netease.Track, size float32, color ui.
 // it is listed in, if set.
 func (a *app) songItems(tr *netease.Track, pid int64) func(m *ui.Menu) {
 	return func(m *ui.Menu) {
-		if tr.ProgramID != 0 {
-			a.programItems(m, tr)
-			return
-		}
 		if m.Item("复制歌名").Chosen() {
 			copyText(tr.Name)
 		}
@@ -56,20 +52,5 @@ func (a *app) songItems(tr *netease.Track, pid int64) func(m *ui.Menu) {
 			a.openPage(route{page: pageAlbum, id: tr.Album.ID})
 		}
 		a.playlistItems(m, tr, pid)
-	}
-}
-
-// programItems builds the menu of an episode: copying its title or the
-// link to its page, or opening its podcast's.
-func (a *app) programItems(m *ui.Menu, tr *netease.Track) {
-	if m.Item("复制节目名").Chosen() {
-		copyText(tr.Name)
-	}
-	if m.Item("复制链接").Chosen() {
-		copyText(tr.URL())
-	}
-	m.Separator()
-	if m.Item("查看播客").Chosen() {
-		a.openPage(route{page: pagePodcast, id: tr.PodcastID})
 	}
 }

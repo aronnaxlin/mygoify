@@ -13,18 +13,14 @@ import (
 // artistLinks shows a track's artists as its credits read, each a link to
 // their page in color, brightening to hover under the pointer, and then,
 // with album, a link to its album. An artist NetEase has no page for,
-// credited by name alone, is plain text. An episode's host and podcast,
-// in its artists' and album's place, link to the podcast's page.
+// credited by name alone, is plain text.
 func (a *app) artistLinks(c *ui.Context, tr *netease.Track, color, hover ui.Color, album ...bool) ui.Element {
-	podcast := route{page: pagePodcast, id: tr.PodcastID}
 	return ui.RichText(c).TextColor(color).Children(func() {
 		for i, ar := range tr.Artists {
 			if i > 0 {
 				ui.Text(c, ", ")
 			}
 			switch {
-			case tr.PodcastID != 0:
-				a.link(c.Key(i), ar.Name, color, hover, podcast)
 			case ar.ID != 0:
 				a.link(c.Key(i), ar.Name, color, hover, route{page: pageArtist, id: ar.ID})
 			default:
@@ -34,8 +30,6 @@ func (a *app) artistLinks(c *ui.Context, tr *netease.Track, color, hover ui.Colo
 		if len(album) > 0 && album[0] && tr.Album.Name != "" {
 			ui.Text(c, " — ")
 			switch {
-			case tr.PodcastID != 0:
-				a.link(c.Key("album"), tr.Album.Name, color, hover, podcast)
 			case tr.Album.ID != 0:
 				a.link(c.Key("album"), tr.Album.Name, color, hover, route{page: pageAlbum, id: tr.Album.ID})
 			default:
@@ -66,19 +60,17 @@ func (a *app) openPage(r route) {
 // openArtist opens an artist's page in the main window.
 func (a *app) openArtist(id int64) { a.openPage(route{page: pageArtist, id: id}) }
 
-// These load an artist, their songs, albums and events from NetEase, and
+// These load an artist, their songs and albums from NetEase, and
 // follow them; tests replace them.
 var (
 	artistDetail      = netease.ArtistDetail
 	artistLatestSongs = netease.ArtistLatestSongs
 	albumsBy          = netease.ArtistAlbums
-	accountEvents     = netease.Events
 	followArtist      = netease.FollowArtist
 )
 
 // artistData is what the app has of an artist: who they are, with their
-// most popular songs, and their newest songs, albums and events once
-// asked for.
+// most popular songs, and their newest songs and albums once asked for.
 type artistData struct {
 	profile       *netease.ArtistProfile
 	loading       bool
@@ -88,27 +80,22 @@ type artistData struct {
 	latestErr     string
 	albums        []netease.AlbumProfile
 	albumsPage    paged
-	events        []netease.Event
-	eventsPage    paged
-	eventsBefore  int64 // the time of the last event loaded, the next page's start
-	following     bool  // a follow or unfollow is on its way
+	following     bool // a follow or unfollow is on its way
 }
 
 // What an artist's page lists: their songs, the most popular or the
-// newest, their albums, or their events.
+// newest, or their albums.
 const (
 	artistHot = iota
 	artistLatest
 	artistAlbums
-	artistEvents
 )
 
 // latestCount is how many of an artist's newest songs their page lists;
-// albumsPage and eventsPage how many albums and events load at a time.
+// albumsPage how many albums load at a time.
 const (
 	latestCount = 100
 	albumsPage  = 30
-	eventsPage  = 20
 )
 
 func (a *app) artist(id int64) *artistData {
@@ -132,9 +119,6 @@ func (a *app) loadArtist(id int64) {
 		}
 	}
 	if d.profile != nil || d.loading {
-		if a.artistTab == artistEvents && !d.eventsPage.loaded {
-			a.loadEvents(id)
-		}
 		return
 	}
 	d.loading, d.err = true, ""
@@ -147,10 +131,6 @@ func (a *app) loadArtist(id int64) {
 				return
 			}
 			d.profile = ar
-			// Their events are their account's, which their profile names.
-			if a.artistTab == artistEvents && a.route == (route{page: pageArtist, id: id}) {
-				a.loadEvents(id)
-			}
 		})
 	}()
 }
@@ -192,35 +172,6 @@ func (a *app) loadAlbums(id int64) {
 			}
 			d.albums = append(d.albums, albums...)
 			d.albumsPage.loaded, d.albumsPage.more = true, more && len(albums) > 0
-		})
-	}()
-}
-
-// loadEvents loads the next page of an artist's events, once their profile
-// says whose they are.
-func (a *app) loadEvents(id int64) {
-	d := a.artist(id)
-	if d.profile == nil || d.profile.AccountID == 0 || d.eventsPage.loading {
-		return
-	}
-	d.eventsPage.loading, d.eventsPage.err = true, ""
-	uid, before := d.profile.AccountID, d.eventsBefore
-	if !d.eventsPage.loaded {
-		before = -1
-	}
-	go func() {
-		events, last, more, err := accountEvents(uid, eventsPage, before)
-		a.post(func() {
-			d.eventsPage.loading = false
-			if err != nil {
-				d.eventsPage.err = "动态加载失败"
-				return
-			}
-			d.events = append(d.events, events...)
-			d.eventsPage.loaded = true
-			// A page that starts no earlier would load forever.
-			d.eventsPage.more = more && len(events) > 0 && (before == -1 || last < before)
-			d.eventsBefore = last
 		})
 	}()
 }
@@ -280,12 +231,6 @@ func (a *app) artistPage(c *ui.Context) {
 			if d.albumsPage.loaded && len(d.albums) == 0 {
 				a.empty(c, "暂无专辑")
 			}
-		})
-		return
-	case artistEvents:
-		a.scrollPage(c, func() {
-			header(c)
-			a.artistEvents(c, d)
 		})
 		return
 	}
@@ -391,13 +336,13 @@ func (a *app) artistHeader(c *ui.Context, d *artistData) {
 	ui.Row(c).AlignItems(ui.Center).Margin(34, 0, 14, 0).Children(func() {
 		ui.Text(c, artistTabTitles[a.artistTab]).FontSize(19).FontWeight(700).LetterSpacing(-0.3)
 		ui.Spacer(c)
-		if segmented(c.Key("tab"), &a.artistTab, "热门", "最新", "专辑", "动态") {
+		if segmented(c.Key("tab"), &a.artistTab, "热门", "最新", "专辑") {
 			a.loadArtist(ar.ID)
 		}
 	})
 }
 
-var artistTabTitles = [...]string{"歌曲", "歌曲", "专辑", "动态"}
+var artistTabTitles = [...]string{"歌曲", "歌曲", "专辑"}
 
 func (a *app) artistHeaderSkeleton(c *ui.Context, s shimmer) {
 	ui.Row(c).Gap(28).AlignItems(ui.End).Padding(0, 0, 8, 0).Children(func() {
