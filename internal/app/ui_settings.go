@@ -141,11 +141,6 @@ func (a *app) settingsView(c *ui.Context) {
 					a.changed()
 				}
 			})
-			row("间奏时显示热评", "前奏、间奏与尾奏时，歌词处换成这首歌的热门评论", func() {
-				if ui.Switch(c.Key("hot-comments"), &s.HotComments).Label("间奏时显示热评").Changed() {
-					a.changed()
-				}
-			})
 			row("音量均衡", "按网易云音乐测得的响度调整每首歌的音量，让歌曲听起来一样响", func() {
 				if ui.Switch(c.Key("normalize"), &s.Normalize).Label("音量均衡").Changed() {
 					a.pl.SetVolume(a.volume)
@@ -153,10 +148,6 @@ func (a *app) settingsView(c *ui.Context) {
 				}
 			})
 		})
-
-		if a.captionsShown() {
-			group("播客", func() { a.captionSettings(row, c) })
-		}
 
 		group("缓存", func() {
 			row("歌曲缓存", "听过的歌曲保存在本机，再次播放无需等待，也不耗流量；"+a.cacheUsage(), func() {
@@ -242,7 +233,7 @@ func (a *app) settingsView(c *ui.Context) {
 			group("更新", func() {
 				desc := "每天检查一次是否有新版本"
 				if t := lastUpdateCheck(); !t.IsZero() {
-					desc += "；上次检查：" + commentTime(t, time.Now())
+					desc += "；上次检查：" + relativeTime(t, time.Now())
 				}
 				row("自动检查更新", desc, func() {
 					on := updateChecks()

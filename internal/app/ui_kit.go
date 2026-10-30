@@ -357,3 +357,43 @@ func (a *app) pageFoot(c *ui.Context, pg *paged, next func()) {
 		next()
 	}
 }
+
+func b2f(b bool) float32 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// avatar shows a round picture of someone, from url, size across.
+func (a *app) avatar(c *ui.Context, url string, size float32, empty ui.Color) {
+	bmp := bitmap(a.art.get(netease.Sized(url, int(size*3)), false))
+	box := ui.Box(c).Size(size, size).Radius(size / 2).Shrink(0)
+	in := artIn(box, bmp)
+	if in < 1 {
+		box.Background(empty)
+	}
+	box.Children(func() { artImage(c, bmp, size/2, in) })
+}
+
+// relativeTime says when t was: in minutes or hours while recent, then by
+// the day.
+func relativeTime(t, now time.Time) string {
+	d := now.Sub(t)
+	y1, m1, d1 := t.Date()
+	y2, m2, d2 := now.Date()
+	switch {
+	case d < time.Minute:
+		return "刚刚"
+	case d < time.Hour:
+		return fmt.Sprintf("%d分钟前", int(d/time.Minute))
+	case y1 == y2 && m1 == m2 && d1 == d2:
+		return t.Format("15:04")
+	case now.AddDate(0, 0, -1).Format("20060102") == t.Format("20060102"):
+		return "昨天 " + t.Format("15:04")
+	case y1 == y2:
+		return fmt.Sprintf("%d月%d日", m1, d1)
+	default:
+		return fmt.Sprintf("%d年%d月%d日", y1, m1, d1)
+	}
+}

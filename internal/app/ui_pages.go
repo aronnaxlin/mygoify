@@ -53,7 +53,6 @@ func (a *app) homePage(c *ui.Context) {
 			a.homeSkeleton(c, a.pageShimmer(c))
 			return
 		}
-		a.dailyCard(c, now)
 
 		if len(a.recPlaylists) > 0 {
 			a.section(c, "今日为你推荐")
@@ -301,21 +300,6 @@ func (a *app) playlistHeader(c *ui.Context, pl *netease.Playlist) {
 							a.confirmDelete(mine)
 						}
 					})
-				}
-				switch {
-				case pl.SpecialType != 5:
-				case a.pl.Radio() == heartRadio:
-					if pillButton(c.Key("heart"), iconX, "退出心动模式", p.hover.Over(p.bg), p.text).Clicked() {
-						a.exitRadio()
-					}
-				default:
-					label := "心动模式"
-					if a.radioStarting == heartRadio {
-						label = "正在开启…"
-					}
-					if pillButton(c.Key("heart"), iconHeartFill, label, p.hover.Over(p.bg), p.text).Clicked() {
-						a.startHeartMode()
-					}
 				}
 			})
 		})

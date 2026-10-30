@@ -130,17 +130,14 @@ func TestNowPlayingHoldsStillWithoutBadge(t *testing.T) {
 	}
 }
 
-// ⌘ and a number choose Now Playing's tab in that place, for a song and
-// for an episode, whose tabs are others: its last is the comments, wherever
-// the captions it may have put it.
+// ⌘ and a number choose Now Playing's tab in that place.
 func TestCmdNumberChoosesTab(t *testing.T) {
 	for _, c := range []struct {
 		track netease.Track
 		keys  []int // from 1, 0 for the last tab
 		panes []int
 	}{
-		{netease.Track{ID: 1, Name: "宝船", Duration: 200000}, []int{4, 2, 1}, []int{paneWall, paneStage, paneLyrics}},
-		{netease.Track{ID: 2, Name: "节目", ProgramID: 9, Duration: 200000}, []int{0, 1}, []int{paneComments, paneProgram}},
+		{netease.Track{ID: 1, Name: "宝船", Duration: 200000}, []int{0, 2, 1}, []int{paneWall, paneStage, paneLyrics}},
 	} {
 		a := newTestApp()
 		a.settings = defaultSettings()
@@ -162,10 +159,9 @@ func TestCmdNumberChoosesTab(t *testing.T) {
 	}
 }
 
-// Now Playing's tabs stay where they are going from one pane to another,
-// and as the comments' count changes: the lyrics, the queue and the
-// comments had them over the pane, and the stage and the wall at the top
-// on the right, where a longer count pushed the others along.
+// Now Playing's tabs stay where they are going from one pane to another:
+// the lyrics and the queue had them over the pane, and the stage and the
+// wall at the top on the right.
 func TestNowPlayingTabsStayPut(t *testing.T) {
 	a := newTestApp()
 	a.settings = defaultSettings()
@@ -191,16 +187,6 @@ func TestNowPlayingTabsStayPut(t *testing.T) {
 		}
 		if r, _ := tt.Find("歌词"); r.X != first.X || r.Y != first.Y {
 			t.Errorf("on %s the 歌词 tab is at %v,%v, was at %v,%v", tab, r.X, r.Y, first.X, first.Y)
-		}
-	}
-	for _, pane := range []int{paneStage, paneLyrics} {
-		a.npPane = pane
-		a.comments.loaded, a.comments.total = true, 0
-		settle()
-		a.comments.total = 12345678
-		settle()
-		if r, _ := tt.Find("歌词"); r.X != first.X || r.Y != first.Y {
-			t.Errorf("in pane %d, with the count, the 歌词 tab is at %v,%v, was at %v,%v", pane, r.X, r.Y, first.X, first.Y)
 		}
 	}
 }

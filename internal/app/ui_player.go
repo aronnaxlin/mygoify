@@ -349,10 +349,6 @@ func (a *app) playerBar(c *ui.Context) {
 	pl := a.pl
 	tr := pl.Current()
 	a.tickTimes(c)
-	if a.picked.id != 0 && (tr == nil || tr.ID != a.picked.id || pl.Playing()) {
-		// Played, or gone: it says what it is again.
-		a.picked = pickedUp{}
-	}
 	// Over the foot of the page: while content is under it, its edge frosts
 	// it, with a hairline along the top.
 	edge := ui.Box(c.Key("bottom-edge")).Absolute().Left(0).Right(0).Bottom(0).Height(playerBarHeight).
@@ -392,8 +388,6 @@ func (a *app) playerBar(c *ui.Context) {
 					var sub string
 					color := p.muted
 					switch {
-					case a.picked.id == tr.ID:
-						sub = a.picked.heard
 					case pl.Loading():
 						sub = "正在缓冲…"
 					case pl.Err() != "":
@@ -428,11 +422,7 @@ func (a *app) playerBar(c *ui.Context) {
 			if a.nowPlaying {
 				lyr = p.accent
 			}
-			label := "歌词"
-			if tr != nil && tr.ProgramID != 0 {
-				label = "节目简介"
-			}
-			if iconButton(c.Key("lyrics"), iconLyrics, 16, lyr, label).Clicked() && tr != nil {
+			if iconButton(c.Key("lyrics"), iconLyrics, 16, lyr, "歌词").Clicked() && tr != nil {
 				a.nowPlaying, a.npPane = true, a.lyricsPaneChosen()
 			}
 			if iconButton(c.Key("queue"), iconQueue, 16, p.muted, "播放队列").Clicked() && tr != nil {

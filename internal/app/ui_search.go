@@ -9,11 +9,8 @@ import (
 	"mygoify/internal/netease"
 )
 
-// searchResults and searchSuggest search NetEase; tests replace them.
-var (
-	searchResults = netease.SearchPage
-	searchSuggest = netease.SearchSuggest
-)
+// searchResults searches NetEase; tests replace it.
+var searchResults = netease.SearchPage
 
 // searchLimit is how many results load at a time.
 const searchLimit = 60
@@ -26,8 +23,6 @@ var searchKinds = []struct {
 	{netease.SearchSongs, "单曲", "首单曲"},
 	{netease.SearchArtists, "歌手", "位歌手"},
 	{netease.SearchAlbums, "专辑", "张专辑"},
-	{netease.SearchUsers, "用户", "位用户"},
-	{netease.SearchPodcasts, "播客", "个播客"},
 }
 
 // searchData is what a search found, as far as its pages have loaded.
@@ -53,7 +48,6 @@ func (a *app) search(q string) {
 // for again, it loads anew.
 func (a *app) searchFor(r route) {
 	a.rememberSearch(r.query)
-	a.dismissSuggestions()
 	if r == a.route {
 		a.nowPlaying = false
 		a.loadSearch(r, true)
@@ -143,14 +137,6 @@ func (a *app) searchPage(c *ui.Context) {
 			})
 		case netease.SearchAlbums:
 			a.albumGrid(c, res.Albums)
-		case netease.SearchUsers:
-			for i := range res.Users {
-				a.userRow(c.Key(res.Users[i].UserID), &res.Users[i])
-			}
-		case netease.SearchPodcasts:
-			for i := range res.Podcasts {
-				a.podcastRow(c.Key(res.Podcasts[i].ID), &res.Podcasts[i])
-			}
 		}
 		if !d.page.loaded && d.page.loading {
 			a.playlistCardsSkeleton(c, a.pageShimmer(c), a.columns(c, 156), 156, false)

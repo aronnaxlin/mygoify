@@ -149,9 +149,6 @@ func (a *app) wallSong(c *ui.Context, tr *netease.Track, art *artwork, top, h fl
 		}
 		cov.Children(func() { artImage(c, bitmap(art), 16, in) })
 		ui.Column(c).Width(440).Shrink(1).MinWidth(0).Gap(4).Children(func() {
-			if r := pl.Radio(); r != "" {
-				a.radioChip(c, r)
-			}
 			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
 				ui.Text(c, tr.Name).FontSize(26).FontWeight(800).LetterSpacing(-0.4).SingleLine().Shrink(1).MinWidth(0)
 				a.likeButton(c.Key("like"), tr, 20, white.Alpha(0.7))

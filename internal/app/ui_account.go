@@ -51,13 +51,11 @@ func (a *app) signedIn(prof *netease.Profile) {
 	// the listener play their songs is back.
 	a.restoreSession()
 	a.mine, a.saved, a.recPlaylists, a.liked = nil, nil, nil, nil
-	a.likedPrograms, a.askedPrograms = nil, nil
 	// What the listener may play, and follows, changed: load the pages
 	// again.
 	a.playlists = map[int64]*netease.Playlist{}
 	a.plErr = map[int64]string{}
-	a.artists, a.albums, a.users, a.podcasts = map[int64]*artistData{}, map[int64]*albumData{}, map[int64]*userData{}, map[int64]*podcastData{}
-	a.podcastTab = &podcastTab{}
+	a.artists, a.albums = map[int64]*artistData{}, map[int64]*albumData{}
 	a.searches = map[route]*searchData{}
 	a.load(a.route)
 	a.loadHome()
@@ -116,9 +114,6 @@ func (a *app) pollLogin(gen int, key string) {
 				case code == netease.QRConfirmed:
 					l.status, l.finished = code, true
 					a.signedIn(prof)
-					if prof != nil {
-						a.pickUp(prof.UserID)
-					}
 					a.closeLoginSoon(gen)
 				case code == netease.QRExpired || code == netease.QRWaiting || code == netease.QRScanned:
 					l.status = code
@@ -293,11 +288,7 @@ func (a *app) accountMenu(c *ui.Context, row ui.Element) {
 		if runtime.GOOS == "darwin" {
 			shortcut = "⌘,"
 		}
-		if a.menuItem(c, iconUser, "我的主页", "").AutoFocus().Clicked() {
-			a.accountOpen = false
-			a.open(route{page: pageUser, id: a.profile.UserID})
-		}
-		if a.menuItem(c, iconSettings, "设置…", shortcut).Clicked() {
+		if a.menuItem(c, iconSettings, "设置…", shortcut).AutoFocus().Clicked() {
 			a.accountOpen = false
 			a.openSettings()
 		}
