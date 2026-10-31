@@ -1,8 +1,10 @@
 package app
 
 import (
+	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"mygoify/internal/auth"
 	"mygoify/internal/library"
@@ -20,7 +22,9 @@ import (
 // the token cmd/poc login kept; SOLOIST_DEVICE_NAME names the Soloist
 // running with its data in SOLOIST_DATA_DIR, or ~/.local/share/mygoify/soloist.
 // Without them, the app shows the fake library and plays through the
-// fake backend.
+// fake backend. With SOLOIST_BIN and SOLOIST_API_KEY too, the app starts
+// that Soloist as a service; without them, it plays through one started
+// by hand.
 
 // devSpotify returns the library and the backend the environment names,
 // or nils without them.
@@ -42,6 +46,18 @@ func devSpotify() (library.Library, playback.Backend) {
 	sess := auth.NewSession(auth.Config{ClientID: clientID, RedirectURI: os.Getenv("SPOTIFY_REDIRECT_URI")}, tokenFile(filepath.Join(data, "poc-token.json")))
 	if !sess.Restore() {
 		return nil, nil
+	}
+	if bin, key := os.Getenv("SOLOIST_BIN"), os.Getenv("SOLOIST_API_KEY"); bin != "" && key != "" {
+		if rest, ok := strings.CutPrefix(bin, "~/"); ok {
+			bin = filepath.Join(home, rest)
+		}
+		svc := &soloist.Service{Bin: bin, Key: key, DeviceName: name, DataDir: dir, Logs: filepath.Join(data, "soloist.log")}
+		// The backend connects once it listens.
+		go func() {
+			if err := svc.Start(); err != nil {
+				log.Print(err)
+			}
+		}()
 	}
 	api := &spotify.Client{Token: sess.AccessToken}
 	return &spotify.Library{API: api}, soloist.New(soloist.Config{DataDir: dir, DeviceName: name, API: api})
