@@ -17,6 +17,7 @@ type Fake struct {
 	states chan State // what emit reports, in order, for Watch's function
 	st     State
 	given  []music.Track // the queue in the order Play gave it
+	queued int           // how many of the tracks after the one playing were queued
 	timer  *time.Timer
 	volume float64
 }
@@ -73,6 +74,7 @@ func (f *Fake) ended() {
 		f.at(0)
 	case f.st.At+1 < len(f.st.Queue):
 		f.st.At++
+		f.queued = max(f.queued-1, 0)
 		f.at(0)
 	case f.st.Repeat == RepeatAll:
 		f.st.At = 0
@@ -95,6 +97,7 @@ func (f *Fake) Play(req Request) error {
 	defer f.mu.Unlock()
 	f.st.Queue = slices.Clone(req.Tracks)
 	f.given = slices.Clone(req.Tracks)
+	f.queued = 0
 	f.st.At = min(max(req.Start, 0), len(req.Tracks)-1)
 	if f.st.Shuffle {
 		f.shuffle()
@@ -106,9 +109,9 @@ func (f *Fake) Play(req Request) error {
 }
 
 // shuffle puts the tracks after the one playing in a random order, as
-// Spotify does: what played stays. f.mu is held.
+// Spotify does: what played stays, and so do those queued. f.mu is held.
 func (f *Fake) shuffle() {
-	rest := f.st.Queue[f.st.At+1:]
+	rest := f.st.Queue[f.st.At+1+f.queued:]
 	rand.Shuffle(len(rest), func(i, j int) { rest[i], rest[j] = rest[j], rest[i] })
 }
 
@@ -145,8 +148,13 @@ func (f *Fake) jump(at int) error {
 	if n := len(f.st.Queue); n == 0 {
 		return errNothing
 	} else {
-		f.st.At = (at%n + n) % n
+		at = (at%n + n) % n
 	}
+	// Moving on past queued tracks plays them, or skips them.
+	if d := at - f.st.At; d > 0 {
+		f.queued = max(f.queued-d, 0)
+	}
+	f.st.At = at
 	f.st.Playing = true
 	f.at(0)
 	f.emit()
@@ -190,6 +198,7 @@ func (f *Fake) SetShuffle(on bool) error {
 		} else {
 			id := f.st.Queue[f.st.At].ID
 			f.st.Queue = slices.Clone(f.given)
+			f.queued = 0
 			f.st.At = max(slices.IndexFunc(f.given, func(t music.Track) bool { return t.ID == id }), 0)
 		}
 	}
@@ -201,6 +210,20 @@ func (f *Fake) SetRepeat(r RepeatMode) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.st.Repeat = r
+	f.emit()
+	return nil
+}
+
+// AddToQueue puts t after the tracks queued before it, ahead of the rest
+// of the queue, as Spotify does.
+func (f *Fake) AddToQueue(t music.Track) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.st.At < 0 {
+		return errNothing
+	}
+	f.st.Queue = slices.Insert(f.st.Queue, f.st.At+1+f.queued, t)
+	f.queued++
 	f.emit()
 	return nil
 }

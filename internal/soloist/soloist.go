@@ -447,6 +447,12 @@ func (b *Backend) SetRepeat(r playback.RepeatMode) error {
 	return b.command("set_repeat_track", "enabled", r == playback.RepeatOne)
 }
 
+// AddToQueue queues t. Soloist takes it without being the device playing,
+// so this leaves playback where it is.
+func (b *Backend) AddToQueue(t music.Track) error {
+	return b.command("add_to_queue", "uri", t.URI())
+}
+
 // maxURIs is the most tracks the Web API plays as a list.
 const maxURIs = 100
 

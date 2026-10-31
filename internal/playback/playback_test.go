@@ -176,3 +176,26 @@ func TestPlayerFollowsOnceAsked(t *testing.T) {
 		t.Fatal("the track playing doesn't show")
 	}
 }
+
+// Queued tracks play after those queued before them, ahead of the rest of
+// the context, and stay there through shuffle.
+func TestFakeQueues(t *testing.T) {
+	f := NewFake()
+	next := states(f)
+	f.Play(Request{Tracks: tracks(3, time.Minute), Start: 0})
+	minute := time.Minute.Milliseconds()
+	x, y, z := music.Track{ID: "x", Duration: minute}, music.Track{ID: "y", Duration: minute}, music.Track{ID: "z", Duration: minute}
+	f.AddToQueue(x)
+	f.AddToQueue(y)
+	f.Next() // plays x
+	f.AddToQueue(z)
+	f.SetShuffle(true)
+	st := next(t, func(st State) bool { return st.Shuffle })
+	var ids string
+	for _, tr := range st.Queue[:st.At+3] {
+		ids += tr.ID
+	}
+	if ids != "axyz" || st.At != 1 {
+		t.Errorf("queue starts %s, at %d; want axyz, at 1", ids, st.At)
+	}
+}
