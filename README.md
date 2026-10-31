@@ -14,6 +14,11 @@
 
 使用需要 Spotify Premium 和一个 Spotify for Developers 账号。
 
+## 凭据放在哪
+
+- Spotify 登录和 Soloist 的 API key 存在系统钥匙串里（macOS 钥匙串，Linux 的 Secret Service，比如 GNOME Keyring、KeePassXC）；client ID 等其余设置存在设置文件里。
+- **Soloist 只能从命令行参数拿到 API key**，没有别的方式。所以 Soloist 运行时，同一台电脑上的其他用户用 `ps` 能看到这个 key。服务的配置文件里不会写 key，只在启动时从只有你能读的文件里读进来。单用户电脑上问题不大；多人共用的机器上，Linux 可以用 `hidepid=2` 重新挂载 `/proc` 来遮住别人的进程参数。
+
 ## 构建
 
 需要 Go 1.27+。
