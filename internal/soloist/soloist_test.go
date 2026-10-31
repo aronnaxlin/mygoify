@@ -400,3 +400,34 @@ func TestLoggedInIsTold(t *testing.T) {
 		t.Fatal("not told of the login")
 	}
 }
+
+// A queue that comes with tracks Soloist doesn't know yet, as it starts
+// a context, is asked for again until they come with their names: the
+// queue showed rows with no name, at 0:00, as it never said it again.
+func TestQueueAskedAgainWhileBare(t *testing.T) {
+	defer func(d time.Duration) { reaskAfter = d }(reaskAfter)
+	reaskAfter = 10 * time.Millisecond
+	f := newFakeSoloist(t)
+	b := New(Config{DataDir: f.dir})
+	states := watch(b)
+	f.connected(t, 1)
+	f.send(t, `{"type":"playback_state","status":"playing","item":`+track("cur", "现在")+`}`)
+	f.send(t, `{"type":"queue_changed","previous":[],"upcoming":[{"uid":"n1","source":"context","item":`+track("next1", "下一首")+`},`+
+		`{"uid":"n2","source":"context","item":{"uri":"spotify:track:next2","entity_type":"track"}}]}`)
+	select {
+	case cmd := <-f.commands:
+		if cmd["command"] != "get_queue" {
+			t.Fatalf("asked %v", cmd)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("the queue wasn't asked for again")
+	}
+	f.send(t, `{"type":"queue_changed","previous":[],"upcoming":[{"uid":"n1","source":"context","item":`+track("next1", "下一首")+`},`+
+		`{"uid":"n2","source":"context","item":`+track("next2", "再下一首")+`}]}`)
+	until(t, states, func(st playback.State) bool { return len(st.Queue) == 3 && st.Queue[2].Name == "再下一首" })
+	select {
+	case cmd := <-f.commands:
+		t.Fatalf("asked %v once the queue was whole", cmd)
+	case <-time.After(100 * time.Millisecond):
+	}
+}

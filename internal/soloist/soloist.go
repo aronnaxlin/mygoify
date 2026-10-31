@@ -62,6 +62,9 @@ type Backend struct {
 	active   bool
 	device   string // its ID in the Web API, once found
 	err      string
+	// reasks counts the queues asked for again, which came with tracks
+	// still bare.
+	reasks int
 	states   chan playback.State
 }
 
@@ -261,6 +264,7 @@ func (b *Backend) handle(data []byte) {
 		}
 	case "queue_changed":
 		b.previous, b.upcoming = ev.Previous, ev.Upcoming
+		b.askAgainIfBare()
 	case "command_result":
 		return
 	}
@@ -287,6 +291,37 @@ func (b *Backend) handle(data []byte) {
 		b.err = ""
 	}
 	b.emit()
+}
+
+// reaskAfter is how long Backend waits to ask again for a queue that came
+// with tracks still bare, and maxReasks how many times it asks.
+var reaskAfter = time.Second
+
+const maxReasks = 5
+
+// askAgainIfBare asks for the queue again, a moment later, if tracks of
+// it came bare: as Soloist starts a context, it says the queue before it
+// knows more than the first few of its tracks, and doesn't say it again
+// once it does. b.mu is held.
+func (b *Backend) askAgainIfBare() {
+	bare := false
+	for _, e := range slices.Concat(b.previous, b.upcoming) {
+		if e.Item != nil && e.Item.URI != "" && e.Item.Decorations.Identity.Name == "" {
+			bare = true
+			break
+		}
+	}
+	if !bare {
+		b.reasks = 0
+		return
+	}
+	if b.reasks >= maxReasks {
+		return
+	}
+	b.reasks++
+	time.AfterFunc(reaskAfter, func() {
+		b.send(context.Background(), map[string]any{"command": "get_queue"})
+	})
 }
 
 // state is where playback is, as the app shows it. b.mu is held.
