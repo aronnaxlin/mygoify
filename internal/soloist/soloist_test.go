@@ -187,12 +187,24 @@ func TestCommands(t *testing.T) {
 	if cmd := f.next(t); cmd["command"] != "set_volume" || cmd["volume"] != 50.0 {
 		t.Fatalf("sent %v", cmd)
 	}
-	b.Resume()
+	resumed := make(chan error, 1)
+	go func() { resumed <- b.Resume() }()
 	if cmd := f.next(t); cmd["command"] != "activate" {
 		t.Fatalf("played without activating: %v", cmd)
 	}
+	// Not until Soloist says it is the device playing: it ignored the
+	// play sent at once, and the app's play button did nothing.
+	select {
+	case cmd := <-f.commands:
+		t.Fatalf("sent %v before Soloist was active", cmd)
+	case <-time.After(200 * time.Millisecond):
+	}
+	f.send(t, `{"type":"device_changed","is_active":true,"device_name":"MyGoify"}`)
 	if cmd := f.next(t); cmd["command"] != "play" {
 		t.Fatalf("sent %v", cmd)
+	}
+	if err := <-resumed; err != nil {
+		t.Fatal(err)
 	}
 	b.SetRepeat(playback.RepeatOne)
 	if a, c := f.next(t), f.next(t); a["command"] != "set_repeat_context" || a["enabled"] != false || c["command"] != "set_repeat_track" || c["enabled"] != true {

@@ -348,8 +348,35 @@ func (b *Backend) command(name string, args ...any) error {
 		if err := b.send(context.Background(), map[string]any{"command": "activate"}); err != nil {
 			return err
 		}
+		// Soloist ignores what comes before it says it is the device
+		// playing, half a second later: the app's play button did
+		// nothing.
+		if !b.waitActive(activateWait) {
+			return errors.New("soloist: did not become the device playing")
+		}
 	}
 	return b.send(context.Background(), cmd)
+}
+
+// activateWait is how long a command waits for Soloist to become the
+// device playing.
+const activateWait = 3 * time.Second
+
+// waitActive waits up to d for Soloist to say it is the device playing,
+// and reports whether it did.
+func (b *Backend) waitActive(d time.Duration) bool {
+	for deadline := time.Now().Add(d); ; {
+		b.mu.Lock()
+		active := b.active
+		b.mu.Unlock()
+		if active {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
 }
 
 // plays are the commands that start playback.
