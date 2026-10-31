@@ -81,12 +81,11 @@ func (s *Service) Stop() error {
 // ChangeKey tries key with CheckKey and starts the service again with it
 // if Spotify took it, or with the key it had, returning why not. The
 // service is stopped meanwhile: the copy CheckKey tries is the same
-// device. Before the first pairing there is nothing to try key on, and
-// it is taken as it is.
+// device. Before the first pairing there is nothing to try key on: it
+// returns ErrNotPaired, leaving the service be.
 func (s *Service) ChangeKey(ctx context.Context, key string) error {
 	if !paired(s.DataDir) {
-		s.Key = key
-		return s.Start()
+		return ErrNotPaired
 	}
 	if err := s.Stop(); err != nil {
 		return err
