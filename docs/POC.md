@@ -32,6 +32,8 @@ ROADMAP M0 各项验证的结果。代码在 `cmd/poc`。
 
 - **key 无效时**：用一份配对数据的副本、一个错误的 key 启动 Soloist。它**不退出**（25 秒后仍在运行），`soloist ctl status` 显示 `logged in: no`。日志依次是 `Access denied` → `Permanent OAuth error … oauth_invalid_credentials` → `Broadcasting forced logout` → **`Session removed from store`**：保存的配对会话被删除。错误的 key 会毁掉配对，见 DESIGN §4.2"运行时配置"。
 
+- **新歌开头偶发卡顿重播**（2026-10-31）：从 App 点歌后，偶尔在开播不到 1 秒时卡一下、从头重放（例：《24K Magic》首次播放）。同一时间 Soloist 的事件只有一次"缓冲 → 播放"，进度没有回退，App 也只发了一次播放请求，所以重放发生在 Soloist 内部、对外不可见。对比测试：各 5 首未缓存的歌，用 Soloist 自己的 `play` 都没出现，用 Web API 播放时有 1 首可疑。暂定为偶发、待观察；`MYGOIFY_DEBUG=1` 启动 App 会打印发出的命令和收到的事件，遇到时用来对时间。
+
 ## 对设计的影响
 
 - **P9**：正式版里，Soloist 用 systemd user unit 启动，key 放在只有当前用户可读的 `EnvironmentFile` 里，命令行写 `-k ${SOLOIST_API_KEY}`。这样 unit 文件里不出现明文，但进程命令行里仍然有。Omarchy 默认没有用 `hidepid` 挂载 `/proc`，单用户机器上可以接受，在 README 里写明。

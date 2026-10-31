@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -134,6 +135,9 @@ func (b *Backend) session(ctx context.Context) error {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
 			return nil // dropped: connect again
+		}
+		if debug {
+			log.Printf("soloist: < %s", summary(data))
 		}
 		b.handle(data)
 	}
@@ -330,7 +334,37 @@ func (b *Backend) send(ctx context.Context, cmd map[string]any) error {
 	data, _ := json.Marshal(cmd)
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	if debug {
+		log.Printf("soloist: > %s", data)
+	}
 	return conn.Write(ctx, websocket.MessageText, data)
+}
+
+// debug, with MYGOIFY_DEBUG set, logs what goes to Soloist and comes back,
+// to line it up with what the listener heard.
+var debug = os.Getenv("MYGOIFY_DEBUG") != ""
+
+// summary is an event of Soloist's in a line: its type, status, the
+// track's name and where it is.
+func summary(data []byte) string {
+	var ev event
+	if json.Unmarshal(data, &ev) != nil {
+		return string(data)
+	}
+	s := ev.Type
+	if ev.Status != "" {
+		s += " " + ev.Status
+	}
+	if ev.Item != nil {
+		s += fmt.Sprintf(" %q", ev.Item.Decorations.Identity.Name)
+	}
+	if p := ev.Position; p != nil {
+		s += fmt.Sprintf(" at %dms speed %g", p.PositionMs, p.Speed)
+	}
+	if ev.Message != "" {
+		s += " " + ev.Message
+	}
+	return s
 }
 
 func (b *Backend) command(name string, args ...any) error {

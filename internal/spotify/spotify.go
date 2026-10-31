@@ -10,8 +10,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"math/rand/v2"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -113,7 +115,18 @@ func (c *Client) once(ctx context.Context, method, path string, body []byte) (*h
 	if h == nil {
 		h = http.DefaultClient
 	}
+	debugf("web api: %s %s %s", method, path, body)
 	return h.Do(req)
+}
+
+// debug, with MYGOIFY_DEBUG set, logs the calls to the Web API, to line
+// them up with what the listener heard.
+var debug = os.Getenv("MYGOIFY_DEBUG") != ""
+
+func debugf(format string, args ...any) {
+	if debug {
+		log.Printf(format, args...)
+	}
 }
 
 // apiError is how the Web API says what went wrong. A spent quota says
