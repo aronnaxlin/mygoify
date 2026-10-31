@@ -36,6 +36,7 @@ type onboarding struct {
 	loginErr   error
 	keyErr     error
 	keysTried  []string
+	keysOld    []string    // the key kept, as each was tried
 	started    chan string // the keys Soloist's service was started with
 	paired     func()      // what Soloist's watch calls as it is logged in
 	relaunched int
@@ -65,7 +66,7 @@ func newOnboarding(t *testing.T) *onboarding {
 		open     func(string) error
 		choose   func() string
 		login    func(context.Context, auth.Config, secret.Store) error
-		check    func(context.Context, string, string, string) error
+		check    func(context.Context, spotifySettings, string, string) error
 		start    func(spotifySettings, string) error
 		watch    func(spotifySettings, func())
 		relaunch func()
@@ -97,8 +98,9 @@ func newOnboarding(t *testing.T) *onboarding {
 		}
 		return keep.Set(secret.SpotifyLogin, []byte(`{"refresh_token":"r"}`))
 	}
-	checkKey = func(ctx context.Context, bin, key, dir string) error {
+	checkKey = func(ctx context.Context, cfg spotifySettings, old, key string) error {
 		o.keysTried = append(o.keysTried, key)
+		o.keysOld = append(o.keysOld, old)
 		return o.keyErr
 	}
 	startSoloist = func(cfg spotifySettings, key string) error { o.started <- key; return nil }
@@ -337,7 +339,7 @@ func TestOnboardingKeyTrialCanBeCancelled(t *testing.T) {
 	o.set(stepKey)
 	o.open()
 	stopped := make(chan struct{})
-	checkKey = func(ctx context.Context, bin, key, dir string) error {
+	checkKey = func(ctx context.Context, cfg spotifySettings, old, key string) error {
 		<-ctx.Done()
 		close(stopped)
 		return ctx.Err()
@@ -383,6 +385,10 @@ func TestOnboardingWrongKeyKeepsTheOld(t *testing.T) {
 	o.settle()
 	if key, _ := o.kept(secret.SoloistKey); key != "the-key" {
 		t.Errorf("the key kept is %q", key)
+	}
+	// The trial is told the key to run Soloist with again, if it fails.
+	if len(o.keysOld) != 1 || o.keysOld[0] != "the-key" {
+		t.Errorf("tried in place of %q", o.keysOld)
 	}
 	select {
 	case k := <-o.started:

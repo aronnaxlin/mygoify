@@ -38,15 +38,17 @@ var (
 		sess := auth.NewSession(cfg, secret.Entry{Store: keep, Name: secret.SpotifyLogin})
 		return sess.Login(ctx, openURL)
 	}
-	// checkKey tries a key on a copy of Soloist's data (DESIGN.md §4.2):
-	// until it holds, the key never meets the pairing.
-	checkKey = soloist.CheckKey
+	// checkKey tries key in place of old, the key kept, and returns what
+	// soloist.CheckKey does (DESIGN.md §4.2): until it holds, the key never
+	// meets the pairing. Soloist's service is stopped while it is tried,
+	// and runs again with key if it holds, or else with old.
+	checkKey = func(ctx context.Context, cfg spotifySettings, old, key string) error {
+		return soloistService(cfg, old).ChangeKey(ctx, key)
+	}
 	// startSoloist starts Soloist's service with the key, or restarts it
 	// as the key or its executable changed.
 	startSoloist = func(cfg spotifySettings, key string) error {
-		bin := expandHome(cfg.SoloistBin)
-		svc := &soloist.Service{Bin: bin, Key: key, DeviceName: cfg.DeviceName, DataDir: soloistDataDir(), Logs: filepath.Join(dataDir(), "soloist.log")}
-		return svc.Start()
+		return soloistService(cfg, key).Start()
 	}
 	// watchSoloist calls paired each time Soloist says it is logged in to
 	// Spotify: as it first is, and again as it restarts.
@@ -130,6 +132,11 @@ func (a *app) vault() secret.Store {
 		return a.keep
 	}
 	return secrets()
+}
+
+// soloistService is Soloist's service as cfg and key set it up.
+func soloistService(cfg spotifySettings, key string) *soloist.Service {
+	return &soloist.Service{Bin: expandHome(cfg.SoloistBin), Key: key, DeviceName: cfg.DeviceName, DataDir: soloistDataDir(), Logs: filepath.Join(dataDir(), "soloist.log")}
 }
 
 // soloistDataDir is where Soloist keeps its pairing, as connectSpotify has
@@ -485,8 +492,9 @@ func (a *app) submitKey() {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	ob.stopKey = cancel
 	keep := a.vault()
+	old := soloistKey(keep)
 	go func() {
-		err := checkKey(ctx, expandHome(cfg.SoloistBin), key, soloistDataDir())
+		err := checkKey(ctx, cfg, old, key)
 		cancel()
 		var state keyState
 		switch {
