@@ -1,88 +1,55 @@
 {
-  "groups": [
+  "fill-specializations" : [
     {
-      "layers": [
-        {
-          "image-name": "arm.svg",
-          "name": "arm",
-          "glass": true
-        }
-      ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0.5
-      },
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
+      "value" : {
+        "solid" : "srgb:0.94902,0.95294,0.93333,1.00000"
       }
     },
     {
-      "layers": [
-        {
-          "image-name": "label.svg",
-          "name": "label",
-          "glass": true
-        },
-        {
-          "image-name": "record.svg",
-          "name": "record",
-          "glass": true
-        }
-      ],
-      "shadow": {
-        "kind": "neutral",
-        "opacity": 0.5
-      },
-      "translucency": {
-        "enabled": false,
-        "value": 0.5
+      "appearance" : "dark",
+      "value" : {
+        "solid" : "srgb:0.04706,0.12157,0.07843,1.00000"
       }
     }
   ],
-  "supported-platforms": {
-    "circles": [
-      "watchOS"
-    ],
-    "squares": "shared"
-  },
-  "fill-specializations": [
+  "groups" : [
     {
-      "value": {
-        "linear-gradient": [
-          "srgb:1.00000,0.97647,0.94902,1.00000",
-          "srgb:0.93725,0.89020,0.83922,1.00000"
-        ],
-        "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 0
-          },
-          "stop": {
-            "x": 0.5,
-            "y": 1
-          }
+      "layers" : [
+        {
+          "image-name" : "strokes.svg",
+          "name" : "strokes",
+          "glass" : true,
+          "fill-specializations" : [
+            { "value" : { "solid" : "srgb:0.07059,0.07059,0.07059,1.00000" } },
+            { "appearance" : "dark", "value" : { "solid" : "srgb:0.11765,0.84314,0.37647,1.00000" } },
+            { "appearance" : "tinted", "value" : { "solid" : "srgb:1.00000,1.00000,1.00000,1.00000" } }
+          ]
+        },
+        {
+          "image-name" : "dots.svg",
+          "name" : "dots",
+          "glass" : true,
+          "fill-specializations" : [
+            { "value" : { "solid" : "srgb:0.07059,0.07059,0.07059,1.00000" } },
+            { "appearance" : "dark", "value" : { "solid" : "srgb:0.11765,0.84314,0.37647,1.00000" } },
+            { "appearance" : "tinted", "value" : { "solid" : "srgb:1.00000,1.00000,1.00000,1.00000" } }
+          ]
         }
-      }
-    },
-    {
-      "appearance": "dark",
-      "value": {
-        "linear-gradient": [
-          "srgb:0.24000,0.22000,0.24000,1.00000",
-          "srgb:0.09000,0.08000,0.09000,1.00000"
-        ],
-        "orientation": {
-          "start": {
-            "x": 0.5,
-            "y": 0
-          },
-          "stop": {
-            "x": 0.5,
-            "y": 1
-          }
-        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
       }
     }
-  ]
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
 }

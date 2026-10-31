@@ -29,7 +29,7 @@
 ## M1 · 骨架（约 1 周）
 
 - [x] Fork `egoist/mygo-cloudmusic` 为 `aronnaxlin/mygoify`，保留历史；改模块名、`mygo.json`（显示名、identifier、slug、更新公钥）
-- [ ] 新图标；官网（`website/`）改造或删除
+- [x] 新图标；官网（`website/`）改造或删除
 - [x] 删除评论、热评、播客、字幕和语音识别（`speech`）、私人 FM 和心动模式、日推、用户页、动态、搜索建议的界面和代码（DESIGN §6）
 - [x] 删除 `netease`、`player`（随下面的接口替换完成）
 - [x] 新建 `internal/music`（数据模型）、`internal/library`、`internal/playback`（接口 + 假实现）

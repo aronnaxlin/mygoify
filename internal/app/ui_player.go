@@ -419,7 +419,7 @@ func (a *app) playerBar(c *ui.Context) {
 					case pl.Loading():
 						sub = "正在缓冲…"
 					case pl.Err() != "":
-						sub, color = pl.Err(), p.accent
+						sub, color = pl.Err(), p.danger
 					}
 					if sub == "" {
 						a.artistLinks(c, tr, p.muted, p.text).FontSize(12).SingleLine()

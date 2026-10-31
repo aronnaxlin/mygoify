@@ -1,8 +1,6 @@
 // Command tray draws internal/app/tray/tray-template.png, the app's icon in
-// the macOS menu bar: the record and tonearm of the app's icon, black on
-// transparent for macOS to tint, the tonearm knocked out of the record
-// around it. It draws from signed distances, supersampled, at 2× of the
-// menu bar's 18 points.
+// the macOS menu bar: the app's mark (icon/mark), black on transparent for
+// macOS to tint, supersampled, at 2× of the menu bar's 18 points.
 //
 // Run it from the repository root:
 //
@@ -21,95 +19,53 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+
+	"mygoify/icon/mark"
 )
 
-type pt struct{ x, y float64 }
-
-func sub(a, b pt) pt              { return pt{a.x - b.x, a.y - b.y} }
-func dot(a, b pt) float64         { return a.x*b.x + a.y*b.y }
-func length(a pt) float64         { return math.Hypot(a.x, a.y) }
-func along(a, u pt, d float64) pt { return pt{a.x + u.x*d, a.y + u.y*d} }
-
-// The glyph, in points, before it is fit to the square.
-var (
-	// The record, its label's edge cut as a ring, and the spindle's hole.
-	center    = pt{7.6, 10.6}
-	radius    = 7.0
-	labelEdge = 2.35
-	labelCut  = 0.8
-	spindle   = 0.85
-
-	// The tonearm: the stylus rests on the grooves, at tip, and the arm
-	// rises steeply from it to the pivot, past the record's edge.
-	tip       = along(center, pt{math.Cos(0.5), -math.Sin(0.5)}, 4.15)
-	toPivot   = pt{math.Cos(1.15), -math.Sin(1.15)}
-	pivot     = along(tip, toPivot, 7.2)
-	pivotR    = 1.45
-	armWidth  = 1.05
-	headLen   = 2.0
-	headWidth = 1.9
-	headR     = 0.45
-	// Knocked out of the record around the tonearm.
-	gap = 0.75
-
-	// The glyph's longer side, centred in the 18-point square.
-	fit = 15.6
-)
-
-// segDist is the distance from p to the segment ab.
-func segDist(p, a, b pt) float64 {
-	pa, ba := sub(p, a), sub(b, a)
-	h := math.Max(0, math.Min(1, dot(pa, ba)/dot(ba, ba)))
-	return length(sub(pa, pt{ba.x * h, ba.y * h}))
+// inside tells whether the point x, y of the mark's 1024-point canvas is
+// inside the mark.
+func inside(x, y float64) bool {
+	ux, uy := mark.Upright(x, y)
+	for i := range mark.Tops {
+		if mark.InStroke(i, ux, uy) || mark.InDot(i, ux, uy) {
+			return true
+		}
+	}
+	return false
 }
 
-// headDist is the signed distance from p to the headshell, a rounded box
-// from the tip back along the arm.
-func headDist(p pt) float64 {
-	v := pt{-toPivot.y, toPivot.x}
-	d := sub(p, tip)
-	q := pt{math.Abs(dot(d, toPivot)-headLen/2) - (headLen/2 - headR), math.Abs(dot(d, v)) - (headWidth/2 - headR)}
-	return length(pt{math.Max(q.x, 0), math.Max(q.y, 0)}) + math.Min(math.Max(q.x, q.y), 0) - headR
-}
+// The mark's longer side, centred in the 18-point square.
+const fit = 15.6
 
-func inside(p pt) bool {
-	d := length(sub(p, center))
-	record := d < radius && math.Abs(d-labelEdge) > labelCut/2 && d > spindle
-	head := along(tip, toPivot, headLen/2)
-	arm, shell, hub := segDist(p, pivot, head), headDist(p), length(sub(p, pivot))
-	knocked := arm < armWidth/2+gap || shell < gap || hub < pivotR+gap
-	return record && !knocked || arm < armWidth/2 || shell < 0 || hub < pivotR
-}
-
-// frame is the scale and offset from the square to the glyph, which fit
-// the glyph's bounds to the square.
-func frame() (scale float64, off pt) {
+// frame is the scale and offset from the square to the canvas, which fit
+// the mark's bounds to the square.
+func frame() (scale, offX, offY float64) {
 	x0, y0, x1, y1 := math.Inf(1), math.Inf(1), math.Inf(-1), math.Inf(-1)
-	for y := -5.0; y < 25; y += 0.02 {
-		for x := -5.0; x < 25; x += 0.02 {
-			if inside(pt{x, y}) {
+	for y := 0.0; y < 1024; y++ {
+		for x := 0.0; x < 1024; x++ {
+			if inside(x, y) {
 				x0, y0, x1, y1 = math.Min(x0, x), math.Min(y0, y), math.Max(x1, x), math.Max(y1, y)
 			}
 		}
 	}
 	scale = fit / math.Max(x1-x0, y1-y0)
-	return scale, pt{(x0+x1)/2 - 9/scale, (y0+y1)/2 - 9/scale}
+	return scale, (x0+x1)/2 - 9/scale, (y0+y1)/2 - 9/scale
 }
 
 // render draws the icon px pixels square, each pixel's alpha the share of
-// 16×16 samples inside the glyph.
+// 16×16 samples inside the mark.
 func render(px int) *image.NRGBA {
 	img := image.NewNRGBA(image.Rect(0, 0, px, px))
 	s := float64(px) / 18
-	k, off := frame()
+	k, offX, offY := frame()
 	const n = 16
 	for y := 0; y < px; y++ {
 		for x := 0; x < px; x++ {
 			hit := 0
 			for j := 0; j < n; j++ {
 				for i := 0; i < n; i++ {
-					p := pt{(float64(x)+(float64(i)+0.5)/n)/s/k + off.x, (float64(y)+(float64(j)+0.5)/n)/s/k + off.y}
-					if inside(p) {
+					if inside((float64(x)+(float64(i)+0.5)/n)/s/k+offX, (float64(y)+(float64(j)+0.5)/n)/s/k+offY) {
 						hit++
 					}
 				}
