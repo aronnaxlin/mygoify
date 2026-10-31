@@ -2,44 +2,27 @@ package app
 
 import (
 	"runtime"
-	"time"
 
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
 )
 
-// These sign in to Spotify, in the browser, and out; tests replace them.
-// Until internal/auth comes (M2) the fake library is signed in at once.
-var (
-	// restoreLogin signs in with the login kept from before, if any.
-	restoreLogin = func() bool { return true }
-	// logIn opens the browser for the listener to log in, and returns once
-	// they have.
-	logIn  = func() error { return nil }
-	logOut = func() {}
-)
-
-// loginState is a login under way, in the browser.
-type loginState struct {
-	open     bool
-	gen      int  // counts logins, to drop the answers of closed ones
-	waiting  bool // the browser is open, for the listener to log in
-	err      string
-	finished bool
-}
-
 // boot signs in with the login kept, if any, then loads the home page for
 // whoever is listening.
 func (a *app) boot() {
 	a.homeLoading = true
 	go func() {
-		var prof *music.User
-		if restoreLogin() {
-			prof, _ = a.lib.Me()
-		}
+		// The fake library knows its listener; Spotify's does with a login
+		// kept that still holds.
+		prof, _ := a.lib.Me()
 		a.post(func() {
 			a.signedIn(prof)
+			// Not Spotify's yet, or not signed in to: onboarding, unless
+			// the listener put it off.
+			if (!a.live || prof == nil) && !a.settings.OnboardingDismissed {
+				a.openOnboarding()
+			}
 		})
 	}()
 }
@@ -63,93 +46,6 @@ func (a *app) signedIn(prof *music.User) {
 	a.loadHome()
 	a.loadLiked(prof.ID)
 	a.loadMine(prof.ID)
-}
-
-func (a *app) openLogin() {
-	a.login = loginState{open: true, gen: a.login.gen + 1}
-}
-
-// startLogin opens the browser for the listener to log in, and signs in
-// once they have.
-func (a *app) startLogin() {
-	l := &a.login
-	l.waiting, l.err = true, ""
-	gen := l.gen
-	go func() {
-		err := logIn()
-		var prof *music.User
-		if err == nil {
-			prof, err = a.lib.Me()
-		}
-		a.post(func() {
-			l := &a.login
-			if gen != l.gen || !l.open {
-				return
-			}
-			l.waiting = false
-			if err != nil {
-				l.err = "登录失败，请稍后再试"
-				return
-			}
-			l.finished = true
-			a.signedIn(prof)
-			a.closeLoginSoon(gen)
-		})
-	}()
-}
-
-// closeLoginSoon closes the dialog a moment after it showed the welcome.
-func (a *app) closeLoginSoon(gen int) {
-	go func() {
-		time.Sleep(1200 * time.Millisecond)
-		a.post(func() {
-			if gen == a.login.gen {
-				a.login.open = false
-			}
-		})
-	}()
-}
-
-func (a *app) signOut() {
-	a.login.gen++
-	a.signedIn(nil)
-	go logOut()
-}
-
-// loginDialog asks the listener to log in to Spotify, in the browser.
-func (a *app) loginDialog(c *ui.Context) {
-	p := a.pal
-	l := &a.login
-	ui.DialogBase(c.Key("login"), &l.open, func(backdrop, panel ui.Element) {
-		backdrop.Background(ui.RGBA(0, 0, 0, 0.35))
-		panel.Width(340).Padding(28, 28, 26, 28).Radius(22).Gap(6).AlignItems(ui.Center).
-			Background(p.bg).Border(1, p.hairline).Shadow(0, 24, 60, -12, ui.RGBA(0, 0, 0, 0.4)).
-			Transition(ui.ElementTransition{Animation: &ui.Snappy, Enter: &ui.Motion{Scale: 0.94}, Exit: &ui.Motion{Scale: 0.96}})
-		title, sub := "登录 Spotify", "在浏览器中登录你的 Spotify 账户"
-		switch {
-		case l.finished:
-			title, sub = "登录成功", "欢迎回来，"+a.profileName()
-		case l.err != "":
-			sub = l.err
-		case l.waiting:
-			sub = "请在浏览器中完成登录"
-		}
-		ui.Text(c, title).FontSize(20).FontWeight(700)
-		ui.Text(c, sub).FontSize(13).TextColor(p.muted).TextAlign(ui.Center).Margin(0, 0, 14, 0)
-		switch {
-		case l.finished:
-			if a.profile != nil {
-				a.avatar(c, a.profile.Images, 72, p.press)
-			}
-		case l.waiting:
-			ui.Spinner(c).FontSize(22).Margin(6, 0)
-		default:
-			if pillButton(c.Key("log-in"), iconUser, "在浏览器中登录", p.accent, p.onAccent).Clicked() {
-				a.startLogin()
-			}
-		}
-		ui.Text(c, "需要 Spotify Premium").FontSize(11.5).TextColor(p.faint).Margin(16, 0, 0, 0)
-	})
 }
 
 func (a *app) profileName() string {
@@ -176,7 +72,7 @@ func (a *app) accountRow(c *ui.Context) {
 			ui.Text(c, "登录 Spotify").FontSize(13).FontWeight(500).TextColor(p.muted)
 		})
 		if b.Clicked() {
-			a.openLogin()
+			a.openOnboarding()
 		}
 		return
 	}
