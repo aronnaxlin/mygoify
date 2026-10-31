@@ -23,6 +23,7 @@ type palette struct {
 	press     ui.Color
 	accent    ui.Color
 	onAccent  ui.Color
+	danger    ui.Color // the button that confirms what can't be undone
 	cardShade ui.Color
 }
 
@@ -38,8 +39,9 @@ func paletteFor(t *ui.Theme) palette {
 			hairline:  ui.RGBA(255, 255, 255, 0.07),
 			hover:     ui.RGBA(255, 255, 255, 0.06),
 			press:     ui.RGBA(255, 255, 255, 0.1),
-			accent:    ui.Oklch(0.66, 0.2, 22),
-			onAccent:  ui.Hex("#ffffff"),
+			accent:    ui.Hex("#1db954"),
+			onAccent:  ui.Hex("#121212"),
+			danger:    ui.Hex("#ff453a"),
 			cardShade: ui.RGBA(0, 0, 0, 0.45),
 		}
 	}
@@ -52,8 +54,9 @@ func paletteFor(t *ui.Theme) palette {
 		hairline:  ui.RGBA(0, 0, 0, 0.07),
 		hover:     ui.RGBA(0, 0, 0, 0.04),
 		press:     ui.RGBA(0, 0, 0, 0.08),
-		accent:    ui.Oklch(0.6, 0.21, 24),
-		onAccent:  ui.Hex("#ffffff"),
+		accent:    ui.Hex("#1db954"),
+		onAccent:  ui.Hex("#121212"),
+		danger:    ui.Hex("#ff3b30"),
 		cardShade: ui.RGBA(0, 0, 0, 0.16),
 	}
 }

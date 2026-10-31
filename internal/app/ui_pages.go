@@ -155,7 +155,7 @@ func (a *app) coverFill(c *ui.Context, cover music.Images, px int, radius float3
 // opening it.
 func (a *app) coverPlayButton(c *ui.Context, shown bool, play func()) {
 	b := ui.ButtonBase(c.Key("play")).Absolute().Bottom(10).Right(10).Size(38, 38).Radius(999).Center().
-		Background(a.pal.accent).TextColor(ui.RGB(255, 255, 255)).Label("播放").FocusRing(false).
+		Background(a.pal.accent).TextColor(a.pal.onAccent).Label("播放").FocusRing(false).
 		Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.3))
 	pose := ui.Pose{Fade: 1, Scale: 0.8, Y: 6}
 	if shown || b.Hovered() {
@@ -214,7 +214,7 @@ func (a *app) playlistHeader(c *ui.Context, pl *music.Playlist) {
 			a.coverFill(c, pl.Images, 600, 14)
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
-			ui.Text(c, "歌单").FontSize(12).FontWeight(600).TextColor(p.accent)
+			ui.Text(c, "歌单").FontSize(12).FontWeight(600).TextColor(p.muted)
 			ui.Text(c, pl.Name).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
 			var meta []string
 			if pl.Owner.Name != "" {
@@ -320,11 +320,7 @@ func (a *app) trackRows(c *ui.Context, tracks []music.Track, covers bool, header
 				a.cover(c, tr.Album.Images, 96, 38, 6)
 			}
 			ui.Column(c).Grow(3).Basis(0).MinWidth(0).Gap(3).Children(func() {
-				name := p.text
-				if playing {
-					name = p.accent
-				}
-				ui.Text(c, tr.Name).FontSize(14).FontWeight(500).TextColor(name).SingleLine()
+				ui.Text(c, tr.Name).FontSize(14).FontWeight(500).SingleLine()
 				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 					if tr.Explicit {
 						ui.Text(c, "E").FontSize(9).FontWeight(800).TextColor(p.muted).Padding(0, 4).Radius(3).Background(p.hover).Label("含有不适宜内容")

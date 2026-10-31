@@ -321,7 +321,7 @@ func (a *app) deletePlaylistDialog(c *ui.Context) {
 			if pillButton(c.Key("cancel"), nil, "取消", p.hover.Over(p.bg), p.text).Clicked() {
 				d.open = false
 			}
-			if pillButton(c.Key("ok"), nil, "删除", p.accent, p.onAccent).Clicked() {
+			if pillButton(c.Key("ok"), nil, "删除", p.danger, white).Clicked() {
 				a.deleteChosen()
 			}
 		})

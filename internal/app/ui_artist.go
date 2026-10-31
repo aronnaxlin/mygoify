@@ -220,7 +220,7 @@ func (a *app) artistHeader(c *ui.Context, d *artistData) {
 			a.coverFill(c, ar.Images, 600, photo/2)
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
-			ui.Text(c, "歌手").FontSize(12).FontWeight(600).TextColor(p.accent)
+			ui.Text(c, "歌手").FontSize(12).FontWeight(600).TextColor(p.muted)
 			ui.Text(c, ar.Name).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
 			if len(ar.Genres) > 0 {
 				ui.Text(c, strings.Join(ar.Genres, " · ")).FontSize(13).TextColor(p.muted)

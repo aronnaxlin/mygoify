@@ -491,7 +491,7 @@ func (n *notch) helloRow(c *ui.Context, shown, left float32) {
 			ui.Text(c, hint).FontSize(11.5).TextColor(white.Alpha(0.55)).SingleLine()
 		})
 		b := ui.ButtonBase(c.Key("keep")).Padding(6, 14).Radius(999).Background(a.pal.accent).FocusRing(false).Label("开启刘海播放器")
-		b.Children(func() { ui.Text(c, "开启").FontSize(12.5).FontWeight(600) })
+		b.Children(func() { ui.Text(c, "开启").FontSize(12.5).FontWeight(600).TextColor(a.pal.onAccent) })
 		if b.Clicked() {
 			n.keep()
 		}
@@ -507,7 +507,7 @@ func (n *notch) idle(c *ui.Context, open, left float32) {
 	ui.Row(c).Absolute().Top(n.h0+4).Left(left).Width(notchIdleW).Padding(10, 20, 14, 20).Gap(12).AlignItems(ui.Center).
 		Opacity(max(0, open*1.4-0.4)).Children(func() {
 		ui.Box(c).Size(36, 36).Radius(10).Background(a.pal.accent).Center().Children(func() {
-			ui.Icon(c, iconNote).Size(18, 18).TextColor(white)
+			ui.Icon(c, iconNote).Size(18, 18).TextColor(a.pal.onAccent)
 		})
 		ui.Column(c).Grow(1).Gap(2).Children(func() {
 			ui.Text(c, mygo.App.Name()).FontSize(14).FontWeight(700)
