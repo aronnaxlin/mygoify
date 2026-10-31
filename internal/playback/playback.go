@@ -322,6 +322,11 @@ func (p *Player) SetVolume(v float64) {
 // Position returns where the track playing is, moving on from where the
 // backend last said while it plays.
 func (p *Player) Position() time.Duration {
+	// Nothing playing is nowhere: Soloist, gone idle, still says where
+	// the track before was.
+	if p.Current() == nil {
+		return 0
+	}
 	pos := p.st.Position
 	if p.st.Playing && !p.st.Loading && !p.held && !p.st.Since.IsZero() {
 		pos += time.Since(p.st.Since)

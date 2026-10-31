@@ -112,3 +112,13 @@ func TestPlayerNextPrev(t *testing.T) {
 		t.Fatalf("went to %s, playing %v", p.Current().Name, p.Playing())
 	}
 }
+
+// With nothing playing the position is 0, whatever the backend says: the
+// player bar showed where Soloist's last track had got to.
+func TestPlayerPositionWithNothing(t *testing.T) {
+	p := New(func(func()) {}, NewFake())
+	p.apply(State{At: -1, Position: 4 * time.Minute})
+	if pos := p.Position(); pos != 0 {
+		t.Fatalf("at %v with nothing playing", pos)
+	}
+}

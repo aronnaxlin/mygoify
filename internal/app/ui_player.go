@@ -369,7 +369,11 @@ func (a *app) playerBar(c *ui.Context) {
 					ui.Box(c).Size(48, 48).Radius(8).Background(p.hover).Center().Children(func() {
 						ui.Icon(c, iconNote).Size(18, 18).TextColor(p.faint)
 					})
-					ui.Text(c, "未在播放").FontSize(13).TextColor(p.muted)
+					// Compact, there is no room for it: it stood one character
+					// to a line.
+					if !compact {
+						ui.Text(c, "未在播放").FontSize(13).TextColor(p.muted).SingleLine()
+					}
 				})
 				return
 			}
