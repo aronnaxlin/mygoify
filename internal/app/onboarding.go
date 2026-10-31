@@ -59,7 +59,6 @@ var (
 // Where the listener makes the app, and gets Soloist.
 const (
 	developerDashboardURL = "https://developer.spotify.com/dashboard"
-	soloistDownloadURL    = "https://github.com/spotify/soloist"
 	// defaultRedirect is what the listener registers as the app's Redirect
 	// URI, unless they have a reason to use another port.
 	defaultRedirect = "http://127.0.0.1:45231/callback"
@@ -107,10 +106,20 @@ type onboardState struct {
 	loginGen           int // counts logins, to drop the answers of those dropped
 	stopLogin          context.CancelFunc
 	binErr             string
+	dl                 download
 	key                string // what the field holds, never shown
 	keyState           keyState
 	keyGen             int
 	stopKey            context.CancelFunc
+}
+
+// download is Soloist being downloaded, or unpacked from a file chosen.
+type download struct {
+	confirm     bool // the listener is asked where it comes from
+	busy        bool
+	done, total int64 // bytes; total is -1 if not known
+	gen         int   // counts downloads, to drop the answers of those dropped
+	stop        context.CancelFunc
 }
 
 // vault is the store of the listener's secrets.
@@ -252,6 +261,8 @@ func (a *app) stopOnboarding() {
 		ob.stopKey()
 		ob.stopKey = nil
 	}
+	a.cancelDownload()
+	ob.dl.confirm = false
 	ob.loginGen++
 	ob.keyGen++
 	ob.loginWaiting, ob.loginErr = false, ""
@@ -358,17 +369,30 @@ func (a *app) cancelKey() {
 	ob.keyState, ob.stopKey = keyIdle, nil
 }
 
-// pickSoloist asks for Soloist's executable and keeps it.
+// pickSoloist asks for Soloist's executable, or the archive it came in,
+// and keeps it.
 func (a *app) pickSoloist() {
 	path := chooseSoloist()
 	if path == "" {
 		return
 	}
 	ob := &a.ob
+	if isArchive(path) {
+		a.install(func(ctx context.Context, _ func(done, total int64)) (string, error) {
+			return installSoloist(ctx, path, soloistHome())
+		})
+		return
+	}
 	if !isExecutable(path) {
 		ob.binErr = "这不是可以运行的文件"
 		return
 	}
+	a.useSoloist(path)
+}
+
+// useSoloist keeps path as Soloist's executable, and goes on.
+func (a *app) useSoloist(path string) {
+	ob := &a.ob
 	ob.binErr = ""
 	a.settings.Spotify.SoloistBin = path
 	ob.dirty = true
@@ -378,6 +402,70 @@ func (a *app) pickSoloist() {
 	ob.paired = false
 	a.soloistChanged()
 	a.next(stepSoloist)
+}
+
+// askDownload asks the listener to confirm where Soloist is downloaded
+// from, before it is.
+func (a *app) askDownload() { a.ob.dl.confirm = true }
+
+// startDownload downloads Soloist's build from Spotify's CDN, and keeps
+// it once it runs.
+func (a *app) startDownload() {
+	a.ob.dl.confirm = false
+	a.install(func(ctx context.Context, progress func(done, total int64)) (string, error) {
+		return downloadSoloist(ctx, soloistHome(), progress)
+	})
+}
+
+// install runs get off the main thread, which brings Soloist's executable
+// and says how far it has got, and keeps what it brings.
+func (a *app) install(get func(ctx context.Context, progress func(done, total int64)) (string, error)) {
+	ob := &a.ob
+	if ob.dl.busy {
+		return
+	}
+	ob.binErr = ""
+	gen := ob.dl.gen + 1
+	ctx, cancel := context.WithCancel(context.Background())
+	ob.dl = download{busy: true, total: -1, gen: gen, stop: cancel}
+	go func() {
+		bin, err := get(ctx, func(done, total int64) {
+			a.post(func() {
+				if gen == ob.dl.gen {
+					ob.dl.done, ob.dl.total = done, total
+				}
+			})
+		})
+		cancel()
+		a.post(func() {
+			if gen != ob.dl.gen {
+				return
+			}
+			ob.dl.busy, ob.dl.stop = false, nil
+			switch {
+			case err == nil:
+				a.useSoloist(bin)
+			case errors.Is(err, errNotSoloist):
+				ob.binErr = "解压出来的文件运行不了，请再试，或自己选择"
+			case errors.Is(err, errNoSoloist):
+				ob.binErr = "压缩包里没有 Soloist"
+			default:
+				ob.binErr = "没能下载或解压，请再试一次"
+			}
+		})
+	}()
+}
+
+// cancelDownload gives up on a download under way.
+func (a *app) cancelDownload() {
+	dl := &a.ob.dl
+	if dl.stop != nil {
+		dl.stop()
+	}
+	if dl.busy {
+		dl.gen++
+	}
+	dl.busy, dl.stop = false, nil
 }
 
 // submitKey tries the key typed, and keeps it if it is good, or Soloist

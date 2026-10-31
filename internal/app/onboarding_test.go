@@ -1,10 +1,12 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"image/png"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,6 +39,10 @@ type onboarding struct {
 	started    chan string // the keys Soloist's service was started with
 	paired     func()      // what Soloist's watch calls as it is logged in
 	relaunched int
+	fetched    []string // what was downloaded
+	archive    []byte   // what the download brings; fetchHeld holds it up
+	fetchHeld  bool
+	home       string // where Soloist is unpacked
 }
 
 func newOnboarding(t *testing.T) *onboarding {
@@ -48,6 +54,7 @@ func newOnboarding(t *testing.T) *onboarding {
 	if err := os.WriteFile(o.bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	o.home = t.TempDir()
 	a := newTestApp()
 	a.settings = defaultSettings()
 	a.keep = o.keep
@@ -62,11 +69,25 @@ func newOnboarding(t *testing.T) *onboarding {
 		start    func(spotifySettings, string) error
 		watch    func(spotifySettings, func())
 		relaunch func()
-	}{openURL, chooseSoloist, spotifyLogin, checkKey, startSoloist, watchSoloist, relaunch}
+		fetch    func(context.Context, string) (io.ReadCloser, int64, error)
+		runs     func(context.Context, string) error
+		home     func() string
+	}{openURL, chooseSoloist, spotifyLogin, checkKey, startSoloist, watchSoloist, relaunch, soloistFetch, soloistRuns, soloistHome}
 	t.Cleanup(func() {
 		openURL, chooseSoloist, spotifyLogin, checkKey, startSoloist, watchSoloist, relaunch =
 			real.open, real.choose, real.login, real.check, real.start, real.watch, real.relaunch
+		soloistFetch, soloistRuns, soloistHome = real.fetch, real.runs, real.home
 	})
+	soloistFetch = func(ctx context.Context, url string) (io.ReadCloser, int64, error) {
+		o.fetched = append(o.fetched, url)
+		if o.fetchHeld {
+			<-ctx.Done()
+			return nil, 0, ctx.Err()
+		}
+		return io.NopCloser(bytes.NewReader(o.archive)), int64(len(o.archive)), nil
+	}
+	soloistRuns = func(context.Context, string) error { return nil }
+	soloistHome = func() string { return o.home }
 	openURL = func(u string) error { o.opened = append(o.opened, u); return nil }
 	chooseSoloist = func() string { return o.bin }
 	spotifyLogin = func(ctx context.Context, cfg auth.Config, keep secret.Store) error {
@@ -249,12 +270,13 @@ func TestOnboardingChoosesSoloist(t *testing.T) {
 	plain := filepath.Join(t.TempDir(), "soloist.tar.gz")
 	os.WriteFile(plain, []byte("x"), 0o644)
 	o.bin, plain = plain, o.bin
-	o.click("选择 Soloist…")
-	if o.a.settings.Spotify.SoloistBin != "" {
+	o.click("选择已下载的文件…")
+	o.settle() // an archive that is none
+	if o.a.settings.Spotify.SoloistBin != "" || o.a.ob.binErr == "" {
 		t.Fatal("kept a file that can't run")
 	}
 	o.bin = plain
-	o.click("选择 Soloist…")
+	o.click("选择已下载的文件…")
 	if o.a.settings.Spotify.SoloistBin != o.bin || o.a.ob.step != stepKey {
 		t.Errorf("kept %q, at step %d", o.a.settings.Spotify.SoloistBin, o.a.ob.step)
 	}
@@ -462,6 +484,11 @@ func TestOnboardingFrames(t *testing.T) {
 		{"2-login", func(o *onboarding) { o.set(stepLogin) }},
 		{"2-login-waiting", func(o *onboarding) { o.set(stepLogin); o.a.ob.loginWaiting = true }},
 		{"3-soloist", func(o *onboarding) { o.set(stepSoloist) }},
+		{"3-soloist-confirm", func(o *onboarding) { o.set(stepSoloist); o.a.ob.dl.confirm = true }},
+		{"3-soloist-progress", func(o *onboarding) {
+			o.set(stepSoloist)
+			o.a.ob.dl = download{busy: true, done: 13_400_000, total: 31_000_000}
+		}},
 		{"4-key", func(o *onboarding) { o.set(stepKey) }},
 		{"4-key-checking", func(o *onboarding) { o.set(stepKey); o.a.ob.key, o.a.ob.keyState = "abcdefabcdef", keyChecking }},
 		{"4-key-invalid", func(o *onboarding) { o.set(stepKey); o.a.ob.key, o.a.ob.keyState = "abcdefabcdef", keyInvalid }},

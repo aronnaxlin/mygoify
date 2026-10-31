@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -177,18 +178,82 @@ func (a *app) stepLogin(c *ui.Context) {
 }
 
 func (a *app) stepSoloist(c *ui.Context) {
+	p := a.pal
 	ob := &a.ob
+	dl := &ob.dl
 	a.onboardStep(c, stepSoloist, "Soloist", a.settings.Spotify.withEnv().SoloistBin, func() {
-		a.note(c, "Soloist 是 Spotify 官方的播放器，MyGoify 通过它播放。从官方页面下载、解压，再选中其中的 soloist 文件。")
+		a.note(c, "Soloist 是 Spotify 官方的播放器，MyGoify 通过它播放。可以直接下载，也可以自己下载后选择。")
 		a.problem(c, ob.binErr)
+		file := soloistArchive()
+		switch {
+		case dl.busy:
+			a.downloadProgress(c)
+			return
+		case dl.confirm:
+			a.note(c, "将从 Spotify 官方（soloist-builds.spotifycdn.com）下载 "+file+"，解压后保存在这台电脑上。")
+			ui.Row(c).Gap(10).Justify(ui.End).Margin(6, 0, 0, 0).Children(func() {
+				if a.action(c, "download-no", "取消", false).Clicked() {
+					dl.confirm = false
+				}
+				if a.action(c, "download-yes", "下载", true).Clicked() {
+					a.startDownload()
+				}
+			})
+			return
+		}
 		ui.Row(c).Gap(10).Wrap().Margin(6, 0, 0, 0).Children(func() {
-			if a.action(c, "download", "打开 Spotify 官方下载页", false).Clicked() {
-				openURL(soloistDownloadURL)
+			if file != "" && a.action(c, "download", "下载 Soloist", true).Clicked() {
+				a.askDownload()
 			}
-			if a.action(c, "choose", "选择 Soloist…", true).Clicked() {
+			if a.action(c, "choose", "选择已下载的文件…", false).Clicked() {
 				a.pickSoloist()
 			}
 		})
+		// For a browser to download it, or to see Spotify's own page.
+		ui.Row(c).Gap(14).Margin(2, 0, 0, 0).Children(func() {
+			link := func(key, label, url string) {
+				b := ui.ButtonBase(c.Key(key)).Label(label).Height(24).PaddingX(6).Radius(6).Center()
+				if b.Hovered() {
+					b.Background(p.hover)
+				}
+				b.Children(func() { ui.Text(c, label).FontSize(12.5).TextColor(p.muted) })
+				if b.Clicked() {
+					openURL(url)
+				}
+			}
+			if file != "" {
+				link("browser", "用浏览器下载", soloistCDN+file)
+			}
+			link("official", "官方下载页", soloistDownloadsURL)
+		})
+	})
+}
+
+// downloadProgress shows how much of Soloist has come, with a way to give
+// up, in the accent's fill.
+func (a *app) downloadProgress(c *ui.Context) {
+	p := a.pal
+	dl := &a.ob.dl
+	frac, label := float32(0), "正在准备…"
+	if dl.total > 0 {
+		frac = min(float32(dl.done)/float32(dl.total), 1)
+		label = fmt.Sprintf("%.1f / %.1f MB", float64(dl.done)/1e6, float64(dl.total)/1e6)
+	} else if dl.done > 0 {
+		label = fmt.Sprintf("%.1f MB", float64(dl.done)/1e6)
+	}
+	ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(6, 0, 0, 0).Children(func() {
+		ui.Column(c).Grow(1).Gap(6).Children(func() {
+			ui.Box(c).Height(6).Radius(3).Draw(func(pt *ui.Painter, r ui.Rect) {
+				pt.Fill(r, p.press, 3)
+				if frac > 0 {
+					pt.Fill(ui.Rect{X: r.X, Y: r.Y, W: r.W * frac, H: r.H}, p.accent, 3)
+				}
+			})
+			ui.Text(c, label).FontSize(12).TextColor(p.muted)
+		})
+		if a.action(c, "cancel-download", "取消", false).Clicked() {
+			a.cancelDownload()
+		}
 	})
 }
 
