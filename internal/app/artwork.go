@@ -7,7 +7,7 @@ import (
 	"image"
 	"image/color"
 	_ "image/jpeg"
-	_ "image/png"
+	"image/png"
 	"io"
 	"math"
 	"net/http"
@@ -19,6 +19,7 @@ import (
 	_ "golang.org/x/image/webp"
 
 	"mygoify/internal/library"
+	"mygoify/internal/music"
 )
 
 // artwork is a cover, decoded and ready to draw, with what the player
@@ -130,6 +131,9 @@ var artClient = &http.Client{Timeout: 20 * time.Second}
 // fetchArt returns the picture at url: Spotify's image CDN serves covers,
 // and the fake library draws its own.
 func fetchArt(url string) ([]byte, error) {
+	if url == music.LikedCover {
+		return likedCover(), nil
+	}
 	if strings.HasPrefix(url, library.FakeImageScheme) {
 		return library.FakeImage(url)
 	}
@@ -142,6 +146,39 @@ func fetchArt(url string) ([]byte, error) {
 		return nil, fmt.Errorf("fetching %s: %s", url, res.Status)
 	}
 	return io.ReadAll(io.LimitReader(res.Body, 16<<20))
+}
+
+// likedCover draws the cover of the liked songs, which Spotify gives
+// none: a white heart on a violet gradient, as Spotify's apps show them.
+func likedCover() []byte {
+	const px = 480
+	img := image.NewRGBA(image.Rect(0, 0, px, px))
+	from, to := [3]float64{72, 30, 200}, [3]float64{142, 199, 230}
+	for y := range px {
+		for x := range px {
+			t := (float64(x) + float64(y)) / (2 * px)
+			// The heart, (x²+y²-1)³ - x²y³ ≤ 0, a third of the cover wide,
+			// its edge smoothed by sampling each pixel four times.
+			in := 0
+			for _, d := range [4][2]float64{{0.25, 0.25}, {0.75, 0.25}, {0.25, 0.75}, {0.75, 0.75}} {
+				hx := (float64(x) + d[0] - px/2) / (px * 0.2)
+				hy := -(float64(y) + d[1] - px*0.53) / (px * 0.2)
+				if q := hx*hx + hy*hy - 1; q*q*q-hx*hx*hy*hy*hy <= 0 {
+					in++
+				}
+			}
+			a := float64(in) / 4
+			var c [3]uint8
+			for i := range c {
+				bg := from[i] + (to[i]-from[i])*t
+				c[i] = uint8(bg*(1-a) + 255*a)
+			}
+			img.Set(x, y, color.RGBA{c[0], c[1], c[2], 255})
+		}
+	}
+	var buf bytes.Buffer
+	png.Encode(&buf, img)
+	return buf.Bytes()
 }
 
 // loadArt fetches the cover at url, as a bitmap to draw and an image to

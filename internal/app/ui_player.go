@@ -309,11 +309,7 @@ func (a *app) volumeSlider(c *ui.Context, color, track ui.Color, width float32) 
 func (a *app) transport(c *ui.Context, color, dim, on ui.Color, size float32) {
 	pl := a.pl
 	ui.Row(c).Gap(size * 0.5).AlignItems(ui.Center).Justify(ui.Center).Children(func() {
-		shuffle := dim
-		if pl.Shuffle() {
-			shuffle = on
-		}
-		if iconButton(c.Key("shuffle"), iconShuffle, size*0.62, shuffle, "随机播放").Clicked() {
+		if modeButton(c.Key("shuffle"), iconShuffle, size*0.62, pl.Shuffle(), dim, on, "随机播放") {
 			pl.ToggleShuffle()
 		}
 		if iconButton(c.Key("prev"), iconPrev, size*0.85, color, "上一首").Clicked() {
@@ -325,17 +321,36 @@ func (a *app) transport(c *ui.Context, color, dim, on ui.Color, size float32) {
 		if iconButton(c.Key("next"), iconNext, size*0.85, color, "下一首").Clicked() {
 			pl.Next()
 		}
-		repeat, ricon := dim, iconRepeat
-		switch pl.Repeat() {
-		case playback.RepeatAll:
-			repeat = on
-		case playback.RepeatOne:
-			repeat, ricon = on, iconRepeat1
+		ricon := iconRepeat
+		if pl.Repeat() == playback.RepeatOne {
+			ricon = iconRepeat1
 		}
-		if iconButton(c.Key("repeat"), ricon, size*0.62, repeat, "循环").Clicked() {
+		if modeButton(c.Key("repeat"), ricon, size*0.62, pl.Repeat() != playback.RepeatOff, dim, on, "循环") {
 			pl.CycleRepeat()
 		}
 	})
+}
+
+// modeButton is the button of a mode, shuffle or repeat, and reports
+// whether it was clicked. On, it takes the color on and a dot under it:
+// over Now Playing's backdrop, where on is white and off a fainter white,
+// the color alone told them apart too faintly.
+func modeButton(c *ui.Context, icon *ui.SVG, size float32, active bool, dim, on ui.Color, label string) bool {
+	color := dim
+	if active {
+		color = on
+	}
+	var clicked bool
+	ui.Box(c).Children(func() {
+		clicked = iconButton(c.Key("button"), icon, size, color, label).Clicked()
+		ui.Row(c).Absolute().Left(0).Right(0).Bottom(-size * 0.2).Justify(ui.Center).PassThrough().Children(func() {
+			dot := ui.Box(c).Size(4, 4).Radius(2).Background(on)
+			if !active {
+				dot.Opacity(0)
+			}
+		})
+	})
+	return clicked
 }
 
 // playerBar runs along the foot of the content: what plays, its controls
@@ -369,7 +384,11 @@ func (a *app) playerBar(c *ui.Context) {
 					ui.Box(c).Size(48, 48).Radius(8).Background(p.hover).Center().Children(func() {
 						ui.Icon(c, iconNote).Size(18, 18).TextColor(p.faint)
 					})
-					ui.Text(c, "未在播放").FontSize(13).TextColor(p.muted)
+					// Compact, there is no room for it: it stood one character
+					// to a line.
+					if !compact {
+						ui.Text(c, "未在播放").FontSize(13).TextColor(p.muted).SingleLine()
+					}
 				})
 				return
 			}

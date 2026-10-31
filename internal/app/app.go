@@ -175,7 +175,11 @@ func Run() error {
 		// Before the window: on Windows it lays out its content as it is
 		// made, and the view asks the player what plays.
 		a.art = newArtCache(a.post)
-		a.pl = playback.New(a.post, playback.NewFake())
+		var backend playback.Backend = playback.NewFake()
+		if lib, b := devSpotify(); lib != nil {
+			a.lib, backend = lib, b
+		}
+		a.pl = playback.New(a.post, backend)
 		a.pl.Artwork = fetchArt
 		a.pl.Changed = a.playbackChanged
 		a.volume = a.settings.Volume
@@ -197,6 +201,8 @@ func Run() error {
 			BackgroundColor:      "light-dark(#ffffff, #141416)",
 			Content:              ui.View(a.view),
 		})
+		// Now that post brings what the backend says to the window.
+		a.pl.Follow()
 		a.setMenu()
 		a.boot()
 		// The notch player is macOS's, over its menu bar: elsewhere it would
