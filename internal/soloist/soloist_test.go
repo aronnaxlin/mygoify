@@ -3,6 +3,7 @@ package soloist
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"mygoify/internal/library"
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
 	"mygoify/internal/spotify"
@@ -271,15 +273,14 @@ func TestPlay(t *testing.T) {
 	spotify.BaseURL = api.URL
 	defer func() { spotify.BaseURL = base }()
 
-	b := New(Config{DeviceName: "MyGoify", API: &spotify.Client{Token: func(context.Context) (string, error) { return "tok", nil }}})
-	tracks := []string{"a", "b", "c"}
-	req := playback.Request{Context: "spotify:playlist:pl", Start: 2}
-	for _, id := range tracks {
-		var e entity
-		json.Unmarshal([]byte(track(id, id)), &e)
-		req.Tracks = append(req.Tracks, e.track())
+	cfg := Config{DeviceName: "MyGoify", API: &spotify.Client{Token: token}, DeviceFile: filepath.Join(t.TempDir(), "device")}
+	req := playback.Request{Context: "spotify:playlist:pl", Tracks: tracks("a", "b", "c"), Start: 2}
+	if err := New(cfg).Play(req); err != nil {
+		t.Fatal(err)
 	}
-	if err := b.Play(req); err != nil {
+	// The app started again plays on the device found, without listing
+	// devices: each list was a call to the Web API as the app started.
+	if err := New(cfg).Play(req); err != nil {
 		t.Fatal(err)
 	}
 	mu.Lock()
@@ -287,8 +288,93 @@ func TestPlay(t *testing.T) {
 	want := []string{
 		`dev1 {"context_uri":"spotify:playlist:pl","offset":{"uri":"spotify:track:c"}}`,
 		`dev2 {"context_uri":"spotify:playlist:pl","offset":{"uri":"spotify:track:c"}}`,
+		`dev2 {"context_uri":"spotify:playlist:pl","offset":{"uri":"spotify:track:c"}}`,
 	}
 	if strings.Join(plays, "\n") != strings.Join(want, "\n") || devices != 2 {
 		t.Fatalf("played:\n%s\nafter %d lists of devices", strings.Join(plays, "\n"), devices)
+	}
+}
+
+func token(context.Context) (string, error) { return "tok", nil }
+
+// tracks are the tracks of ids, as Soloist names them.
+func tracks(ids ...string) []music.Track {
+	var ts []music.Track
+	for _, id := range ids {
+		var e entity
+		json.Unmarshal([]byte(track(id, id)), &e)
+		ts = append(ts, e.track())
+	}
+	return ts
+}
+
+// webAPI answers each call to the Web API with status, and counts them.
+func webAPI(t *testing.T, status int) *int {
+	var mu sync.Mutex
+	calls := 0
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		if status == http.StatusTooManyRequests {
+			w.Header().Set("Retry-After", "3600")
+		}
+		w.WriteHeader(status)
+		fmt.Fprint(w, `{"devices":[{"id":"dev","name":"MyGoify"}]}`)
+	}))
+	t.Cleanup(api.Close)
+	base := spotify.BaseURL
+	spotify.BaseURL = api.URL
+	t.Cleanup(func() { spotify.BaseURL = base })
+	return &calls
+}
+
+// active connects b to f as the device playing.
+func active(t *testing.T, f *fakeSoloist, b *Backend) {
+	t.Helper()
+	states := watch(b)
+	f.connected(t, 1)
+	f.send(t, `{"type":"device_changed","is_active":true}`)
+	until(t, states, func(playback.State) bool { b.mu.Lock(); defer b.mu.Unlock(); return b.active })
+}
+
+// Playing an album or a playlist from its start, as its play button does,
+// asks Soloist alone, though tracks the listener can't play come first:
+// the Web API need not hear of it.
+func TestPlayFromStart(t *testing.T) {
+	calls := webAPI(t, http.StatusOK)
+	f := newFakeSoloist(t)
+	b := New(Config{DataDir: f.dir, DeviceName: "MyGoify", API: &spotify.Client{Token: token}})
+	active(t, f, b)
+	ts := tracks("a", "b", "c")
+	ts[0].Unplayable = true
+	if err := b.Play(playback.Request{Context: "spotify:album:al", Tracks: ts, Start: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if cmd := f.next(t); cmd["command"] != "play" || cmd["uri"] != "spotify:album:al" {
+		t.Fatalf("sent %v", cmd)
+	}
+	if *calls != 0 {
+		t.Fatalf("%d calls to the Web API", *calls)
+	}
+}
+
+// While Spotify limits the app's calls, playing from a track of a context
+// fails, saying until when, and asks Soloist nothing: played as the track
+// alone, with those after it queued, it changed what the listener's other
+// devices showed playing, and left their queue full.
+func TestPlayLimited(t *testing.T) {
+	webAPI(t, http.StatusTooManyRequests)
+	f := newFakeSoloist(t)
+	b := New(Config{DataDir: f.dir, DeviceName: "MyGoify", API: &spotify.Client{Token: token}})
+	active(t, f, b)
+	err := b.Play(playback.Request{Context: "spotify:album:al", Tracks: tracks("a", "b", "c"), Start: 1})
+	if !errors.Is(err, library.ErrLimited) {
+		t.Fatalf("played, limited: %v", err)
+	}
+	select {
+	case cmd := <-f.commands:
+		t.Fatalf("sent %v", cmd)
+	case <-time.After(200 * time.Millisecond):
 	}
 }

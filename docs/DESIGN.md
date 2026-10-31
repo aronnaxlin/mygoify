@@ -116,12 +116,15 @@ Soloist 的版本每 90 天过期；API key 官方没说会过期，但社区有
 
 | 操作 | 通道 | 原因 |
 |---|---|---|
+| 从头播放一个 context（专辑、歌单的播放按钮） | WebSocket `play`（`uri` 为 context） | 从第一首能播的开始，不需要 offset；随机播放打开时 Soloist 会另选一首，仍走 Web API |
 | 播放 context 里的某一首 | Web API `PUT /me/player/play`（`context_uri` + `offset` + `device_id`） | WebSocket 的 `play` 只能传一个 URI，不能指定 offset |
 | 播放一组曲目 | Web API `PUT /me/player/play`（`uris`，最多 100 首） | 同上 |
 | 暂停、继续、上一首、下一首、seek、音量、随机、循环、加入队列 | WebSocket | 本地通道，不消耗 Web API 配额，延迟低 |
 | 状态、进度、队列 | WebSocket 事件（`playback_state`、`position_sync`、`queue_changed`） | 推送，不轮询 |
 
-`device_id` 来自 `GET /me/player/devices`，按设备名匹配 Soloist。命令发出后的结果以后续的 `playback_changed` 事件为准；`command_result` 只表示命令已派发。
+`device_id` 来自 `GET /me/player/devices`，按设备名匹配 Soloist，找到后存进数据目录的 `soloist-device`，以后启动不再查；Web API 回 404 时再查一次。Spotify 限流期间，这两种播放直接失败，播放条显示"Spotify 限流中，HH:MM 后再试"；从头播放和 WebSocket 的其他命令照常可用。不退回本地播放：只播点中的那首、再把后面的加入队列，会让其他设备显示的播放来源变成单曲，加入的歌也会一直留在 Spotify 的队列里，排在用户之后播的内容前面；连续下一首跳过去，又会给播放记录留下一串跳过。
+
+App 空闲时不调 Web API：窗口隐藏或静止、歌曲自然切换，都不发请求（`TestIdleAsksNothing`）。只有用户的操作才会请求，例如打开页面、搜索、喜欢。命令发出后的结果以后续的 `playback_changed` 事件为准；`command_result` 只表示命令已派发。
 
 **首次配对**
 - Soloist 要先在 Spotify Connect 里登录一次。默认流程：引导用户在同一局域网的手机 App 里选中这个设备播放一次，之后会话保存在 `--data-dir`。

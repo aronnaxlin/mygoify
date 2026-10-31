@@ -79,6 +79,10 @@ type Player struct {
 	b    Backend
 	cmds chan func() error
 
+	// Explain, if set, says why a command failed as the listener reads
+	// it, in place of msg; it is called off the main thread.
+	Explain func(err error, msg string) string
+
 	// Changed, if set, hears that what plays, where it is or whether it
 	// plays changed.
 	Changed func()
@@ -133,9 +137,13 @@ func (p *Player) Follow() {
 func (p *Player) run() {
 	for cmd := range p.cmds {
 		if err := cmd(); err != nil {
+			msg := "播放失败，请稍后再试"
+			if p.Explain != nil {
+				msg = p.Explain(err, msg)
+			}
 			p.post(func() {
 				p.st.Loading = false
-				p.st.Err = "播放失败，请稍后再试"
+				p.st.Err = msg
 				p.sync()
 			})
 		}

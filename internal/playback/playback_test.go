@@ -1,6 +1,7 @@
 package playback
 
 import (
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -197,5 +198,31 @@ func TestFakeQueues(t *testing.T) {
 	}
 	if ids != "axyz" || st.At != 1 {
 		t.Errorf("queue starts %s, at %d; want axyz, at 1", ids, st.At)
+	}
+}
+
+// failing is a backend whose every play fails with err.
+type failing struct {
+	*Fake
+	err error
+}
+
+func (f failing) Play(Request) error { return f.err }
+
+// A play that fails shows why as Explain says: it said only that playing
+// failed while Spotify limited the app's calls for hours.
+func TestExplainFailure(t *testing.T) {
+	posted := make(chan func(), 8)
+	p := New(func(fn func()) { posted <- fn }, failing{NewFake(), errors.New("limited")})
+	p.Explain = func(err error, msg string) string { return err.Error() + ": " + msg }
+	p.PlayQueue("", tracks(2, time.Minute), 0)
+	select {
+	case fn := <-posted:
+		fn()
+	case <-time.After(2 * time.Second):
+		t.Fatal("the failure was not shown")
+	}
+	if got := p.Err(); got != "limited: 播放失败，请稍后再试" {
+		t.Fatalf("shown %q", got)
 	}
 }

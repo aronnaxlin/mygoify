@@ -1,7 +1,9 @@
 // Package soloist plays through Spotify Soloist, Spotify's own headless
 // player: Backend follows it over its local WebSocket and sends it the
-// listener's commands, and starts what to play through the Web API, which
-// the WebSocket cannot start from a track of a context (DESIGN.md §4.2).
+// listener's commands. What to play starts over the WebSocket too when it
+// can: a context from its start. From a track of a context, or a list of
+// tracks, it starts through the Web API, as the WebSocket cannot
+// (DESIGN.md §4.2).
 package soloist
 
 import (
@@ -34,6 +36,9 @@ type Config struct {
 	DeviceName string
 	// API starts playback on it, as the WebSocket cannot.
 	API *spotify.Client
+	// DeviceFile, if set, keeps its ID in the Web API across restarts:
+	// finding it again is a call to the Web API each time the app starts.
+	DeviceFile string
 }
 
 // Backend plays through a Soloist. It connects as Watch is called, and
@@ -456,10 +461,16 @@ func (b *Backend) AddToQueue(t music.Track) error {
 // maxURIs is the most tracks the Web API plays as a list.
 const maxURIs = 100
 
-// Play starts what req asks on this Soloist, through the Web API: from a
-// track of a context, or a list of tracks, as many around the one asked
-// for as it takes.
+// Play starts what req asks on this Soloist. A context from its start
+// plays over the WebSocket; from a track of a context, or a list of
+// tracks, as many around the one asked for as it takes, through the Web
+// API. While Spotify limits the app's calls, those fail: played otherwise,
+// as the track alone with those after it queued, they would change what
+// the listener's other devices show playing, and leave the queue full.
 func (b *Backend) Play(req playback.Request) error {
+	if req.Context != "" && b.fromStart(req) {
+		return b.command("play", "uri", req.Context)
+	}
 	body := map[string]any{}
 	switch {
 	case req.Context != "":
@@ -480,6 +491,27 @@ func (b *Backend) Play(req playback.Request) error {
 		return errors.New("soloist: nothing to play")
 	}
 	return b.playOnDevice(body)
+}
+
+// fromStart reports whether req plays its context as Soloist plays it
+// from the start: from its first track the listener can play, not
+// shuffled, as Soloist would pick another.
+func (b *Backend) fromStart(req playback.Request) bool {
+	b.mu.Lock()
+	shuffle := b.options.Shuffle
+	b.mu.Unlock()
+	if shuffle {
+		return false
+	}
+	if req.Start < 0 || req.Start >= len(req.Tracks) {
+		return true
+	}
+	for _, t := range req.Tracks[:req.Start] {
+		if t.Playable() {
+			return false
+		}
+	}
+	return true
 }
 
 // Jump plays the track at i of the queue: within the context it plays,
@@ -531,12 +563,17 @@ func (b *Backend) playOnDevice(body map[string]any) error {
 	}
 }
 
-// deviceID returns this Soloist's ID in the Web API, asking for the list
-// of devices the first time, or again when fresh.
+// deviceID returns this Soloist's ID in the Web API, as kept, or asking
+// for the list of devices when none is, or when fresh.
 func (b *Backend) deviceID(ctx context.Context, fresh bool) (string, error) {
 	b.mu.Lock()
 	dev := b.device
 	b.mu.Unlock()
+	if dev == "" && b.cfg.DeviceFile != "" {
+		if data, err := os.ReadFile(b.cfg.DeviceFile); err == nil {
+			dev = strings.TrimSpace(string(data))
+		}
+	}
 	if dev != "" && !fresh {
 		return dev, nil
 	}
@@ -554,6 +591,10 @@ func (b *Backend) deviceID(ctx context.Context, fresh bool) (string, error) {
 			b.mu.Lock()
 			b.device = d.ID
 			b.mu.Unlock()
+			if f := b.cfg.DeviceFile; f != "" {
+				os.MkdirAll(filepath.Dir(f), 0o700)
+				os.WriteFile(f, []byte(d.ID+"\n"), 0o600)
+			}
 			return d.ID, nil
 		}
 	}

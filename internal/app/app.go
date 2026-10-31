@@ -182,6 +182,8 @@ func Run() error {
 		a.pl = playback.New(a.post, backend)
 		a.pl.Artwork = fetchArt
 		a.pl.Changed = a.playbackChanged
+		// While Spotify limits the app's calls, until when.
+		a.pl.Explain = failed
 		a.volume = a.settings.Volume
 		a.pl.SetVolume(a.volume)
 		a.win = mygo.NewWindow(mygo.WindowOptions{

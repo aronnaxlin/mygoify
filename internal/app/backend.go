@@ -64,7 +64,7 @@ func devSpotify() (library.Library, playback.Backend) {
 	if c, err := os.UserCacheDir(); err == nil {
 		lib.Cache = filepath.Join(c, "mygoify", "spotify")
 	}
-	return lib, soloist.New(soloist.Config{DataDir: dir, DeviceName: name, API: api})
+	return lib, soloist.New(soloist.Config{DataDir: dir, DeviceName: name, API: api, DeviceFile: filepath.Join(data, "soloist-device")})
 }
 
 // tokenFile keeps the token in a private file, as cmd/poc does.
