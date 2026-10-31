@@ -51,12 +51,12 @@
 - [ ] Soloist 服务管理：systemd user unit / launchd agent，安装、启动、停止
 - [ ] Soloist 和账户相关的配置全部运行时读取（DESIGN §4.2 "运行时配置"）：设置页可更换 key、可执行文件、设备名
 - [ ] 过期处理：`soloist --version` 算出到期日，设置页显示，到期前 14 天提醒；退出码 `10` → 只走"更新 Soloist"一步
-- [ ] 实测并处理：key 失效或填错时 Soloist 的表现；换新版本后配对会话是否保留
-- [ ] `playback` 的 Soloist 实现：WebSocket 客户端、断线重连、状态插值
-- [ ] 播放条：播放和暂停、上一首和下一首、seek、音量、随机、循环
-- [ ] 正在播放页：封面、背景、进度
-- [ ] 队列：从 `queue_changed` 读取，显示在封面墙上；"加入队列"
-- [ ] MPRIS / Now Playing、媒体键（mygo 内置）
+- [ ] 实测并处理：key 失效或填错时 Soloist 的表现；换新版本后配对会话是否保留（key 填错已实测：会删掉配对会话，见 POC.md；换版本待测）
+- [x] `playback` 的 Soloist 实现：WebSocket 客户端、断线重连、状态插值
+- [x] 播放条：播放和暂停、上一首和下一首、seek、音量、随机、循环
+- [x] 正在播放页：封面、背景、进度
+- [ ] 队列：从 `queue_changed` 读取，显示在封面墙上；"加入队列"（读取和显示已完成，"加入队列"未做）
+- [x] MPRIS / Now Playing、媒体键（mygo 内置）
 - [ ] 关窗口缩到托盘
 
 **退出条件**：新用户按引导页从零走完，能播放一首歌，媒体键可用。
