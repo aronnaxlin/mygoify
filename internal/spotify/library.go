@@ -21,6 +21,10 @@ type Library struct {
 
 	mu sync.Mutex
 	me *music.User
+	// The liked songs, as read last, for a while: their playlist and the
+	// hearts both read them.
+	liked   []music.Track
+	likedAt time.Time
 }
 
 var _ library.Library = (*Library)(nil)
@@ -250,9 +254,67 @@ func (l *Library) Home() (music.Home, error) {
 // lists them apart from the playlists.
 const likedID = "liked"
 
-// maxLiked is how many liked songs the liked songs' playlist lists, and
-// hearts know of: the first, the latest liked, a page of 50 a call.
-const maxLiked = 500
+// maxLiked is how many liked songs the app reads, the latest liked first.
+const maxLiked = 10000
+
+// likedFresh is how long the liked songs read stay good.
+const likedFresh = 2 * time.Minute
+
+// likedTracks returns the liked songs, the latest liked first, as read
+// last if lately. The first page says how many there are, and the others
+// are read four at a time: a page of 50 takes a third of a second, and
+// one after another 2000 songs took more than ten.
+func (l *Library) likedTracks() ([]music.Track, error) {
+	l.mu.Lock()
+	if time.Since(l.likedAt) < likedFresh {
+		liked := l.liked
+		l.mu.Unlock()
+		return liked, nil
+	}
+	l.mu.Unlock()
+	type saved = page[struct {
+		Track track `json:"track"`
+	}]
+	var first saved
+	if err := l.do("GET", "/me/tracks?limit=50", nil, &first); err != nil {
+		return nil, err
+	}
+	total := min(first.Total, maxLiked)
+	pages := make([]saved, (total+49)/50)
+	if len(pages) > 0 {
+		pages[0] = first
+	}
+	errs := make([]error, len(pages))
+	var wg sync.WaitGroup
+	next := make(chan int)
+	for range 4 {
+		wg.Go(func() {
+			for i := range next {
+				errs[i] = l.do("GET", fmt.Sprintf("/me/tracks?limit=50&offset=%d", i*50), nil, &pages[i])
+			}
+		})
+	}
+	for i := 1; i < len(pages); i++ {
+		next <- i
+	}
+	close(next)
+	wg.Wait()
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	var liked []music.Track
+	for _, p := range pages {
+		for _, s := range p.Items {
+			if s.Track.playable() {
+				liked = append(liked, s.Track.music(nil))
+			}
+		}
+	}
+	l.mu.Lock()
+	l.liked, l.likedAt = liked, time.Now()
+	l.mu.Unlock()
+	return liked, nil
+}
 
 func (l *Library) MyPlaylists() (made, saved []music.Playlist, err error) {
 	me, err := l.Me()
@@ -263,7 +325,7 @@ func (l *Library) MyPlaylists() (made, saved []music.Playlist, err error) {
 	if err := l.do("GET", "/me/tracks?limit=1", nil, &liked); err != nil {
 		return nil, nil, err
 	}
-	made = append(made, music.Playlist{ID: likedID, Name: "喜欢的歌曲", Liked: true, Owner: *me, TrackCount: liked.Total})
+	made = append(made, music.Playlist{ID: likedID, Name: "喜欢的歌曲", Liked: true, Owner: *me, TrackCount: liked.Total, Images: music.Images{{URL: music.LikedCover}}})
 	lists, err := pages[playlist](l, "/me/playlists?limit=50", 500)
 	for i := range lists {
 		p := lists[i].music()
@@ -320,18 +382,11 @@ func (l *Library) likedPlaylist() (*music.Playlist, error) {
 	if err != nil {
 		return nil, err
 	}
-	saved, err := pages[struct {
-		Track track `json:"track"`
-	}](l, "/me/tracks?limit=50", maxLiked)
-	if err != nil && len(saved) == 0 {
+	liked, err := l.likedTracks()
+	if err != nil {
 		return nil, err
 	}
-	p := &music.Playlist{ID: likedID, Name: "喜欢的歌曲", Liked: true, Owner: *me}
-	for _, s := range saved {
-		if s.Track.playable() {
-			p.Tracks = append(p.Tracks, s.Track.music(nil))
-		}
-	}
+	p := &music.Playlist{ID: likedID, Name: "喜欢的歌曲", Liked: true, Owner: *me, Images: music.Images{{URL: music.LikedCover}}, Tracks: liked}
 	p.TrackCount = len(p.Tracks)
 	p.Snapshot = fmt.Sprint(len(p.Tracks))
 	return p, nil
@@ -444,12 +499,10 @@ func (l *Library) Search(query string, kind music.SearchType, limit, offset int)
 }
 
 func (l *Library) LikedIDs() ([]string, error) {
-	saved, err := pages[struct {
-		Track track `json:"track"`
-	}](l, "/me/tracks?limit=50", maxLiked)
-	ids := make([]string, 0, len(saved))
-	for _, s := range saved {
-		ids = append(ids, s.Track.ID)
+	liked, err := l.likedTracks()
+	ids := make([]string, 0, len(liked))
+	for _, t := range liked {
+		ids = append(ids, t.ID)
 	}
 	return ids, err
 }
@@ -464,6 +517,10 @@ func (l *Library) keep(uri string, keep bool) error {
 }
 
 func (l *Library) Like(trackID string, like bool) error {
+	// The liked songs read are stale now.
+	l.mu.Lock()
+	l.likedAt = time.Time{}
+	l.mu.Unlock()
 	return l.keep("spotify:track:"+trackID, like)
 }
 

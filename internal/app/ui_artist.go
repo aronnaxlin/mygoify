@@ -236,7 +236,7 @@ func (a *app) artistHeader(c *ui.Context, d *artistData) {
 					if !a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}
-					a.pl.PlayQueue("", songs, firstPlayable(songs))
+					a.pl.PlayQueue("", songs, randomPlayable(songs))
 				}
 				icon, label := iconPlus, "关注"
 				if ar.Followed {

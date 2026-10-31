@@ -25,6 +25,16 @@ func (a *app) songMenu(c *ui.Context, tr *music.Track, size float32, color ui.Co
 // it is listed in, if set.
 func (a *app) songItems(tr *music.Track, pid string) func(m *ui.Menu) {
 	return func(m *ui.Menu) {
+		if a.profile != nil {
+			label := "喜欢"
+			if a.isLiked(tr) {
+				label = "取消喜欢"
+			}
+			if m.Item(label).Chosen() {
+				a.toggleLike(tr)
+			}
+			m.Separator()
+		}
 		if m.Item("复制歌名").Chosen() {
 			copyText(tr.Name)
 		}

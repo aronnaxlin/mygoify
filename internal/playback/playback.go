@@ -82,18 +82,22 @@ type Player struct {
 	// Artwork, if set, fetches a cover, to show the system what plays.
 	Artwork func(url string) ([]byte, error)
 
-	st     State
-	held   bool // a test holds the position where it is
-	volume float64
-	shown  string // the track the system was last shown
+	st   State
+	held bool // a test holds the position where it is
+	// expect is the track asked to play, until the backend says it plays
+	// it: what it says before is of the track before.
+	expect   string
+	expectAt time.Time
+	volume   float64
+	shown    string // the track the system was last shown
 }
 
-// New returns a player of what b plays. post runs a function on the main
-// thread.
+// New returns a player of what b plays, which follows it once asked to
+// (Follow).
+// post runs a function on the main thread.
 func New(post func(func()), b Backend) *Player {
 	p := &Player{post: post, b: b, st: State{At: -1}, volume: 0.8, cmds: make(chan func() error, 64)}
 	go p.run()
-	b.Watch(func(st State) { p.post(func() { p.apply(st) }) })
 	// The media keys, and the controls of the system's Now Playing.
 	mygo.NowPlaying.OnCommand(func(cmd mygo.MediaCommand, pos time.Duration) {
 		p.post(func() {
@@ -112,6 +116,14 @@ func New(post func(func()), b Backend) *Player {
 		})
 	})
 	return p
+}
+
+// Follow follows what the backend plays. The app calls it once post
+// brings functions to its window: what the backend says as it first
+// connects, before, was lost, and the player bar showed nothing while
+// music played on.
+func (p *Player) Follow() {
+	p.b.Watch(func(st State) { p.post(func() { p.apply(st) }) })
 }
 
 // run sends the commands to the backend in the order they were given.
@@ -136,7 +148,24 @@ func (p *Player) send(cmd func() error) {
 	}
 }
 
+// expectFor is how long the player waits for the track asked to play
+// before it shows what the backend says plays all the same.
+const expectFor = 5 * time.Second
+
 func (p *Player) apply(st State) {
+	// Soloist says where the track before was once more before it plays
+	// the one asked for: the player bar went back to it a moment, and
+	// seemed to start the new one twice.
+	if p.expect != "" {
+		var id string
+		if st.At >= 0 && st.At < len(st.Queue) {
+			id = st.Queue[st.At].ID
+		}
+		if id != p.expect && time.Since(p.expectAt) < expectFor {
+			return
+		}
+		p.expect = ""
+	}
 	p.st = st
 	p.held = false
 	p.sync()
@@ -203,6 +232,10 @@ func (p *Player) PlayQueue(context string, tracks []music.Track, start int) {
 		start = -1
 	}
 	p.st = State{Queue: tracks, At: start, Playing: true, Loading: true, Since: time.Now(), Shuffle: p.st.Shuffle, Repeat: p.st.Repeat}
+	p.expect, p.expectAt = "", time.Now()
+	if start >= 0 {
+		p.expect = tracks[start].ID
+	}
 	p.sync()
 	req := Request{Context: context, Tracks: tracks, Start: start}
 	p.send(func() error { return p.b.Play(req) })

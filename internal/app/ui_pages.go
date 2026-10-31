@@ -236,7 +236,7 @@ func (a *app) playlistHeader(c *ui.Context, pl *music.Playlist) {
 					if !a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}
-					a.pl.PlayQueue(pl.URI(), pl.Tracks, firstPlayable(pl.Tracks))
+					a.pl.PlayQueue(pl.URI(), pl.Tracks, randomPlayable(pl.Tracks))
 				}
 				if mine := a.editable(pl.ID); mine != nil {
 					more := iconButton(c.Key("more"), iconMore, 18, p.muted, "更多")

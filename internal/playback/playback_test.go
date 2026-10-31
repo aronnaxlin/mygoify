@@ -1,6 +1,7 @@
 package playback
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -120,5 +121,58 @@ func TestPlayerPositionWithNothing(t *testing.T) {
 	p.apply(State{At: -1, Position: 4 * time.Minute})
 	if pos := p.Position(); pos != 0 {
 		t.Fatalf("at %v with nothing playing", pos)
+	}
+}
+
+// Asked to play a track, the player shows it until the backend says it
+// plays it, not what the backend says of the track before: the player bar
+// went back to it a moment, and seemed to start the new one twice.
+func TestPlayerWaitsForTheTrackAsked(t *testing.T) {
+	p := New(func(func()) {}, NewFake())
+	old, asked := tracks(1, time.Minute), tracks(3, time.Minute)
+	p.PlayQueue("", asked, 2)
+	p.apply(State{Queue: old, At: 0, Playing: true, Position: 40 * time.Second, Since: time.Now()})
+	if p.Current().ID != asked[2].ID {
+		t.Fatalf("went back to %s", p.Current().Name)
+	}
+	p.apply(State{Queue: asked, At: 2, Playing: true, Since: time.Now()})
+	p.apply(State{Queue: asked, At: 1, Playing: true, Since: time.Now()})
+	if p.Current().ID != asked[1].ID {
+		t.Fatalf("the backend moving on, still on %s", p.Current().Name)
+	}
+}
+
+// eager reports the state it has as soon as it is watched, as Soloist
+// does once connected.
+type eager struct {
+	*Fake
+	st State
+}
+
+func (e eager) Watch(fn func(State)) { go fn(e.st) }
+
+// What the backend says as the player first follows it shows: it said it
+// before the app's window was there to take it, and the player bar showed
+// nothing while music played on.
+func TestPlayerFollowsOnceAsked(t *testing.T) {
+	var ready atomic.Bool
+	applied := make(chan func(), 1)
+	post := func(fn func()) {
+		if ready.Load() {
+			applied <- fn
+		}
+	}
+	playing := tracks(1, time.Minute)
+	p := New(post, eager{NewFake(), State{Queue: playing, At: 0, Playing: true}})
+	ready.Store(true) // the window is there
+	p.Follow()
+	select {
+	case fn := <-applied:
+		fn()
+	case <-time.After(time.Second):
+		t.Fatal("nothing reported")
+	}
+	if p.Current() == nil || p.Current().ID != playing[0].ID {
+		t.Fatal("the track playing doesn't show")
 	}
 }

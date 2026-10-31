@@ -14,6 +14,10 @@ type Image struct {
 	Width, Height int
 }
 
+// LikedCover is the URL of the cover of the liked songs, which Spotify
+// gives none: the app draws it.
+const LikedCover = "mygoify:liked"
+
 // Images are the sizes Spotify serves a picture at: a cover's are 640, 300
 // and 64 pixels across.
 type Images []Image

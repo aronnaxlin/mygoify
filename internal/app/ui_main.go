@@ -1,6 +1,7 @@
 package app
 
 import (
+	"math/rand/v2"
 	"runtime"
 	"time"
 
@@ -444,6 +445,22 @@ func (a *app) loadPlaylist(id string, thenPlay bool) {
 			}
 		})
 	}()
+}
+
+// randomPlayable returns a track to start the shuffled tracks from, as
+// Spotify starts them: any, not the first, which shuffle always played
+// first.
+func randomPlayable(tracks []music.Track) int {
+	var playable []int
+	for i := range tracks {
+		if tracks[i].Playable() {
+			playable = append(playable, i)
+		}
+	}
+	if len(playable) == 0 {
+		return 0
+	}
+	return playable[rand.IntN(len(playable))]
 }
 
 func firstPlayable(tracks []music.Track) int {

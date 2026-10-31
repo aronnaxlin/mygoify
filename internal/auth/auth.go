@@ -27,6 +27,8 @@ var Scopes = []string{
 	"user-read-playback-state", "user-modify-playback-state", "user-read-currently-playing",
 	"user-read-recently-played", "user-top-read", "user-library-read", "user-library-modify",
 	"playlist-read-private", "playlist-read-collaborative", "playlist-modify-private", "playlist-modify-public",
+	// Following artists, and whether the listener does.
+	"user-follow-read", "user-follow-modify",
 }
 
 // These are Spotify's; tests replace them.
