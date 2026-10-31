@@ -6,6 +6,7 @@
 //	go run ./cmd/poc login   logs in, in the browser
 //	go run ./cmd/poc me      says who is logged in, refreshing the login
 //	go run ./cmd/poc dump    prints Soloist's state and queue as it sends them
+//	go run ./cmd/poc lib     reads the library through internal/spotify, changing nothing
 //	go run ./cmd/poc p4      plays the third track of a playlist on Soloist
 //	go run ./cmd/poc p6      plays a minute, measuring the position and Soloist's cost
 package main
@@ -30,6 +31,8 @@ import (
 	"github.com/coder/websocket"
 
 	"mygoify/internal/auth"
+	"mygoify/internal/music"
+	"mygoify/internal/spotify"
 )
 
 var (
@@ -45,7 +48,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if len(os.Args) < 2 {
-		log.Fatal("usage: poc login | me | dump | p4 | p6")
+		log.Fatal("usage: poc login | me | dump | lib | p4 | p6")
 	}
 	switch os.Args[1] {
 	case "login":
@@ -60,6 +63,8 @@ func main() {
 		}
 	case "dump":
 		err = dump()
+	case "lib":
+		err = readLibrary()
 	case "p4":
 		err = p4()
 	case "p6":
@@ -322,6 +327,108 @@ func dump() error {
 			fmt.Println(string(data))
 			seen++
 		}
+	}
+	return nil
+}
+
+// readLibrary reads through internal/spotify what the app shows, and says
+// how much it found, changing nothing.
+func readLibrary() error {
+	s := session()
+	if !s.Restore() {
+		return errors.New("not logged in: run poc login")
+	}
+	l := &spotify.Library{API: &spotify.Client{Token: s.AccessToken}}
+	step := func(name string, f func() (string, error)) {
+		start := time.Now()
+		out, err := f()
+		if err != nil {
+			out = "ERROR " + err.Error()
+		}
+		fmt.Printf("%-14s %6v  %s\n", name, time.Since(start).Round(time.Millisecond), out)
+	}
+	first := func(ts []music.Track) string {
+		if len(ts) == 0 {
+			return "-"
+		}
+		return fmt.Sprintf("%q by %s, cover %v", ts[0].Name, ts[0].ArtistNames(), len(ts[0].Album.Images) > 0)
+	}
+	var made, saved []music.Playlist
+	var album, artist string
+	step("Me", func() (string, error) {
+		me, err := l.Me()
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("id %s, %d images", me.ID, len(me.Images)), nil
+	})
+	step("Home", func() (string, error) {
+		h, err := l.Home()
+		if len(h.Recent) > 0 {
+			album = h.Recent[0].Album.ID
+			artist = h.Recent[0].Artists[0].ID
+		}
+		return fmt.Sprintf("%d recent, %d top tracks, %d top artists; recent: %s", len(h.Recent), len(h.TopTracks), len(h.TopArtists), first(h.Recent)), err
+	})
+	step("MyPlaylists", func() (string, error) {
+		var err error
+		made, saved, err = l.MyPlaylists()
+		return fmt.Sprintf("%d made (first the liked songs: %d), %d saved", len(made), made[0].TrackCount, len(saved)), err
+	})
+	step("Playlist liked", func() (string, error) {
+		p, err := l.Playlist("liked")
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%d tracks; %s", len(p.Tracks), first(p.Tracks)), nil
+	})
+	if len(made) > 1 {
+		step("Playlist own", func() (string, error) {
+			p, err := l.Playlist(made[1].ID)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("%d of %d tracks, hidden %v; %s", len(p.Tracks), p.TrackCount, p.Hidden, first(p.Tracks)), nil
+		})
+	}
+	if len(saved) > 0 {
+		step("Playlist saved", func() (string, error) {
+			p, err := l.Playlist(saved[0].ID)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("%d tracks, hidden %v (by %s)", len(p.Tracks), p.Hidden, p.Owner.Name), nil
+		})
+	}
+	step("LikedIDs", func() (string, error) {
+		ids, err := l.LikedIDs()
+		return fmt.Sprintf("%d", len(ids)), err
+	})
+	if album != "" {
+		step("Album", func() (string, error) {
+			a, err := l.Album(album)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("%q, %s, %d songs, released %s", a.Name, a.ArtistNames(), len(a.Songs), a.Released), nil
+		})
+		step("Artist", func() (string, error) {
+			a, err := l.Artist(artist)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("%q, genres %v, %d songs, followed %v; %s", a.Name, a.Genres, len(a.Songs), a.Followed, first(a.Songs)), nil
+		})
+		step("ArtistAlbums", func() (string, error) {
+			as, more, err := l.ArtistAlbums(artist, 30, 0)
+			return fmt.Sprintf("%d, more %v", len(as), more), err
+		})
+	}
+	for _, k := range []music.SearchType{music.SearchTracks, music.SearchArtists, music.SearchAlbums, music.SearchPlaylists} {
+		step(fmt.Sprint("Search ", k), func() (string, error) {
+			r, err := l.Search("春日影", k, 10, 0)
+			return fmt.Sprintf("%d, more %v", r.Len(), r.More), err
+		})
 	}
 	return nil
 }

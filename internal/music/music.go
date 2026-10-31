@@ -113,11 +113,11 @@ type Playlist struct {
 	Tracks []Track
 }
 
-// URI names the playlist to play it whole: the liked songs are the
-// listener's collection.
+// URI names the playlist to play it whole, or is "" for the liked songs,
+// which the Web API plays not as a context: as a list of their tracks.
 func (p *Playlist) URI() string {
 	if p.Liked {
-		return "spotify:user:" + p.Owner.ID + ":collection"
+		return ""
 	}
 	return "spotify:playlist:" + p.ID
 }

@@ -176,8 +176,8 @@ func Run() error {
 		// made, and the view asks the player what plays.
 		a.art = newArtCache(a.post)
 		var backend playback.Backend = playback.NewFake()
-		if b := devSoloist(); b != nil {
-			backend = b
+		if lib, b := devSpotify(); lib != nil {
+			a.lib, backend = lib, b
 		}
 		a.pl = playback.New(a.post, backend)
 		a.pl.Artwork = fetchArt
