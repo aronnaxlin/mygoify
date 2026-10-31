@@ -16,6 +16,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"mygoify/internal/music"
 	"mygoify/internal/playback"
 	"mygoify/internal/spotify"
 )
@@ -174,8 +175,8 @@ func TestState(t *testing.T) {
 }
 
 // A command that plays makes a Soloist that isn't the device playing so,
-// and the others don't take playback from where it is; repeat sets both of
-// Soloist's.
+// and the others, queueing a track among them, don't take playback from
+// where it is; repeat sets both of Soloist's.
 func TestCommands(t *testing.T) {
 	f := newFakeSoloist(t)
 	b := New(Config{DataDir: f.dir})
@@ -185,6 +186,12 @@ func TestCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	if cmd := f.next(t); cmd["command"] != "set_volume" || cmd["volume"] != 50.0 {
+		t.Fatalf("sent %v", cmd)
+	}
+	if err := b.AddToQueue(music.Track{ID: "4uLU6hMCjMI75M1A2tKUQC"}); err != nil {
+		t.Fatal(err)
+	}
+	if cmd := f.next(t); cmd["command"] != "add_to_queue" || cmd["uri"] != "spotify:track:4uLU6hMCjMI75M1A2tKUQC" {
 		t.Fatalf("sent %v", cmd)
 	}
 	resumed := make(chan error, 1)

@@ -19,12 +19,16 @@ func (a *app) songMenu(c *ui.Context, tr *music.Track, size float32, color ui.Co
 }
 
 // songItems builds the menu of what can be done with tr, behind its dots
-// or a right click on its row: copying its title, its title with its
-// artists, or the link to its page, opening its artists' or album's, and,
-// signed in, adding it to a playlist or taking it out of pid, the playlist
-// it is listed in, if set.
+// or a right click on its row: queueing it, copying its title, its title
+// with its artists, or the link to its page, opening its artists' or
+// album's, and, signed in, adding it to a playlist or taking it out of
+// pid, the playlist it is listed in, if set.
 func (a *app) songItems(tr *music.Track, pid string) func(m *ui.Menu) {
 	return func(m *ui.Menu) {
+		if m.Item("加入队列").Chosen() {
+			a.addToQueue(tr)
+		}
+		m.Separator()
 		if a.profile != nil {
 			label := "喜欢"
 			if a.isLiked(tr) {
@@ -63,4 +67,15 @@ func (a *app) songItems(tr *music.Track, pid string) func(m *ui.Menu) {
 		}
 		a.playlistItems(m, tr, pid)
 	}
+}
+
+// addToQueue queues tr, and says with a toast whether it was.
+func (a *app) addToQueue(tr *music.Track) {
+	a.pl.AddToQueue(*tr, func(err error) {
+		if err != nil {
+			a.toast = "加入队列失败，请稍后再试"
+		} else {
+			a.toast = "已加入队列"
+		}
+	})
 }

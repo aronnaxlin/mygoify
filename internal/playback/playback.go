@@ -66,6 +66,9 @@ type Backend interface {
 	SetVolume(float64) error
 	SetShuffle(bool) error
 	SetRepeat(RepeatMode) error
+	// AddToQueue queues t after the tracks queued before it, ahead of
+	// the rest of the context.
+	AddToQueue(t music.Track) error
 }
 
 // Player is where playback is, as the app shows it. Its methods run on the
@@ -251,6 +254,18 @@ func (p *Player) CycleRepeat() {
 	p.st.Repeat = (p.st.Repeat + 1) % 3
 	r := p.st.Repeat
 	p.send(func() error { return p.b.SetRepeat(r) })
+}
+
+// AddToQueue queues t to play after the tracks queued before it, ahead of
+// the rest of what plays. done hears, on the main thread, whether the
+// backend did: the queue shows it as the backend reports it, and failing,
+// it isn't the track playing that failed.
+func (p *Player) AddToQueue(t music.Track, done func(error)) {
+	p.send(func() error {
+		err := p.b.AddToQueue(t)
+		p.post(func() { done(err) })
+		return nil
+	})
 }
 
 // Current returns the track playing or loading, or nil.
