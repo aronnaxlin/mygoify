@@ -10,6 +10,7 @@ import (
 	"mygoify/internal/library"
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
+	"mygoify/internal/secret"
 )
 
 type pageKind int
@@ -48,7 +49,9 @@ type app struct {
 
 	profile     *music.User
 	mine, saved []music.Playlist // the listener's playlists: made, and saved
-	login       loginState
+	ob          onboardState
+	keep        secret.Store    // the listener's secrets; secrets() unless a test sets it
+	live        bool            // the library and the player are Spotify's, not the fake ones
 	accountOpen bool            // the dropdown of the account row shows
 	naming      nameDialog      // the name of a playlist asked for
 	deleting    deleteDialog    // whether to delete a playlist, asked
@@ -115,12 +118,18 @@ type app struct {
 	settings    settings
 	settingsWin *mygo.Window
 	updates     bool // the update plugin is used (useUpdater)
+	// inline, if set, runs what post is given, as a test does by hand where
+	// a window would.
+	inline func(fn func())
 }
 
 // post runs fn on the main thread and redraws both windows. Without a
 // window, as in tests, it drops fn.
 func (a *app) post(fn func()) {
 	if a.win == nil {
+		if a.inline != nil {
+			a.inline(fn)
+		}
 		return
 	}
 	a.win.Update(func() {
@@ -177,7 +186,7 @@ func Run() error {
 		a.art = newArtCache(a.post)
 		var backend playback.Backend = playback.NewFake()
 		if lib, b := connectSpotify(a.settings.Spotify, secrets()); lib != nil {
-			a.lib, backend = lib, b
+			a.lib, backend, a.live = lib, b, true
 		}
 		a.pl = playback.New(a.post, backend)
 		a.pl.Artwork = fetchArt

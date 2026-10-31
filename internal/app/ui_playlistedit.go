@@ -70,7 +70,7 @@ func (a *app) playlistChanged(id string) {
 func (a *app) newPlaylist(tr *music.Track) {
 	if a.profile == nil {
 		a.showMain()
-		a.openLogin()
+		a.openOnboarding()
 		return
 	}
 	a.naming = nameDialog{open: true, add: tr}
