@@ -48,7 +48,7 @@
 
 - [ ] 引导页：创建应用、填 client ID → PKCE 登录 → 下载或选择 Soloist → 填 API key → 配对
 - [ ] 凭据存进钥匙串，token 自动刷新
-- [ ] Soloist 服务管理：systemd user unit / launchd agent，安装、启动、停止
+- [ ] Soloist 服务管理：systemd user unit / launchd agent，安装、启动、停止（App 启动时安装并拉起已完成，macOS 已实测、Linux 待实测；停止未做；key 和路径暂时从 `.env` 读）
 - [ ] Soloist 和账户相关的配置全部运行时读取（DESIGN §4.2 "运行时配置"）：设置页可更换 key、可执行文件、设备名
 - [ ] 过期处理：`soloist --version` 算出到期日，设置页显示，到期前 14 天提醒；退出码 `10` → 只走"更新 Soloist"一步
 - [ ] 实测并处理：key 失效或填错时 Soloist 的表现；换新版本后配对会话是否保留（key 填错已实测：会删掉配对会话，见 POC.md；换版本待测）
