@@ -48,6 +48,9 @@ type settings struct {
 	AppIcon string `json:"appIcon"`
 	// SearchHistory keeps submitted keywords, most recent first.
 	SearchHistory []string `json:"searchHistory,omitempty"`
+	// Spotify is what the app logs in with and plays through, as
+	// onboarding fills it in; the secrets are kept apart (secret).
+	Spotify spotifySettings `json:"spotify"`
 
 	path string // where they were loaded from, and are saved to
 }

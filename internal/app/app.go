@@ -176,7 +176,7 @@ func Run() error {
 		// made, and the view asks the player what plays.
 		a.art = newArtCache(a.post)
 		var backend playback.Backend = playback.NewFake()
-		if lib, b := devSpotify(); lib != nil {
+		if lib, b := connectSpotify(a.settings.Spotify, secrets()); lib != nil {
 			a.lib, backend = lib, b
 		}
 		a.pl = playback.New(a.post, backend)
