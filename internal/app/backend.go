@@ -59,8 +59,12 @@ func devSpotify() (library.Library, playback.Backend) {
 			}
 		}()
 	}
-	api := &spotify.Client{Token: sess.AccessToken}
-	return &spotify.Library{API: api}, soloist.New(soloist.Config{DataDir: dir, DeviceName: name, API: api})
+	api := &spotify.Client{Token: sess.AccessToken, HoldFile: filepath.Join(data, "spotify-hold")}
+	lib := &spotify.Library{API: api}
+	if c, err := os.UserCacheDir(); err == nil {
+		lib.Cache = filepath.Join(c, "mygoify", "spotify")
+	}
+	return lib, soloist.New(soloist.Config{DataDir: dir, DeviceName: name, API: api})
 }
 
 // tokenFile keeps the token in a private file, as cmd/poc does.

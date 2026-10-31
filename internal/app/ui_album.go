@@ -31,7 +31,7 @@ func (a *app) loadAlbum(id string) {
 		a.post(func() {
 			d.loading = false
 			if err != nil {
-				d.err = "专辑加载失败"
+				d.err = failed(err, "专辑加载失败")
 				return
 			}
 			d.album = al

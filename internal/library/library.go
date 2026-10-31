@@ -46,6 +46,10 @@ type Library interface {
 	DeletePlaylist(id string) error
 }
 
+// ErrLimited is what a call returns, wrapped, while Spotify refuses the
+// app's calls for a while: waiting is all that helps.
+var ErrLimited = errors.New("Spotify is limiting the app's calls")
+
 // ErrInPlaylist is what AddToPlaylist returns when the track is there
 // already. Spotify would add it again: the library checks first.
 var ErrInPlaylist = errors.New("the track is in the playlist already")

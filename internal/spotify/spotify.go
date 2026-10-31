@@ -14,9 +14,13 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	"mygoify/internal/library"
 )
 
 // BaseURL is the Web API's; tests replace it.
@@ -45,8 +49,13 @@ type Client struct {
 	Token func(ctx context.Context) (string, error)
 	HTTP  *http.Client
 
-	mu    sync.Mutex
-	until time.Time // calls wait until then: Spotify asked them to
+	// HoldFile, if set, keeps how long Spotify asked calls to wait
+	// across restarts.
+	HoldFile string
+
+	mu       sync.Mutex
+	until    time.Time // calls wait until then: Spotify asked them to
+	holdRead bool
 }
 
 // maxRetries is how many times a rate-limited call is tried again.
@@ -55,7 +64,8 @@ const maxRetries = 4
 // Do calls method on path with in, if set, as JSON, and decodes the
 // answer into out, if set and there is one. A call Spotify rate-limits
 // waits as long as it says, a little longer, and is tried again; meanwhile
-// other calls wait too, rather than add to what Spotify refuses.
+// other calls wait too, rather than add to what Spotify refuses. A wait
+// past ctx's deadline fails at once, with a LimitedError.
 func (c *Client) Do(ctx context.Context, method, path string, in, out any) error {
 	var body []byte
 	if in != nil {
@@ -149,20 +159,56 @@ func retryAfter(h string) time.Duration {
 	return d + time.Duration(rand.Int64N(int64(d)/3+1))
 }
 
+// LimitedError is what a call returns when Spotify asked for a longer
+// wait than the call may take: it may ask for hours.
+type LimitedError struct {
+	Until time.Time
+}
+
+func (e *LimitedError) Error() string {
+	return "spotify: rate limited until " + e.Until.Format(time.DateTime)
+}
+
+func (e *LimitedError) Is(target error) bool { return target == library.ErrLimited }
+
 func (c *Client) holdOff(d time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.loadHold()
 	if t := time.Now().Add(d); t.After(c.until) {
 		c.until = t
+		if c.HoldFile != "" {
+			os.MkdirAll(filepath.Dir(c.HoldFile), 0o700)
+			os.WriteFile(c.HoldFile, []byte(t.Format(time.RFC3339)), 0o600)
+		}
+	}
+}
+
+// loadHold reads the wait Spotify asked for before the app last quit,
+// once: calling again at once would only lengthen it.
+func (c *Client) loadHold() {
+	if c.HoldFile == "" || c.holdRead {
+		return
+	}
+	c.holdRead = true
+	if b, err := os.ReadFile(c.HoldFile); err == nil {
+		if t, err := time.Parse(time.RFC3339, strings.TrimSpace(string(b))); err == nil && t.After(c.until) {
+			c.until = t
+		}
 	}
 }
 
 func (c *Client) wait(ctx context.Context) error {
 	c.mu.Lock()
-	d := time.Until(c.until)
+	c.loadHold()
+	until := c.until
 	c.mu.Unlock()
+	d := time.Until(until)
 	if d <= 0 {
 		return nil
+	}
+	if end, ok := ctx.Deadline(); ok && until.After(end) {
+		return &LimitedError{until}
 	}
 	t := time.NewTimer(d)
 	defer t.Stop()
