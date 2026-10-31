@@ -268,7 +268,12 @@ func (a *app) stepKey(c *ui.Context) {
 		summary = "已保存，配对后才能确认"
 	}
 	a.onboardStep(c, stepKey, "API key", summary, func() {
-		a.note(c, "在开发者后台的 Soloist 页面生成 API key，贴到这里。key 只保存在这台电脑上，不会显示出来。")
+		a.note(c, "在开发者后台的 Soloist 页面登录并接受条款，生成 API key，贴到这里。key 只保存在这台电脑上，不会显示出来。")
+		ui.Row(c).Margin(4, 0, 0, 0).Children(func() {
+			if a.action(c, "key-page", "打开 API key 页面", false).Clicked() {
+				openURL(soloistKeyURL)
+			}
+		})
 		in := ui.TextInput(c.Key("api-key"), &ob.key).Password().Placeholder("API key").Label("填写 API key").FontSize(13).Margin(4, 0, 0, 0)
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(6, 0, 0, 0).Children(func() {
 			switch ob.keyState {

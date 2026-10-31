@@ -59,6 +59,8 @@ var (
 // Where the listener makes the app, and gets Soloist.
 const (
 	developerDashboardURL = "https://developer.spotify.com/dashboard"
+	// soloistKeyURL is where the listener makes Soloist's API key.
+	soloistKeyURL = "https://developer.spotify.com/dashboard/soloist"
 	// defaultRedirect is what the listener registers as the app's Redirect
 	// URI, unless they have a reason to use another port.
 	defaultRedirect = "http://127.0.0.1:45231/callback"

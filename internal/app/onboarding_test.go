@@ -359,6 +359,17 @@ func TestOnboardingKeyTrialCanBeCancelled(t *testing.T) {
 	}
 }
 
+// The key step sends the listener to where Soloist's key is made.
+func TestOnboardingKeyStepLinksToTheKeyPage(t *testing.T) {
+	o := newOnboarding(t)
+	o.set(stepKey)
+	o.open()
+	o.click("打开 API key 页面")
+	if len(o.opened) != 1 || o.opened[0] != "https://developer.spotify.com/dashboard/soloist" {
+		t.Errorf("opened %v", o.opened)
+	}
+}
+
 // A key that was good and is replaced by a wrong one is still the key
 // kept, which Soloist runs with.
 func TestOnboardingWrongKeyKeepsTheOld(t *testing.T) {
