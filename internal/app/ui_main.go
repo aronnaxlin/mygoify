@@ -88,7 +88,7 @@ func (a *app) view(c *ui.Context) {
 		})
 		a.nowPlayingLayer(c, npOpen, npSettled)
 	})
-	a.loginDialog(c)
+	a.onboardingDialog(c)
 	a.playlistNameDialog(c)
 	a.deletePlaylistDialog(c)
 	if a.toast != "" {

@@ -19,6 +19,10 @@ func init() {
 	shotHook = func(a *app) {
 		// The walk changes settings: keep the listener's own as they were.
 		a.settings.path = ""
+		// On the fake library onboarding opens as the app starts, over every
+		// view: put it off.
+		a.settings.OnboardingDismissed = true
+		a.ob.open = false
 		go func() {
 			shot := func(name string, w *mygo.Window) {
 				if w == nil {

@@ -33,7 +33,7 @@ func (a *app) loadLiked(uid string) {
 func (a *app) toggleLike(tr *music.Track) {
 	if a.profile == nil {
 		a.showMain()
-		a.openLogin()
+		a.openOnboarding()
 		return
 	}
 	if a.liked == nil {

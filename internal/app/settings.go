@@ -51,6 +51,9 @@ type settings struct {
 	// Spotify is what the app logs in with and plays through, as
 	// onboarding fills it in; the secrets are kept apart (secret).
 	Spotify spotifySettings `json:"spotify"`
+	// OnboardingDismissed says the listener put onboarding off, so that it
+	// doesn't open as the app starts; the account menu still opens it.
+	OnboardingDismissed bool `json:"onboardingDismissed,omitempty"`
 
 	path string // where they were loaded from, and are saved to
 }

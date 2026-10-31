@@ -150,11 +150,18 @@ func (a *app) settingsView(c *ui.Context) {
 		})
 
 		group("账号", func() {
+			row("连接 Spotify", "创建应用、登录、Soloist、API key 和配对，每一步可以单独重做", func() {
+				if ui.Button(c.Key("onboarding"), "设置…").Clicked() {
+					a.showMain()
+					a.openOnboarding()
+					a.win.Invalidate()
+				}
+			})
 			if a.profile == nil {
 				row("未登录", "登录后，每日推荐与歌单将根据你的口味生成", func() {
 					if ui.PrimaryButton(c.Key("login"), "扫码登录").Clicked() {
 						a.showMain()
-						a.openLogin()
+						a.openOnboarding()
 						a.win.Invalidate()
 					}
 				})

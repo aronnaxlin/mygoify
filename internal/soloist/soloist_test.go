@@ -378,3 +378,25 @@ func TestPlayLimited(t *testing.T) {
 	case <-time.After(200 * time.Millisecond):
 	}
 }
+
+// Onboarding goes on to its last step once Soloist says it is logged in,
+// and not as it says it isn't.
+func TestLoggedInIsTold(t *testing.T) {
+	f := newFakeSoloist(t)
+	told := make(chan struct{}, 4)
+	b := New(Config{DataDir: f.dir, LoggedIn: func() { told <- struct{}{} }})
+	watch(b)
+	f.connected(t, 1)
+	f.send(t, `{"type":"auth_state","logged_in":false}`)
+	select {
+	case <-told:
+		t.Fatal("told of a login as Soloist wasn't logged in")
+	case <-time.After(100 * time.Millisecond):
+	}
+	f.send(t, `{"type":"auth_state","logged_in":true}`)
+	select {
+	case <-told:
+	case <-time.After(2 * time.Second):
+		t.Fatal("not told of the login")
+	}
+}
