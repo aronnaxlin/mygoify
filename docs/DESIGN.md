@@ -88,11 +88,27 @@ type Backend interface {
 
 ### 4.2 Soloist 实现
 
+**运行时配置（硬约束）**
+
+Soloist 的版本每 90 天过期；API key 官方没说会过期，但社区有"90 天"的说法，按会失效设计。所以**和 Soloist、Spotify 账户相关的东西一律是运行时状态，换掉任何一项都不需要 MyGoify 发新版**：
+
+| 配置 | 存在哪 | 谁写入 | 失效时 |
+|---|---|---|---|
+| Soloist 可执行文件路径 | 设置文件（用户数据目录） | 引导页；设置页可换 | 退出码 `10`（版本过期）→ 只走"更新 Soloist"这一步：选新文件或打开官方下载页，换完重启服务 |
+| Soloist API key | 系统钥匙串 | 引导页；设置页可换 | Soloist 用它登录失败 → 只走"重新填 key"这一步，其余配置不动 |
+| 设备名 | 设置文件 | 默认 "MyGoify"，设置页可改 | — |
+| Web API client ID、回调地址 | 设置文件 | 引导页 | 刷新 token 被拒（`auth.ErrRevoked`）→ 只走"重新登录"这一步 |
+| Web API refresh token | 系统钥匙串 | 登录时 | 同上 |
+
+- **不编译进安装包的**：以上全部，以及 Soloist 二进制本身（条款也禁止再分发）。安装包里没有任何账户相关的值。
+- **提前提醒**：App 启动 Soloist 前运行 `soloist --version`，读出构建时间戳，到期日 = 构建日 + 90 天。设置页显示到期日，到期前 14 天开始提醒更新。
+- **哪一项失效就只修哪一项**：引导页的每一步可以单独重做，不会让用户从头配置。
+- **待 M2 实测**：key 失效或填错时 Soloist 的表现（退出码、日志、`auth_state`），以及换新版本后 `--data-dir` 里的配对会话是否保留。
+
 **进程管理**
 - Soloist 作为**用户级服务**运行：Linux 用 systemd user unit，macOS 用 launchd agent。由 App 安装，默认不开机自启，App 启动时拉起，这一点参考 Omarchy-Spotify。
 - 启动参数：`--device-name`、`--api-key`、`--data-dir`、`--cache-dir`、`--ws 127.0.0.1:0`。端口用 0 让系统分配，实际地址从 data-dir 里的 `ws.addr` / `ws.port` 读。
-- API key 存在系统钥匙串里，用 mygo 的凭据存储，不写进 unit 文件和命令行历史。启动方式待定，见 §10 问题 4。
-- 版本 90 天过期，过期时进程以退出码 `10` 退出。App 识别这个退出码，提示更新。
+- API key 存在系统钥匙串里，用 mygo 的凭据存储。PoC 证实 Soloist 只接受 `-k` 参数（P9）：App 每次启动服务前，从钥匙串把 key 写进只有当前用户可读的 `EnvironmentFile`，unit 里写 `-k ${SOLOIST_API_KEY}`。unit 文件本身不含 key。
 - **获取 Soloist：** Spotify 不允许再分发二进制。App 内的引导页提供"从 Spotify 官方 CDN 下载"按钮，下载前需要用户确认；也可以让用户自己指定已下载的二进制路径。App 安装包里不带 Soloist。
 
 **命令分工**（根据 WebSocket API 的能力决定）
@@ -108,7 +124,7 @@ type Backend interface {
 
 **首次配对**
 - Soloist 要先在 Spotify Connect 里登录一次。默认流程：引导用户在同一局域网的手机 App 里选中这个设备播放一次，之后会话保存在 `--data-dir`。
-- 待验证的改进：App 自己当 zeroconf 发送方，把 Web API 的 access token 交给 Soloist 完成配对，不需要手机（Omarchy-Spotify 对 access-token 类型的接收端就是这样做的）。见 PoC P4。
+- 待验证的改进：App 自己当 zeroconf 发送方，把 Web API 的 access token 交给 Soloist 完成配对，不需要手机（Omarchy-Spotify 对 access-token 类型的接收端就是这样做的）。见 PoC P5（已推迟）。
 
 **WebSocket 安全**
 - WebSocket 没有任何认证，只绑定 `127.0.0.1`。
@@ -214,4 +230,4 @@ type Backend interface {
 1. ~~App 显示名~~：已定为 MyGoify。
 2. ~~代码来源~~：已 fork 为 aronnaxlin/mygoify，保留 git 历史，`upstream` 指向原仓库。
 3. **Soloist 下载**：App 内一键从官方 CDN 下载算不算"再分发"？我的理解是不算，因为二进制直接从 Spotify 下载。但条款原文只说了 "link to Downloads and updates"。保守做法是 v1 只给链接，加上"选择已下载的文件"。
-4. **API key 怎么交给 Soloist**：作为命令行参数传入时，同机用户能在 `ps` 里看到。要确认 Soloist 是否直接读取 `SOLOIST_API_KEY` 环境变量，或者支持从文件读取。PoC 阶段确认。
+4. ~~API key 怎么交给 Soloist~~：PoC P9 确认只能用 `-k` 参数，同机其他用户能在 `ps` 里看到；做法见 §4.2"进程管理"，单用户机器上接受，README 写明。

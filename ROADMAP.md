@@ -48,7 +48,10 @@
 
 - [ ] 引导页：创建应用、填 client ID → PKCE 登录 → 下载或选择 Soloist → 填 API key → 配对
 - [ ] 凭据存进钥匙串，token 自动刷新
-- [ ] Soloist 服务管理：systemd user unit / launchd agent，安装、启动、停止、识别过期退出码 `10` 并提示更新
+- [ ] Soloist 服务管理：systemd user unit / launchd agent，安装、启动、停止
+- [ ] Soloist 和账户相关的配置全部运行时读取（DESIGN §4.2 "运行时配置"）：设置页可更换 key、可执行文件、设备名
+- [ ] 过期处理：`soloist --version` 算出到期日，设置页显示，到期前 14 天提醒；退出码 `10` → 只走"更新 Soloist"一步
+- [ ] 实测并处理：key 失效或填错时 Soloist 的表现；换新版本后配对会话是否保留
 - [ ] `playback` 的 Soloist 实现：WebSocket 客户端、断线重连、状态插值
 - [ ] 播放条：播放和暂停、上一首和下一首、seek、音量、随机、循环
 - [ ] 正在播放页：封面、背景、进度
