@@ -5,6 +5,7 @@
 //
 //	go run ./cmd/poc login   logs in, in the browser
 //	go run ./cmd/poc me      says who is logged in, refreshing the login
+//	go run ./cmd/poc dump    prints Soloist's state and queue as it sends them
 //	go run ./cmd/poc p4      plays the third track of a playlist on Soloist
 //	go run ./cmd/poc p6      plays a minute, measuring the position and Soloist's cost
 package main
@@ -44,7 +45,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if len(os.Args) < 2 {
-		log.Fatal("usage: poc login | me | p4 | p6")
+		log.Fatal("usage: poc login | me | dump | p4 | p6")
 	}
 	switch os.Args[1] {
 	case "login":
@@ -57,6 +58,8 @@ func main() {
 		if err = api("GET", "/me", nil, &me); err == nil {
 			fmt.Printf("logged in as %s (%s)\n", me.DisplayName, me.ID)
 		}
+	case "dump":
+		err = dump()
 	case "p4":
 		err = p4()
 	case "p6":
@@ -289,5 +292,36 @@ func p4() error {
 		return err
 	}
 	fmt.Println("Paused after 5 seconds, through the WebSocket. P4 passed.")
+	return nil
+}
+
+// dump prints what Soloist answers to get_state and get_queue, as it
+// sends it, for writing the backend that reads it.
+func dump() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	ws, err := dialSoloist(ctx)
+	if err != nil {
+		return err
+	}
+	defer ws.CloseNow()
+	for _, cmd := range []string{"get_auth_state", "get_state", "get_queue"} {
+		if err := command(ctx, ws, cmd); err != nil {
+			return err
+		}
+	}
+	for seen := 0; seen < 3; {
+		_, data, err := ws.Read(ctx)
+		if err != nil {
+			return err
+		}
+		var ev struct{ Type string }
+		json.Unmarshal(data, &ev)
+		switch ev.Type {
+		case "auth_state", "playback_state", "queue_changed", "error":
+			fmt.Println(string(data))
+			seen++
+		}
+	}
 	return nil
 }

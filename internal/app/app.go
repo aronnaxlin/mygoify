@@ -175,7 +175,11 @@ func Run() error {
 		// Before the window: on Windows it lays out its content as it is
 		// made, and the view asks the player what plays.
 		a.art = newArtCache(a.post)
-		a.pl = playback.New(a.post, playback.NewFake())
+		var backend playback.Backend = playback.NewFake()
+		if b := devSoloist(); b != nil {
+			backend = b
+		}
+		a.pl = playback.New(a.post, backend)
 		a.pl.Artwork = fetchArt
 		a.pl.Changed = a.playbackChanged
 		a.volume = a.settings.Volume
