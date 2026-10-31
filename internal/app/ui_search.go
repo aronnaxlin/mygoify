@@ -73,7 +73,7 @@ func (a *app) moreResults(r route, d *searchData) {
 		a.post(func() {
 			d.page.loading = false
 			if err != nil {
-				d.page.err = "搜索失败，请稍后再试"
+				d.page.err = failed(err, "搜索失败，请稍后再试")
 				return
 			}
 			d.res.Append(res)

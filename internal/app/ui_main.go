@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"math/rand/v2"
 	"runtime"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/internal/spotify"
 )
 
 const sidebarWidth = 232
@@ -388,6 +390,16 @@ func (a *app) centered(c *ui.Context, err string, retry func()) {
 
 // Loading what the pages show.
 
+// failed is what a page says when loading it failed with err: msg, or,
+// while Spotify limits the app's calls, until when.
+func failed(err error, msg string) string {
+	var lim *spotify.LimitedError
+	if errors.As(err, &lim) {
+		return "Spotify 限流中，" + lim.Until.Format("15:04") + " 后再试"
+	}
+	return msg
+}
+
 func (a *app) loadHome() {
 	a.homeLoading, a.homeErr = true, ""
 	at := time.Now()
@@ -398,7 +410,7 @@ func (a *app) loadHome() {
 			if err != nil {
 				// What shows stays, to try once more.
 				if len(a.home.Recent) == 0 && len(a.home.TopTracks) == 0 {
-					a.homeErr = "无法连接 Spotify，请检查网络"
+					a.homeErr = failed(err, "无法连接 Spotify，请检查网络")
 				}
 				return
 			}
@@ -436,7 +448,7 @@ func (a *app) loadPlaylist(id string, thenPlay bool) {
 		a.post(func() {
 			delete(a.loadingPl, id)
 			if err != nil {
-				a.plErr[id] = "歌单加载失败"
+				a.plErr[id] = failed(err, "歌单加载失败")
 				return
 			}
 			a.playlists[id] = pl

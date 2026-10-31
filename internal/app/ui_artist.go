@@ -102,7 +102,7 @@ func (a *app) loadArtist(id string) {
 		a.post(func() {
 			d.loading = false
 			if err != nil {
-				d.err = "歌手加载失败"
+				d.err = failed(err, "歌手加载失败")
 				return
 			}
 			d.profile = ar
@@ -123,7 +123,7 @@ func (a *app) loadAlbums(id string) {
 		a.post(func() {
 			d.albumsPage.loading = false
 			if err != nil {
-				d.albumsPage.err = "专辑加载失败"
+				d.albumsPage.err = failed(err, "专辑加载失败")
 				return
 			}
 			d.albums = append(d.albums, albums...)

@@ -18,13 +18,19 @@ import (
 // the limits of Development Mode (DESIGN.md §5.3).
 type Library struct {
 	API *Client
+	// Cache, if set, is the directory where the library keeps what it
+	// read (cache.go).
+	Cache string
 
 	mu sync.Mutex
 	me *music.User
 	// The liked songs, as read last, for a while: their playlist and the
 	// hearts both read them.
-	liked   []music.Track
+	liked   *likedSongs
 	likedAt time.Time
+	// syncing is held while the liked songs are read: the hearts and
+	// their playlist ask at once, and read them once.
+	syncing sync.Mutex
 }
 
 var _ library.Library = (*Library)(nil)
@@ -197,11 +203,18 @@ func (l *Library) Me() (*music.User, error) {
 	}
 	var u user
 	if err := l.do("GET", "/me", nil, &u); err != nil {
-		return nil, err
-	}
-	me = &music.User{ID: u.ID, Name: u.DisplayName, Images: images(u.Images)}
-	if me.Name == "" {
-		me.Name = u.ID
+		// Read before, while Spotify answered.
+		kept, _, ok := load[music.User](l, "me")
+		if !ok {
+			return nil, err
+		}
+		me = &kept
+	} else {
+		me = &music.User{ID: u.ID, Name: u.DisplayName, Images: images(u.Images)}
+		if me.Name == "" {
+			me.Name = u.ID
+		}
+		l.store("me", me)
 	}
 	l.mu.Lock()
 	l.me = me
@@ -210,7 +223,19 @@ func (l *Library) Me() (*music.User, error) {
 	return &c, nil
 }
 
+// homeFresh is how long the home page read stays good: the app reads it
+// again after as long (homeStale), and what was played lately changes.
+const homeFresh = 5 * time.Minute
+
 func (l *Library) Home() (music.Home, error) {
+	name, err := l.mine("home")
+	if err != nil {
+		return music.Home{}, err
+	}
+	return cached(l, name, homeFresh, l.home)
+}
+
+func (l *Library) home() (music.Home, error) {
 	var h music.Home
 	var recent struct {
 		Items []struct {
@@ -260,27 +285,121 @@ const maxLiked = 10000
 // likedFresh is how long the liked songs read stay good.
 const likedFresh = 2 * time.Minute
 
+// likedWhole is how long the liked songs are only read since the latest
+// read, before they are read whole again: songs unliked in another app,
+// as many as were liked, go unnoticed until then.
+const likedWhole = 24 * time.Hour
+
+// likedSongs are the liked songs read, the latest liked first: those the
+// app plays, and how many Spotify counted besides, as local files.
+type likedSongs struct {
+	Tracks  []music.Track
+	Skipped int
+	Whole   time.Time // when they were last read whole
+}
+
+func (s *likedSongs) count() int { return len(s.Tracks) + s.Skipped }
+
+func (s *likedSongs) add(t *track) {
+	if t.playable() {
+		s.Tracks = append(s.Tracks, t.music(nil))
+	} else {
+		s.Skipped++
+	}
+}
+
+type savedPage = page[struct {
+	Track track `json:"track"`
+}]
+
 // likedTracks returns the liked songs, the latest liked first, as read
-// last if lately. The first page says how many there are, and the others
-// are read four at a time: a page of 50 takes a third of a second, and
-// one after another 2000 songs took more than ten.
+// last if lately. Kept from before, they are read only since then, which
+// takes a call; when Spotify limits the app, they answer as they are.
 func (l *Library) likedTracks() ([]music.Track, error) {
+	l.syncing.Lock()
+	defer l.syncing.Unlock()
 	l.mu.Lock()
-	if time.Since(l.likedAt) < likedFresh {
-		liked := l.liked
+	have := l.liked
+	if have != nil && time.Since(l.likedAt) < likedFresh {
 		l.mu.Unlock()
-		return liked, nil
+		return have.Tracks, nil
 	}
 	l.mu.Unlock()
-	type saved = page[struct {
-		Track track `json:"track"`
-	}]
-	var first saved
+	name, err := l.mine("liked")
+	if err != nil {
+		return nil, err
+	}
+	if have == nil {
+		if kept, _, ok := load[likedSongs](l, name); ok {
+			have = &kept
+		}
+	}
+	got, err := l.readLiked(have)
+	if err != nil {
+		if have != nil {
+			return have.Tracks, nil
+		}
+		return nil, err
+	}
+	l.store(name, got)
+	l.mu.Lock()
+	l.liked, l.likedAt = got, time.Now()
+	l.mu.Unlock()
+	return got.Tracks, nil
+}
+
+// readLiked reads the songs liked since have, ahead of have, or all of
+// them, when have is old or no longer adds up to what Spotify counts.
+func (l *Library) readLiked(have *likedSongs) (*likedSongs, error) {
+	var first savedPage
 	if err := l.do("GET", "/me/tracks?limit=50", nil, &first); err != nil {
 		return nil, err
 	}
+	if have != nil && time.Since(have.Whole) < likedWhole && len(have.Tracks) > 0 && first.Total <= maxLiked {
+		got, ok, err := l.likedSince(have, first)
+		if ok || err != nil {
+			return got, err
+		}
+	}
+	return l.readAllLiked(first)
+}
+
+// likedSince reads the songs liked since have, from the first page on,
+// until the latest of have. Past a few pages, reading them all costs as
+// much.
+func (l *Library) likedSince(have *likedSongs, first savedPage) (*likedSongs, bool, error) {
+	latest := have.Tracks[0].ID
+	got := &likedSongs{Whole: have.Whole}
+	p := first
+	for range 4 {
+		for i := range p.Items {
+			t := &p.Items[i].Track
+			if t.playable() && t.ID == latest {
+				got.Tracks = append(got.Tracks, have.Tracks...)
+				got.Skipped += have.Skipped
+				return got, got.count() == first.Total, nil
+			}
+			got.add(t)
+		}
+		if p.Next == "" {
+			break
+		}
+		next := strings.TrimPrefix(p.Next, BaseURL)
+		p = savedPage{}
+		if err := l.do("GET", next, nil, &p); err != nil {
+			return nil, false, err
+		}
+	}
+	return nil, false, nil
+}
+
+// readAllLiked reads all the liked songs. The first page says how many
+// there are, and the others are read four at a time: a page of 50 takes
+// a third of a second, and one after another 2000 songs took more than
+// ten.
+func (l *Library) readAllLiked(first savedPage) (*likedSongs, error) {
 	total := min(first.Total, maxLiked)
-	pages := make([]saved, (total+49)/50)
+	pages := make([]savedPage, (total+49)/50)
 	if len(pages) > 0 {
 		pages[0] = first
 	}
@@ -302,21 +421,42 @@ func (l *Library) likedTracks() ([]music.Track, error) {
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
 	}
-	var liked []music.Track
+	got := &likedSongs{Whole: time.Now()}
 	for _, p := range pages {
-		for _, s := range p.Items {
-			if s.Track.playable() {
-				liked = append(liked, s.Track.music(nil))
-			}
+		for i := range p.Items {
+			got.add(&p.Items[i].Track)
 		}
 	}
-	l.mu.Lock()
-	l.liked, l.likedAt = liked, time.Now()
-	l.mu.Unlock()
-	return liked, nil
+	return got, nil
 }
 
+// playlistsFresh is how long the listener's playlists read stay good.
+// The app's own changes drop them at once; another app's show after this.
+const playlistsFresh = 10 * time.Minute
+
+type myPlaylists struct{ Made, Saved []music.Playlist }
+
 func (l *Library) MyPlaylists() (made, saved []music.Playlist, err error) {
+	name, err := l.mine("playlists")
+	if err != nil {
+		return nil, nil, err
+	}
+	m, err := cached(l, name, playlistsFresh, func() (m myPlaylists, err error) {
+		m.Made, m.Saved, err = l.myPlaylists()
+		return m, err
+	})
+	return m.Made, m.Saved, err
+}
+
+// playlistsChanged drops the listener's playlists read: one of them
+// changed, as its count or its name.
+func (l *Library) playlistsChanged() {
+	if name, err := l.mine("playlists"); err == nil {
+		l.forget(name)
+	}
+}
+
+func (l *Library) myPlaylists() (made, saved []music.Playlist, err error) {
 	me, err := l.Me()
 	if err != nil {
 		return nil, nil, err
@@ -342,8 +482,16 @@ func (l *Library) Playlist(id string) (*music.Playlist, error) {
 	if id == likedID {
 		return l.likedPlaylist()
 	}
+	name, err := l.mine("playlist-" + id)
+	if err != nil {
+		return nil, err
+	}
+	kept, _, ok := load[music.Playlist](l, name)
 	var p playlist
 	if err := l.do("GET", "/playlists/"+url.PathEscape(id)+"?fields="+url.QueryEscape("id,name,description,images,owner(id,display_name),public,collaborative,snapshot_id,items(total),tracks(total)"), nil, &p); err != nil {
+		if ok {
+			return &kept, nil
+		}
 		return nil, err
 	}
 	mp := p.music()
@@ -351,6 +499,12 @@ func (l *Library) Playlist(id string) (*music.Playlist, error) {
 		// Someone else's: Spotify lists none of its tracks, in
 		// Development Mode.
 		mp.Hidden = true
+		return &mp, nil
+	}
+	// Its tracks are as read last while its snapshot is: one call
+	// rather than one a page.
+	if ok && mp.Snapshot != "" && kept.Snapshot == mp.Snapshot {
+		mp.Tracks = kept.Tracks
 		return &mp, nil
 	}
 	items, err := pages[struct {
@@ -374,6 +528,7 @@ func (l *Library) Playlist(id string) (*music.Playlist, error) {
 			mp.Tracks = append(mp.Tracks, t.music(nil))
 		}
 	}
+	l.store(name, mp)
 	return &mp, nil
 }
 
@@ -392,7 +547,18 @@ func (l *Library) likedPlaylist() (*music.Playlist, error) {
 	return p, nil
 }
 
+// albumFresh is how long an album read stays good: one rarely changes.
+const albumFresh = 7 * 24 * time.Hour
+
 func (l *Library) Album(id string) (*music.AlbumProfile, error) {
+	name, err := l.mine("album-" + id)
+	if err != nil {
+		return nil, err
+	}
+	return cached(l, name, albumFresh, func() (*music.AlbumProfile, error) { return l.album(id) })
+}
+
+func (l *Library) album(id string) (*music.AlbumProfile, error) {
 	var a album
 	if err := l.do("GET", "/albums/"+url.PathEscape(id), nil, &a); err != nil {
 		return nil, err
@@ -517,11 +683,28 @@ func (l *Library) keep(uri string, keep bool) error {
 }
 
 func (l *Library) Like(trackID string, like bool) error {
-	// The liked songs read are stale now.
+	if err := l.keep("spotify:track:"+trackID, like); err != nil {
+		return err
+	}
+	name, err := l.mine("liked")
+	if err != nil {
+		return nil
+	}
+	l.syncing.Lock()
+	defer l.syncing.Unlock()
 	l.mu.Lock()
-	l.likedAt = time.Time{}
-	l.mu.Unlock()
-	return l.keep("spotify:track:"+trackID, like)
+	defer l.mu.Unlock()
+	if like || l.liked == nil {
+		// Read next since the latest read, which finds it.
+		l.likedAt = time.Time{}
+		return nil
+	}
+	// Unliked, it leaves what was read, which stays good.
+	got := *l.liked
+	got.Tracks = slices.DeleteFunc(slices.Clone(got.Tracks), func(t music.Track) bool { return t.ID == trackID })
+	l.liked = &got
+	l.store(name, &got)
+	return nil
 }
 
 func (l *Library) FollowArtist(id string, follow bool) error {
@@ -533,12 +716,22 @@ func (l *Library) CreatePlaylist(name string) (*music.Playlist, error) {
 	if err := l.do("POST", "/me/playlists", map[string]any{"name": name, "public": false}, &p); err != nil {
 		return nil, err
 	}
+	l.playlistsChanged()
 	mp := p.music()
 	return &mp, nil
 }
 
 func (l *Library) RenamePlaylist(id, name string) error {
-	return l.do("PUT", "/playlists/"+url.PathEscape(id), map[string]any{"name": name}, nil)
+	return l.changed(l.do("PUT", "/playlists/"+url.PathEscape(id), map[string]any{"name": name}, nil))
+}
+
+// changed drops the listener's playlists read, unless err says nothing
+// changed, and returns err.
+func (l *Library) changed(err error) error {
+	if err == nil {
+		l.playlistsChanged()
+	}
+	return err
 }
 
 // AddToPlaylist adds tracks to a playlist, unless one is in it already:
@@ -555,7 +748,7 @@ func (l *Library) AddToPlaylist(id string, trackIDs ...string) error {
 		}
 		uris = append(uris, "spotify:track:"+tid)
 	}
-	return l.do("POST", "/playlists/"+url.PathEscape(id)+"/items", map[string]any{"uris": uris}, nil)
+	return l.changed(l.do("POST", "/playlists/"+url.PathEscape(id)+"/items", map[string]any{"uris": uris}, nil))
 }
 
 func (l *Library) RemoveFromPlaylist(id string, trackIDs ...string) error {
@@ -563,11 +756,11 @@ func (l *Library) RemoveFromPlaylist(id string, trackIDs ...string) error {
 	for i, tid := range trackIDs {
 		items[i] = map[string]string{"uri": "spotify:track:" + tid}
 	}
-	return l.do("DELETE", "/playlists/"+url.PathEscape(id)+"/items", map[string]any{"items": items}, nil)
+	return l.changed(l.do("DELETE", "/playlists/"+url.PathEscape(id)+"/items", map[string]any{"items": items}, nil))
 }
 
 // DeletePlaylist takes the playlist out of the listener's library, as
 // Spotify's apps delete one: it unfollows it.
 func (l *Library) DeletePlaylist(id string) error {
-	return l.keep("spotify:playlist:"+id, false)
+	return l.changed(l.keep("spotify:playlist:"+id, false))
 }
