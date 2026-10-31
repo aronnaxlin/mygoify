@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,7 +33,10 @@ var checkWait = 30 * time.Second
 // CheckKey tries key with Soloist's executable bin on a copy of dataDir,
 // and returns nil once Soloist logs in with it, within 30 seconds. A
 // wrong key makes Soloist delete the pairing in its data (DESIGN.md
-// §4.2): a key not checked so never meets the real one.
+// §4.2): a key not checked so never meets the real one. The pairing
+// holds only for the device it was made with, so the copy is that
+// device: no Soloist may run on dataDir meanwhile, as Service.ChangeKey
+// sees to.
 func CheckKey(ctx context.Context, bin, key, dataDir string) error {
 	if !paired(dataDir) {
 		return ErrNotPaired
@@ -48,9 +52,8 @@ func CheckKey(ctx context.Context, bin, key, dataDir string) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, checkWait)
 	defer cancel()
-	out := &refusal{}
-	// Its own name, and no device ID copied: the Soloist that plays stays
-	// the device it is. Its own cache, as two may not share one.
+	out := &refusal{key: key}
+	// Its own cache, as two may not share one.
 	cmd := exec.CommandContext(ctx, bin, "-n", "MyGoify key check", "-k", key, "-D", data, "-C", filepath.Join(tmp, "cache"), "-w", "127.0.0.1:0")
 	cmd.Stdout, cmd.Stderr = out, out
 	if err := cmd.Start(); err != nil {
@@ -103,16 +106,18 @@ func paired(dataDir string) bool {
 	return false
 }
 
+// notCopied is what of Soloist's data copyPairing leaves out.
+var notCopied = map[string]bool{"ws.addr": true, "ws.port": true, "soloist.pid": true, ".lock": true, "crashpad": true}
+
 // copyPairing copies Soloist's data but what is the running Soloist's
-// own: where it listens, its lock and process, its device and caches.
+// own: where it listens, its lock and process.
 func copyPairing(from, to string) error {
-	skip := map[string]bool{"ws.addr": true, "ws.port": true, "soloist.pid": true, ".lock": true, ".device_id": true, "cache": true, "crashpad": true}
 	return filepath.WalkDir(from, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		rel, _ := filepath.Rel(from, path)
-		if skip[rel] {
+		if notCopied[rel] {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
@@ -163,9 +168,18 @@ func waitLoggedIn(ctx context.Context, dataDir string) error {
 	}
 	defer conn.CloseNow()
 	conn.SetReadLimit(16 << 20)
-	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"command":"get_auth_state"}`)); err != nil {
-		return err
-	}
+	// Asked again and again: it may not say when it logs in.
+	go func() {
+		for ctx.Err() == nil {
+			if conn.Write(ctx, websocket.MessageText, []byte(`{"command":"get_auth_state"}`)) != nil {
+				return
+			}
+			select {
+			case <-ctx.Done():
+			case <-time.After(time.Second):
+			}
+		}
+	}()
 	for {
 		_, data, err := conn.Read(ctx)
 		if err != nil {
@@ -179,8 +193,9 @@ func waitLoggedIn(ctx context.Context, dataDir string) error {
 }
 
 // refusal reads what Soloist prints for Spotify refusing its key; it
-// keeps none of it, as some may be the key's.
+// keeps none of it, and with MYGOIFY_DEBUG logs it without the key.
 type refusal struct {
+	key  string
 	mu   sync.Mutex
 	line []byte
 	hit  bool
@@ -197,8 +212,15 @@ func (r *refusal) Write(p []byte) (int, error) {
 		if i < 0 {
 			break
 		}
-		if s := string(r.line[:i]); strings.Contains(s, "oauth_invalid_credentials") || strings.Contains(s, "Access denied") {
+		s := string(r.line[:i])
+		if strings.Contains(s, "oauth_invalid_credentials") || strings.Contains(s, "Access denied") {
 			r.hit = true
+		}
+		if r.key != "" {
+			s = strings.ReplaceAll(s, r.key, "<key>")
+		}
+		if debug {
+			log.Printf("key check: %s", s)
 		}
 		r.line = r.line[i+1:]
 	}

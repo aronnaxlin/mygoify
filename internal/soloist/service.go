@@ -2,6 +2,7 @@ package soloist
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -57,6 +58,47 @@ func (s *Service) Start() error {
 		return s.startUnit()
 	}
 	return fmt.Errorf("soloist: no service on %s", runtime.GOOS)
+}
+
+// Stop stops the service, if it runs.
+func (s *Service) Stop() error {
+	if s.run == nil {
+		s.run = runCommand
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		target := "gui/" + strconv.Itoa(os.Getuid()) + "/" + agentLabel
+		if s.run("launchctl", "print", target) != nil {
+			return nil
+		}
+		return s.run("launchctl", "bootout", target)
+	case "linux":
+		return s.run("systemctl", "--user", "stop", unitName)
+	}
+	return fmt.Errorf("soloist: no service on %s", runtime.GOOS)
+}
+
+// ChangeKey tries key with CheckKey and starts the service again with it
+// if Spotify took it, or with the key it had, returning why not. The
+// service is stopped meanwhile: the copy CheckKey tries is the same
+// device. Before the first pairing there is nothing to try key on, and
+// it is taken as it is.
+func (s *Service) ChangeKey(ctx context.Context, key string) error {
+	if !paired(s.DataDir) {
+		s.Key = key
+		return s.Start()
+	}
+	if err := s.Stop(); err != nil {
+		return err
+	}
+	err := CheckKey(ctx, s.Bin, key, s.DataDir)
+	if err == nil {
+		s.Key = key
+	}
+	if serr := s.Start(); serr != nil && err == nil {
+		err = serr
+	}
+	return err
 }
 
 // keyFile is where the service reads the key from.

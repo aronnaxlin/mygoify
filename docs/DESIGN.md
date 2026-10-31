@@ -103,7 +103,7 @@ Soloist 的版本每 90 天过期；API key 官方没说会过期，但社区有
 - **不编译进安装包的**：以上全部，以及 Soloist 二进制本身（条款也禁止再分发）。安装包里没有任何账户相关的值。
 - **提前提醒**：App 启动 Soloist 前运行 `soloist --version`，读出构建时间戳，到期日 = 构建日 + 90 天。设置页显示到期日，到期前 14 天开始提醒更新。
 - **哪一项失效就只修哪一项**：引导页的每一步可以单独重做，不会让用户从头配置。
-- **未经验证的 key 不能碰真正的配对数据**（2026-10-31 实测，见 POC.md）：key 无效时 Soloist 不退出，保持"未登录"，同时**删除 data-dir 里保存的配对会话**，之后即使换回正确的 key 也要用手机重新配对。所以填入或更换 key 时，App 先把 data-dir 复制一份到临时目录（不带 `ws.*`、锁、`.device_id` 和缓存，以免和正在播放的 Soloist 抢同一个设备身份；2026-10-31 查过，macOS 上 Soloist 的配对也在 data-dir 里，不在钥匙串里），用新 key、另一个设备名在副本上启动 Soloist（`soloist.CheckKey`）：WebSocket 的 `auth_state` 在 30 秒内变成 `logged_in: true` 才算有效，再存进钥匙串、用于真正的服务；否则提示 key 无效，原来的配对不受影响。首次配对时还没有会话可试，key 填错的表现在引导页实测。
+- **未经验证的 key 不能碰真正的配对数据**（2026-10-31 实测，见 POC.md）：key 无效时 Soloist 不退出，保持"未登录"，同时**删除 data-dir 里保存的配对会话**，之后即使换回正确的 key 也要用手机重新配对。所以填入或更换 key 时，App 先停掉 Soloist 服务，把 data-dir 复制一份到临时目录（不带 `ws.*`、锁和 crashpad），用新 key、另一个设备名和单独的缓存目录在副本上启动 Soloist（`Service.ChangeKey` → `soloist.CheckKey`）：WebSocket 的 `auth_state` 在 30 秒内变成 `logged_in: true` 才算有效，再存进钥匙串，用新 key 重启服务；否则提示 key 无效，用原来的 key 重启，原来的配对不受影响。副本必须带上 `.device_id`：配对只对配对时的设备 ID 有效，2026-10-31 实测不带它副本会当作新设备等配对，带上则 1.5 秒内恢复会话。副本因此和真服务是同一台设备，不能同时在线，所以验证期间服务要停，播放会中断这几秒；换 key 很少见，可以接受。首次配对时还没有会话可试，key 填错的表现在引导页实测。
 - **待实测**：换新版本后 `--data-dir` 里的配对会话是否保留。现在的版本就是最新的，要等 Spotify 发布下一个版本；在此之前按"会丢，需要重新配对"设计。
 
 **进程管理**
@@ -111,7 +111,7 @@ Soloist 的版本每 90 天过期；API key 官方没说会过期，但社区有
 - 启动参数：`--device-name`、`--api-key`、`--data-dir`、`--cache-dir`、`--ws 127.0.0.1:0`。端口用 0 让系统分配，实际地址从 data-dir 里的 `ws.addr` / `ws.port` 读。
 - API key 和 Spotify 登录存在系统钥匙串里（`internal/secret`）。mygo 没有凭据存储，也不用 cgo，所以用 purego 调系统接口：macOS 调 Security framework，不用 `security` 命令，因为它要把密码放进参数；Linux 用 godbus 调会话总线上的 Secret Service（GNOME Keyring、KeePassXC 等）。没有钥匙串时退回只有当前用户可读的文件；以前存在文件里的值第一次读取时搬进钥匙串。开发时设 `MYGOIFY_SECRETS=files` 只用文件：macOS 每遇到一个新构建都会弹窗问能不能读钥匙串。
 - PoC 证实 Soloist 只接受 `-k` 参数（P9）：App 每次启动服务前，从钥匙串把 key 写进只有当前用户可读的文件。systemd unit 用 `EnvironmentFile` 读它，写 `-k ${SOLOIST_API_KEY}`；launchd agent 用 `sh -c` 读它。unit 和 agent 文件都不含 key，但 Soloist 运行后，它的命令行里仍然有 key，同机其他用户用 `ps` 能看到，这一点 README 里写明。
-- 正式版要用固定的 Developer ID 签名：macOS 按签名决定哪个程序能读钥匙串条目，ad-hoc 签名每个构建都不一样，升级后会弹窗。
+- 签名和钥匙串：macOS 按签名决定哪个程序能读钥匙串条目。用 Developer ID 签名，升级后不弹窗；没有证书时用 ad-hoc 签名，每个新版本第一次读钥匙串会弹一次授权。
 - **获取 Soloist：** Spotify 不允许再分发二进制。引导页提供"从 Spotify 官方下载"按钮（§10 问题 3）：按平台选 `soloist_release_<arch>.tar.gz`，下载前说明来源并让用户确认，解压到 App 的数据目录，用 `--version` 检查能运行。也可以选择已下载的文件。更新走同一个流程。App 安装包里不带 Soloist。
 
 **命令分工**（根据 WebSocket API 的能力决定）

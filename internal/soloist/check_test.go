@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -112,7 +113,8 @@ func TestCheckKeyNotPaired(t *testing.T) {
 
 // The real Soloist logs in on a copy of its data with the key it plays
 // with, and the copy's pairing is all it needs. It runs Soloist, with
-// MYGOIFY_SOLOIST_CHECK, SOLOIST_BIN and SOLOIST_API_KEY set.
+// MYGOIFY_SOLOIST_CHECK, SOLOIST_BIN and SOLOIST_API_KEY set; stop the
+// service first, as the copy is the same device.
 func TestCheckKeyReal(t *testing.T) {
 	bin, key := os.Getenv("SOLOIST_BIN"), os.Getenv("SOLOIST_API_KEY")
 	if os.Getenv("MYGOIFY_SOLOIST_CHECK") == "" || bin == "" || key == "" {
@@ -129,4 +131,48 @@ func TestCheckKeyReal(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("logged in on the copy in %v", time.Since(start).Round(time.Millisecond))
+}
+
+// A new key is tried with the Soloist that plays stopped, and it plays
+// on with the new key if Spotify took it, or with the one it had.
+func TestChangeKey(t *testing.T) {
+	t.Setenv("FAKE_SOLOIST", "1")
+	s, ran := fakeService(t)
+	s.Bin, _ = os.Executable()
+	s.DataDir = pairedData(t)
+	s.Key = "good"
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	*ran = nil
+	if err := s.ChangeKey(context.Background(), "bad"); !errors.Is(err, ErrBadKey) {
+		t.Errorf("bad key: %v, want ErrBadKey", err)
+	}
+	if s.Key != "good" {
+		t.Errorf("a bad key left the key %q", s.Key)
+	}
+	if !strings.HasPrefix(strings.Join(*ran, ", "), stopCmd()) || !running(*ran) {
+		t.Errorf("a bad key ran %s", strings.Join(*ran, ", "))
+	}
+	*ran = nil
+	s.Key = "old"
+	if err := s.ChangeKey(context.Background(), "good"); err != nil {
+		t.Errorf("good key: %v", err)
+	}
+	if s.Key != "good" || !running(*ran) {
+		t.Errorf("a good key left the key %q, and ran %s", s.Key, strings.Join(*ran, ", "))
+	}
+}
+
+// stopCmd is what stops the service, as fakeService notes it.
+func stopCmd() string {
+	if runtime.GOOS == "linux" {
+		return "systemctl stop"
+	}
+	return "launchctl bootout"
+}
+
+// running reports whether ran ends with the service started.
+func running(ran []string) bool {
+	return len(ran) > 0 && (ran[len(ran)-1] == "launchctl kickstart" || ran[len(ran)-1] == "systemctl restart" || ran[len(ran)-1] == "systemctl start")
 }

@@ -48,7 +48,7 @@
 
 - [ ] 引导页：创建应用、填 client ID → PKCE 登录 → 下载或选择 Soloist → 填 API key → 配对
 - [x] 凭据存进钥匙串，token 自动刷新（macOS 钥匙串已实测；Linux Secret Service 只编译过，待在 Omarchy 上实测）
-- [x] 填 key 前在 data-dir 副本上验证（`soloist.CheckKey`；真 Soloist 待实测）
+- [x] 填 key 前停掉服务，在 data-dir 副本上验证（`Service.ChangeKey`；macOS 真 Soloist 实测通过，Linux 待测）
 - [ ] Soloist 服务管理：systemd user unit / launchd agent，安装、启动、停止（App 启动时安装并拉起已完成，macOS 已实测、Linux 待实测；停止未做；key 和路径暂时从 `.env` 读）
 - [ ] Soloist 和账户相关的配置全部运行时读取（DESIGN §4.2 "运行时配置"）：设置页可更换 key、可执行文件、设备名
 - [ ] 过期处理：`soloist --version` 算出到期日，设置页显示，到期前 14 天提醒；退出码 `10` → 只走"更新 Soloist"一步（launchd 和 systemd 已设置为退出码 10 时不重启；到期日、提醒和更新流程未做）
@@ -108,7 +108,7 @@
 
 - [ ] 内存门槛：Linux 上窗口打开时界面 PSS ≤ 200 MB，写进 `perf_test.go` 或基准脚本
 - [ ] 空闲 CPU：窗口静止时不请求新帧（沿用 cloudmusic 的帧预算测试）（`perf_test.go` 已覆盖正在播放页和背景；其他页面、窗口隐藏时的 CPU 未测）
-- [ ] 打包：Linux `.tar.gz` + `install.sh`；macOS arm64 `.dmg`（签名和公证；必须用固定的 Developer ID 签名，否则每次升级读钥匙串都会弹窗）
+- [ ] 打包：Linux `.tar.gz` + `install.sh`；macOS arm64 `.dmg`（有 Developer ID 就签名和公证，升级不弹钥匙串授权；没有就 ad-hoc 签名，每个新版本弹一次，README 写明 Gatekeeper 怎么放行）
 - [ ] 签名的自动更新（mygo update，配置 Ed25519 公钥）（公钥已写进 `mygo.json`，App 已接入更新器；还没发布过版本，未实测）
 - [ ] README：安装、申请 Spotify 开发者应用和 Soloist key 的步骤、已知限制（§5.3）、Hyprland 快捷键示例
 - [ ] CHANGELOG、Release 流程（沿用 cloudmusic 的 `release.yml`）（两者都已沿用；`release.yml` 还带着 Windows 构建，未按 v1 的平台调整，也没走过一次）
