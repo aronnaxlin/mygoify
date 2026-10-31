@@ -6,6 +6,7 @@ package secret
 import (
 	"errors"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 )
@@ -27,9 +28,55 @@ type Store interface {
 	Delete(name string) error
 }
 
-// Default is the store the app keeps its secrets in, with dir for what
-// it keeps in files.
-func Default(dir string) Store { return Files(dir) }
+// Default is the store the app keeps its secrets in: the system's
+// keychain, which takes over the secrets kept in files in dir, or those
+// files where there is none. MYGOIFY_SECRETS=files keeps them in files
+// anyway, for development: macOS asks the listener to let each new build
+// read the keychain, and the app is built anew at each change.
+func Default(dir string) Store {
+	if os.Getenv("MYGOIFY_SECRETS") == "files" {
+		return Files(dir)
+	}
+	s, err := system()
+	if err != nil {
+		log.Printf("secret: no keychain, keeping secrets in files: %v", err)
+		return Files(dir)
+	}
+	return moving{s, Files(dir)}
+}
+
+// moving keeps secrets in to, and moves there those from keeps as they
+// are asked for.
+type moving struct{ to, from Store }
+
+func (m moving) Get(name string) ([]byte, error) {
+	v, err := m.to.Get(name)
+	if !errors.Is(err, ErrNotFound) {
+		return v, err
+	}
+	if v, err = m.from.Get(name); err != nil {
+		return nil, err
+	}
+	if err := m.to.Set(name, v); err != nil {
+		return nil, err
+	}
+	m.from.Delete(name)
+	return v, nil
+}
+
+func (m moving) Set(name string, v []byte) error {
+	if err := m.to.Set(name, v); err != nil {
+		return err
+	}
+	return m.from.Delete(name)
+}
+
+func (m moving) Delete(name string) error {
+	if err := m.to.Delete(name); err != nil {
+		return err
+	}
+	return m.from.Delete(name)
+}
 
 // Files keeps each secret in a file of its own in the directory, which
 // only the listener can read: other users of the computer can't, though
