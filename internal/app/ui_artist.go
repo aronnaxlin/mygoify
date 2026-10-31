@@ -140,7 +140,7 @@ func (a *app) toggleFollow(id string) {
 		return
 	}
 	if a.profile == nil {
-		a.openLogin()
+		a.openOnboarding()
 		return
 	}
 	ar := d.profile

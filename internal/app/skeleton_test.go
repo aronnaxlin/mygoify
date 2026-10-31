@@ -30,7 +30,7 @@ var skeletonScenes = []struct {
 		a.route = route{page: pageSearch, query: "春日影", kind: music.SearchArtists}
 		a.searches[a.route] = &searchData{page: paged{loading: true}}
 	}},
-	{"login", func(a *app) { a.login = loginState{open: true} }},
+	{"onboarding", func(a *app) { a.ob.open = true }},
 	{"lyrics", func(a *app) { a.nowPlaying, a.npPane = true, paneLyrics }},
 	{"stage", func(a *app) { a.nowPlaying, a.npPane = true, paneStage }},
 }

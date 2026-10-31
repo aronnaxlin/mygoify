@@ -39,6 +39,9 @@ type Config struct {
 	// DeviceFile, if set, keeps its ID in the Web API across restarts:
 	// finding it again is a call to the Web API each time the app starts.
 	DeviceFile string
+	// LoggedIn, if set, is called, off the main thread, each time Soloist
+	// says it is logged in to Spotify: paired, for onboarding to go on.
+	LoggedIn func()
 }
 
 // Backend plays through a Soloist. It connects as Watch is called, and
@@ -253,6 +256,8 @@ func (b *Backend) handle(data []byte) {
 	case "auth_state":
 		if ev.LoggedIn != nil && !*ev.LoggedIn {
 			b.err = "Soloist 未登录"
+		} else if ev.LoggedIn != nil && b.cfg.LoggedIn != nil {
+			go b.cfg.LoggedIn()
 		}
 	case "queue_changed":
 		b.previous, b.upcoming = ev.Previous, ev.Upcoming
