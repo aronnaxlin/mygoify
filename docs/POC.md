@@ -28,6 +28,10 @@ ROADMAP M0 各项验证的结果。代码在 `cmd/poc`。
 - **搜索**：`limit` 最大 10，传 11 返回 `400 Invalid limit`；结果里的 `total` 恒为 0，界面不能显示"共 N 条"，翻页以 `next` 是否为空为准。
 - **Web API 设备列表**：除了 Soloist，还会列出这台机器上的其他客户端，所以要按设备名匹配，不能取第一个。
 
+## M2 补充实测（2026-10-31）
+
+- **key 无效时**：用一份配对数据的副本、一个错误的 key 启动 Soloist。它**不退出**（25 秒后仍在运行），`soloist ctl status` 显示 `logged in: no`。日志依次是 `Access denied` → `Permanent OAuth error … oauth_invalid_credentials` → `Broadcasting forced logout` → **`Session removed from store`**：保存的配对会话被删除。错误的 key 会毁掉配对，见 DESIGN §4.2"运行时配置"。
+
 ## 对设计的影响
 
 - **P9**：正式版里，Soloist 用 systemd user unit 启动，key 放在只有当前用户可读的 `EnvironmentFile` 里，命令行写 `-k ${SOLOIST_API_KEY}`。这样 unit 文件里不出现明文，但进程命令行里仍然有。Omarchy 默认没有用 `hidepid` 挂载 `/proc`，单用户机器上可以接受，在 README 里写明。

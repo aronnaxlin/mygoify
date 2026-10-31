@@ -103,13 +103,14 @@ Soloist 的版本每 90 天过期；API key 官方没说会过期，但社区有
 - **不编译进安装包的**：以上全部，以及 Soloist 二进制本身（条款也禁止再分发）。安装包里没有任何账户相关的值。
 - **提前提醒**：App 启动 Soloist 前运行 `soloist --version`，读出构建时间戳，到期日 = 构建日 + 90 天。设置页显示到期日，到期前 14 天开始提醒更新。
 - **哪一项失效就只修哪一项**：引导页的每一步可以单独重做，不会让用户从头配置。
-- **待 M2 实测**：key 失效或填错时 Soloist 的表现（退出码、日志、`auth_state`），以及换新版本后 `--data-dir` 里的配对会话是否保留。
+- **未经验证的 key 不能碰真正的配对数据**（2026-10-31 实测，见 POC.md）：key 无效时 Soloist 不退出，保持"未登录"，同时**删除 data-dir 里保存的配对会话**，之后即使换回正确的 key 也要用手机重新配对。所以填入或更换 key 时，App 先把 data-dir 复制一份到临时目录，用新 key 在副本上启动 Soloist：WebSocket 的 `auth_state` 在 30 秒内变成 `logged_in: true` 才算有效，再存进钥匙串、用于真正的服务；否则提示 key 无效，原来的配对不受影响。首次配对时还没有会话可试，key 填错的表现在引导页实测。
+- **待实测**：换新版本后 `--data-dir` 里的配对会话是否保留。现在的版本就是最新的，要等 Spotify 发布下一个版本；在此之前按"会丢，需要重新配对"设计。
 
 **进程管理**
 - Soloist 作为**用户级服务**运行：Linux 用 systemd user unit，macOS 用 launchd agent。由 App 安装，默认不开机自启，App 启动时拉起，这一点参考 Omarchy-Spotify。
 - 启动参数：`--device-name`、`--api-key`、`--data-dir`、`--cache-dir`、`--ws 127.0.0.1:0`。端口用 0 让系统分配，实际地址从 data-dir 里的 `ws.addr` / `ws.port` 读。
 - API key 存在系统钥匙串里，用 mygo 的凭据存储。PoC 证实 Soloist 只接受 `-k` 参数（P9）：App 每次启动服务前，从钥匙串把 key 写进只有当前用户可读的 `EnvironmentFile`，unit 里写 `-k ${SOLOIST_API_KEY}`。unit 文件本身不含 key。
-- **获取 Soloist：** Spotify 不允许再分发二进制。App 内的引导页提供"从 Spotify 官方 CDN 下载"按钮，下载前需要用户确认；也可以让用户自己指定已下载的二进制路径。App 安装包里不带 Soloist。
+- **获取 Soloist：** Spotify 不允许再分发二进制。引导页提供"从 Spotify 官方下载"按钮（§10 问题 3）：按平台选 `soloist_release_<arch>.tar.gz`，下载前说明来源并让用户确认，解压到 App 的数据目录，用 `--version` 检查能运行。也可以选择已下载的文件。更新走同一个流程。App 安装包里不带 Soloist。
 
 **命令分工**（根据 WebSocket API 的能力决定）
 
@@ -229,5 +230,5 @@ Soloist 的版本每 90 天过期；API key 官方没说会过期，但社区有
 
 1. ~~App 显示名~~：已定为 MyGoify。
 2. ~~代码来源~~：已 fork 为 aronnaxlin/mygoify，保留 git 历史，`upstream` 指向原仓库。
-3. **Soloist 下载**：App 内一键从官方 CDN 下载算不算"再分发"？我的理解是不算，因为二进制直接从 Spotify 下载。但条款原文只说了 "link to Downloads and updates"。保守做法是 v1 只给链接，加上"选择已下载的文件"。
+3. ~~Soloist 下载~~：**一键从官方 CDN 下载**（2026-10-31 定）。二进制直接从 Spotify 的 `soloist-builds.spotifycdn.com` 下载到用户机器，App 不转发、不打包，理解为不属于再分发。下载前说明来源并让用户确认；同时保留"选择已下载的文件"，CDN 不可用时也能装。
 4. ~~API key 怎么交给 Soloist~~：PoC P9 确认只能用 `-k` 参数，同机其他用户能在 `ps` 里看到；做法见 §4.2"进程管理"，单用户机器上接受，README 写明。
