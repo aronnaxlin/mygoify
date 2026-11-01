@@ -156,10 +156,10 @@ App 空闲时不调 Web API：窗口隐藏或静止、歌曲自然切换，都�
 Soloist 不提供音频数据，播放条的烟雾光点、歌曲行和刘海里的音柱、烟雾背景要的频谱，从系统混音时听到的 Soloist 的声音里算。
 
 - **macOS 14.2+**：Core Audio 的 process tap 只听 Soloist 这一个进程（按 data-dir 里的 `soloist.pid` 找），放进一个只有它的私有聚合设备，IO 回调拿到 48 kHz 浮点立体声。全部用 purego，不用 cgo。tap 设为 private、不静音，Soloist 照常从原来的输出设备出声。首次会弹"录制系统音频"授权（`NSAudioCaptureUsageDescription`，在 mygo.json 里）；不给授权时 tap 只收到静音，界面退回空闲动画。`go tool mygo dev` 从终端启动时，授权记在终端名下，终端已有授权就不再弹。
-- **何时开**：Soloist 第一次报 `playing` 时建 tap，连接断开（Soloist 重启，换了进程）时拆掉，下次播放再按新 pid 建。暂停时系统不再混 Soloist 的声音，回调停止，不耗电。刚启动时 Core Audio 可能还不认识这个进程，隔 2 秒重试，最多 3 次。
+- **何时开**：Soloist 第一次报 `playing` 时建 tap，连接断开（Soloist 重启，换了进程）时拆掉，下次播放再按新 pid 建。暂停时系统不再混 Soloist 的声音，回调停止，不耗电。刚启动时 Core Audio 可能还不认识这个进程，隔 2 秒重试，最多 3 次。Linux 上 tap 一直跟着这个进程，它的流没了就等下一个。
 - **怎么算**：只保留最近约 0.7 秒的单声道样本（环形缓冲，不断覆盖），界面要时取 1024 点加 Hann 窗做 FFT，按音高从 40 Hz 到 14 kHz 均分 24 段（沿用 cloudmusic 的算法）。取的是"现在听到的"那一段：减去默认输出设备的延迟（蓝牙耳机一两百毫秒）。Soloist 的音量和响度均衡会作用在听到的声音上（2026-11-01 实测，音量 25% 时 RMS 只有约 1/40），所以按最近最响的一段做自动增益：它立即跟上，每秒回落 4 dB，最低 −70 dB。
 - **红线**：样本只在内存里，用来算 24 个数，不写盘、不发送，也不能导出（§9）。
-- **Linux**：未做。打算从 PipeWire 读 Soloist 的流，现在 `Levels()` 返回没有数据，界面是空闲动画。
+- **Linux（PipeWire）**：用 PipeWire 自带的两个工具，不用 cgo，也不自己实现 PipeWire 协议。`pw-dump --monitor` 盯着图的变化，找 Soloist 进程（`soloist.pid`，对 client 的 `application.process.id`）放出的 `Stream/Output/Audio` 节点，不按名字找，因为官方客户端的流也叫 `spotify`；找到后起一个 `pw-record --raw --format f32 --target <节点 serial>`，直接录这个流的输出（混音之前，采样率跟流一致，44.1 kHz），经管道交给 meter。录音节点设为 `node.passive`（暂停后不让输出设备一直醒着）、`node.dont-fallback` 和 `node.dont-reconnect`（目标不在或消失时直接退出，不会改录麦克风）。Soloist 暂停时没有流，再播放时开新流，tap 跟着换节点，不必重建。延迟取流的输出端口上 PipeWire 算好的到输出设备的延迟（几个 quantum 加若干样本和纳秒，蓝牙会更长），quantum 按 settings 里的 `clock.quantum` 算。没装这两个工具时 `Tap` 返回 `ErrUnsupported`，界面是空闲动画。录音节点在 PipeWire 里是一个录音流，状态栏的录音指示可能会亮。2026-11-01 用自己放的测试音实测通过，还没在 Soloist 真正播放时验证。
 
 ## 5. 数据层（internal/library）
 

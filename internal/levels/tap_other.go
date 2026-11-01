@@ -1,7 +1,6 @@
-//go:build !darwin
+//go:build !darwin && !linux
 
 package levels
 
-// Tap hears no other process here yet: on Linux, it would read Soloist's
-// stream from PipeWire.
+// Tap hears no other process here.
 func Tap(pid int, m *Meter) (stop func(), err error) { return nil, ErrUnsupported }

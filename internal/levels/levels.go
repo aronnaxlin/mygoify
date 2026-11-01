@@ -22,7 +22,7 @@ const (
 )
 
 // ErrUnsupported is Tap's error where it can't hear a process: before
-// macOS 14.2, and on other systems.
+// macOS 14.2, on Linux without PipeWire's tools, and on other systems.
 var ErrUnsupported = errors.New("levels: can't hear another process here")
 
 // Meter takes in sound as it is mixed and measures the spectrum of what
