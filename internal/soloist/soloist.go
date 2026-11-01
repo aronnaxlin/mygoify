@@ -65,7 +65,7 @@ type Backend struct {
 	// reasks counts the queues asked for again, which came with tracks
 	// still bare.
 	reasks int
-	states   chan playback.State
+	states chan playback.State
 }
 
 func New(cfg Config) *Backend { return &Backend{cfg: cfg} }
