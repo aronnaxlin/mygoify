@@ -346,10 +346,19 @@ func (a *app) trackRows(c *ui.Context, tracks []music.Track, covers bool, header
 			})
 			ui.Text(c, clock(tr.Length())).FontSize(12.5).FontFeatures("tnum").TextColor(p.faint).Width(44).TextAlign(ui.End)
 		})
-		if row.Clicked() && tr.Playable() {
+		if a.rowPlays(row) && tr.Playable() {
 			a.pl.PlayQueue(a.pageContext(), tracks, i)
 		}
 	}).Grow(1).Padding(top+pageGap, pagePad-12, bottom+32, pagePad-12).ScrollbarInsets(top, 0, bottom, 0)
+}
+
+// rowPlays says whether a song's row was clicked to play it: twice, as
+// in Spotify's own app, or once if the listener chose so.
+func (a *app) rowPlays(row ui.Element) bool {
+	if a.settings.ClickPlays {
+		return row.Clicked()
+	}
+	return row.DoubleClicked()
 }
 
 // nowPlayingBars dance in the row of the track playing.

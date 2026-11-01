@@ -123,6 +123,11 @@ func (a *app) settingsView(c *ui.Context) {
 					a.changed()
 				}
 			})
+			row("单击歌曲即播放", "关闭时，和 Spotify 官方客户端一样双击播放", func() {
+				if ui.Switch(c.Key("click-plays"), &s.ClickPlays).Label("单击歌曲即播放").Changed() {
+					a.changed()
+				}
+			})
 			if a.canHide() {
 				row("关闭窗口时退出", "关闭后，按上面的设置处理音乐；不勾选则只隐藏窗口，音乐继续播放", func() {
 					if ui.Switch(c.Key("close-quits"), &s.CloseQuits).Label("关闭窗口时退出").Changed() {
