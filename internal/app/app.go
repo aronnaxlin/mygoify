@@ -96,7 +96,8 @@ type app struct {
 	lyricGlide  lyricGlide
 	lyricAt     int
 	lyricTrack  string
-	lyr         lyricsState // the lyrics of the track playing
+	lyr         lyricsState     // the lyrics of the track playing
+	lyrAsking   map[string]bool // the tracks whose lyrics are being fetched
 	queueList   ui.ListState
 	queueAt     int // the row of the queue pane last scrolled to, -1 while it is hidden
 
@@ -213,6 +214,7 @@ func Run() error {
 		a.backend = playback.NewFake()
 		if lib, b, svc := connectSpotify(a.settings.Spotify, secrets()); lib != nil {
 			a.lib, a.backend, a.svc, a.live = lib, b, svc, true
+			useLRCLIB()
 		}
 		a.pl = playback.New(a.post, a.backend)
 		a.pl.Artwork = fetchArt
