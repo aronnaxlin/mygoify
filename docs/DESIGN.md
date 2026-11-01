@@ -133,7 +133,7 @@ Soloist 的版本每 90 天过期；API key 官方没说会过期，但社区有
 App 空闲时不调 Web API：窗口隐藏或静止、歌曲自然切换，都不发请求（`TestIdleAsksNothing`）。只有用户的操作才会请求，例如打开页面、搜索、喜欢。命令发出后的结果以后续的 `playback_changed` 事件为准；`command_result` 只表示命令已派发。
 
 **首次配对**
-- Soloist 要先在 Spotify Connect 里登录一次。默认流程：引导用户在同一局域网的手机 App 里选中这个设备播放一次，之后会话保存在 `--data-dir`。
+- Soloist 要先在 Spotify Connect 里登录一次。默认流程：引导用户在同一局域网的手机 App 里选中这个设备播放一次，之后会话保存在 `--data-dir` 的 `cache/dbrts`，用设备 ID 加密。2026-11-01 实测：这个文件解不开时，Soloist 当作没有会话，也不会用新登录覆盖它（"to avoid data loss"），于是每次启动都要从手机重新连；把它移走、连一次就好了。怎么坏的没复现，所以停服务要等 launchd 真正放手（`Service.Stop`），再动它的数据或重新启动它：`launchctl bootout` 返回时还没有，紧接着 bootstrap 会失败。
 - 待验证的改进：App 自己当 zeroconf 发送方，把 Web API 的 access token 交给 Soloist 完成配对，不需要手机（Omarchy-Spotify 对 access-token 类型的接收端就是这样做的）。见 PoC P5（已推迟）。
 
 **WebSocket 安全**

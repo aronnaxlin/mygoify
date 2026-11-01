@@ -1,6 +1,7 @@
 package soloist
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -177,5 +178,43 @@ func TestUnitQuotesDeviceName(t *testing.T) {
 	want := `-n "Lin's \"Desk\" $$HOME 100%%"`
 	if !strings.Contains(got, want) {
 		t.Errorf("unit has no %s:\n%s", want, got)
+	}
+}
+
+// A new key restarts Soloist, and Stop returns, only once launchd has let
+// the agent go. launchctl bootout returned before it had, and the
+// bootstrap right after failed with "Bootstrap failed: 5".
+func TestAgentWaitsForBootout(t *testing.T) {
+	s, _ := fakeService(t)
+	if err := s.startAgent(); err != nil {
+		t.Fatal(err)
+	}
+	fake := s.run
+	lingering := 0
+	s.run = func(name string, args ...string) error {
+		switch args[0] {
+		case "print":
+			if lingering > 0 {
+				lingering--
+				return nil
+			}
+		case "bootstrap":
+			if lingering > 0 {
+				return errors.New("Bootstrap failed: 5: Input/output error")
+			}
+		case "bootout":
+			lingering = 3
+		}
+		return fake(name, args...)
+	}
+	s.Key = "key_2"
+	if err := s.startAgent(); err != nil {
+		t.Fatalf("restarting with a new key: %v", err)
+	}
+	if err := s.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	if lingering > 0 {
+		t.Fatal("Stop returned while launchd still had the agent")
 	}
 }

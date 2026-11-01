@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Service runs Soloist as the listener's own service, a launchd agent on
@@ -74,7 +75,7 @@ func (s *Service) Stop() error {
 		if s.run("launchctl", "print", target) != nil {
 			return nil
 		}
-		return s.run("launchctl", "bootout", target)
+		return s.bootout(target)
 	case "linux":
 		return s.run("systemctl", "--user", "stop", unitName)
 	}
@@ -143,7 +144,7 @@ func (s *Service) startAgent() error {
 	loaded := s.run("launchctl", "print", target) == nil
 	if loaded && (keyChanged || agentChanged) {
 		// Loaded as it was: bootout stops it and forgets the old file.
-		if err := s.run("launchctl", "bootout", target); err != nil {
+		if err := s.bootout(target); err != nil {
 			return err
 		}
 		loaded = false
@@ -155,6 +156,27 @@ func (s *Service) startAgent() error {
 	}
 	// Starts it unless it runs, as RunAtLoad may be off.
 	return s.run("launchctl", "kickstart", target)
+}
+
+// bootoutWait is how long bootout waits for launchd to let the agent go.
+var bootoutWait = 10 * time.Second
+
+// bootout stops Soloist and unloads its agent, and returns once launchd
+// has let it go. launchctl bootout returns before: bootstrapping it again
+// meanwhile fails with "Bootstrap failed: 5: Input/output error", and
+// what moves its data aside then may find Soloist still in it.
+func (s *Service) bootout(target string) error {
+	if err := s.run("launchctl", "bootout", target); err != nil {
+		return err
+	}
+	deadline := time.Now().Add(bootoutWait)
+	for s.run("launchctl", "print", target) == nil {
+		if time.Now().After(deadline) {
+			return fmt.Errorf("soloist: still stopping %v after bootout", bootoutWait)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return nil
 }
 
 // agent is the launch agent's property list, which starts Soloist at
