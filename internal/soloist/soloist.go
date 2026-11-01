@@ -588,7 +588,24 @@ func (b *Backend) PauseAndWait(ctx context.Context) error {
 func (b *Backend) Resume() error { return b.command("play") }
 func (b *Backend) Pause() error  { return b.command("pause") }
 func (b *Backend) Next() error   { return b.command("skip_next") }
-func (b *Backend) Prev() error   { return b.command("skip_prev") }
+
+// Prev plays the track before, however far this one has played, as the
+// player does: a few seconds into a track, Soloist's skip_prev starts it
+// again. The listener pressed twice, and the app showed the track before,
+// then this one, and its lyrics, once more. This one is sent to its start
+// first, when this Soloist plays it: else seeking would move another
+// device's playback.
+func (b *Backend) Prev() error {
+	b.mu.Lock()
+	active := b.active
+	b.mu.Unlock()
+	if active {
+		if err := b.command("seek", "position_ms", 0); err != nil {
+			return err
+		}
+	}
+	return b.command("skip_prev")
+}
 
 func (b *Backend) Seek(t time.Duration) error {
 	return b.command("seek", "position_ms", t.Milliseconds())

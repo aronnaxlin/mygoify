@@ -126,6 +126,7 @@ func best(found []record, q Query, near time.Duration) (record, bool) {
 	picks := make([]pick, len(found))
 	for i, r := range found {
 		picks[i] = pick{
+			Name:      r.TrackName,
 			Length:    time.Duration(r.Duration * float64(time.Second)),
 			Album:     r.AlbumName,
 			HasLyrics: r.SyncedLyrics != "" && !r.Instrumental,

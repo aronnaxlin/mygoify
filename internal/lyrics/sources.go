@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -60,6 +61,7 @@ type Sources struct {
 // A pick is a track a source may have the lyrics of, as it compares to
 // the query.
 type pick struct {
+	Name      string
 	Length    time.Duration
 	Album     string
 	HasLyrics bool
@@ -67,9 +69,17 @@ type pick struct {
 
 // nearestOf returns the index of the pick nearest q in length, within
 // near, and of q's album if several are as near: soundtracks and singles
-// carry the same song. It returns -1 if none is.
+// carry the same song. Of as near ones, a cover, a sped-up or a live take
+// comes after the song itself, or the song after one if q is one, and
+// else the one found first, as a source ranks the song itself first. It returns -1 if none
+// is near.
+//
+// Lengths are compared to the second: Spotify's queue gives them so. To
+// the half second, a cover 0.2 seconds off the queue's 288 won over the
+// song itself, 0.36 seconds off, and its lyrics didn't keep time.
 func nearestOf(picks []pick, q Query, near time.Duration) int {
-	best, gap := -1, near+1
+	best := -1
+	var bestKey [3]int
 	for i, p := range picks {
 		if !p.HasLyrics {
 			continue
@@ -78,18 +88,41 @@ func nearestOf(picks []pick, q Query, near time.Duration) int {
 		if g < 0 {
 			g = -g
 		}
-		g = g.Round(500 * time.Millisecond)
+		g = g.Round(time.Second)
 		if g > near {
 			continue
 		}
+		key := [3]int{0, int(g / time.Second), 1}
+		if otherTake(p.Name) != otherTake(q.Name) {
+			key[0] = 1
+		}
 		// Of as near ones, the album's: only when asked with one, else
 		// every pick without an album would win over the one before it.
-		if g < gap || g == gap && q.Album != "" && strings.EqualFold(p.Album, q.Album) && !strings.EqualFold(picks[best].Album, q.Album) {
-			best, gap = i, g
+		if q.Album != "" && strings.EqualFold(p.Album, q.Album) {
+			key[2] = 0
+		}
+		if best < 0 || less(key, bestKey) {
+			best, bestKey = i, key
 		}
 	}
 	return best
 }
+
+func less(a, b [3]int) bool {
+	for i := range a {
+		if a[i] != b[i] {
+			return a[i] < b[i]
+		}
+	}
+	return false
+}
+
+// takeMarks are what the names of covers, sped-up, live and other takes
+// of a song carry, as "麦恩莉(1.2X)" or "麦恩莉 (Cover 方大同)".
+var takeMarks = regexp.MustCompile(`(?i)\bcover\b|翻唱|翻自|\blive\b|伴奏|instrumental|karaoke|\bremix\b|\bdj\b|dj版|\d(\.\d+)?\s*x\b|倍速|加速|降调|升调|版[)）]`)
+
+// otherTake says whether a name is that of another take of a song.
+func otherTake(name string) bool { return takeMarks.MatchString(name) }
 
 // kept is what the cache keeps of a track: its lyrics, empty when there
 // are none, when they were asked for, the source that had them, and the
