@@ -431,3 +431,44 @@ func TestQueueAskedAgainWhileBare(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 }
+
+// Pausing as the app quits waits for Soloist to say it paused, and leaves
+// what plays on another device be.
+func TestPauseAndWait(t *testing.T) {
+	f := newFakeSoloist(t)
+	b := New(Config{DataDir: f.dir})
+	states := watch(b)
+	f.connected(t, 1)
+	f.send(t, `{"type":"playback_state","status":"playing","item":`+track("cur", "现在")+`,"is_active":false}`)
+	until(t, states, func(st playback.State) bool { return st.Playing })
+	if err := b.PauseAndWait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case cmd := <-f.commands:
+		t.Fatalf("sent %v, pausing the phone", cmd)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	f.send(t, `{"type":"device_changed","is_active":true}`)
+	until(t, states, func(playback.State) bool { b.mu.Lock(); defer b.mu.Unlock(); return b.active })
+	paused := make(chan error, 1)
+	go func() { paused <- b.PauseAndWait(context.Background()) }()
+	if cmd := f.next(t); cmd["command"] != "pause" {
+		t.Fatalf("sent %v", cmd)
+	}
+	select {
+	case <-paused:
+		t.Fatal("returned before Soloist paused")
+	case <-time.After(100 * time.Millisecond):
+	}
+	f.send(t, `{"type":"playback_changed","status":"paused"}`)
+	select {
+	case err := <-paused:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("still waiting once Soloist paused")
+	}
+}

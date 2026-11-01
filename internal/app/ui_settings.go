@@ -99,6 +99,45 @@ func (a *app) settingsView(c *ui.Context) {
 			})
 		}
 
+		// What happens to the music as the app goes (DESIGN.md §4.2):
+		// Soloist plays apart from the window.
+		group("播放", func() {
+			mode := quitModes[0]
+			for _, m := range quitModes {
+				if m.id == s.Quit {
+					mode = m
+				}
+			}
+			row("退出 App 时", mode.desc, func() {
+				labels := make([]string, len(quitModes))
+				for i, m := range quitModes {
+					labels[i] = m.label
+				}
+				chosen := mode.label
+				if ui.Select(c.Key("quit"), &chosen, labels).Label("退出 App 时").Width(170).Changed() {
+					for _, m := range quitModes {
+						if m.label == chosen {
+							s.Quit = m.id
+						}
+					}
+					a.changed()
+				}
+			})
+			if a.canHide() {
+				row("关闭窗口时退出", "关闭后，按上面的设置处理音乐；不勾选则只隐藏窗口，音乐继续播放", func() {
+					if ui.Switch(c.Key("close-quits"), &s.CloseQuits).Label("关闭窗口时退出").Changed() {
+						a.changed()
+					}
+				})
+			}
+			row("登录电脑时启动 Soloist", "不打开 App，也能在手机的 Spotify Connect 里选这台电脑", func() {
+				if ui.Switch(c.Key("soloist-at-login"), &s.Spotify.SoloistAtLogin).Label("登录电脑时启动 Soloist").Changed() {
+					a.changed()
+					a.changeAtLogin()
+				}
+			})
+		})
+
 		// Only on macOS, the one with a notch player.
 		if a.notch != nil {
 			group("刘海播放器", func() {

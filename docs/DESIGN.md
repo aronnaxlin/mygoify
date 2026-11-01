@@ -107,7 +107,11 @@ Soloist 的版本每 90 天过期；API key 官方没说会过期，但社区有
 - **待实测**：换新版本后 `--data-dir` 里的配对会话是否保留。现在的版本就是最新的，要等 Spotify 发布下一个版本；在此之前按"会丢，需要重新配对"设计。
 
 **进程管理**
-- Soloist 作为**用户级服务**运行：Linux 用 systemd user unit，macOS 用 launchd agent。由 App 安装，默认不开机自启，App 启动时拉起，这一点参考 Omarchy-Spotify。
+- Soloist 作为**用户级服务**运行：Linux 用 systemd user unit，macOS 用 launchd agent。由 App 安装，App 启动时拉起，这一点参考 Omarchy-Spotify。
+- Soloist 和界面分开运行，所以退出 App 后怎么处理音乐，由用户在设置页"播放"里选择：
+  - **退出 App 时**：默认"停止并关闭 Soloist"，先暂停，等 Soloist 回报已暂停，再停掉服务，从手机投放到这台电脑的播放也随之停止；"暂停"只暂停，Soloist 留在后台（约 60 MB），下次打开更快；"继续播放"什么都不做，退出后要回到 App 才能控制（直到 v1.1 的 agent，见 §4.3）。暂停只针对这台电脑正在播的内容，别的设备上的播放不动。引导页里点"重新启动"时不做这些，Soloist 照常播放。
+  - **关闭窗口时退出**：默认关窗只隐藏窗口；打开后关窗就按上一项退出。没有托盘的 Linux 桌面上本来就是关窗即退出，不显示这一项。
+  - **登录电脑时启动 Soloist**：默认关。打开后 launchd 的 `RunAtLoad`、systemd 的 `enable` 让 Soloist 在登录时启动，不开 App 也能在 Spotify Connect 里选这台电脑。切换这一项只改服务文件，不重启正在播放的 Soloist。
 - 启动参数：`--device-name`、`--api-key`、`--data-dir`、`--cache-dir`、`--ws 127.0.0.1:0`。端口用 0 让系统分配，实际地址从 data-dir 里的 `ws.addr` / `ws.port` 读。
 - API key 和 Spotify 登录存在系统钥匙串里（`internal/secret`）。mygo 没有凭据存储，也不用 cgo，所以用 purego 调系统接口：macOS 调 Security framework，不用 `security` 命令，因为它要把密码放进参数；Linux 用 godbus 调会话总线上的 Secret Service（GNOME Keyring、KeePassXC 等）。没有钥匙串时退回只有当前用户可读的文件；以前存在文件里的值第一次读取时搬进钥匙串。开发时设 `MYGOIFY_SECRETS=files` 只用文件：macOS 每遇到一个新构建都会弹窗问能不能读钥匙串。
 - PoC 证实 Soloist 只接受 `-k` 参数（P9）：App 每次启动服务前，从钥匙串把 key 写进只有当前用户可读的文件。systemd unit 用 `EnvironmentFile` 读它，写 `-k ${SOLOIST_API_KEY}`；launchd agent 用 `sh -c` 读它。unit 和 agent 文件都不含 key，但 Soloist 运行后，它的命令行里仍然有 key，同机其他用户用 `ps` 能看到，这一点 README 里写明。
@@ -140,7 +144,7 @@ App 空闲时不调 Web API：窗口隐藏或静止、歌曲自然切换，都�
 
 界面关掉以后，媒体键、Waybar、`playerctl` 需要 MPRIS 才能控制，但 Soloist 本身不提供 MPRIS。
 
-- v1：关窗口默认**缩到托盘**，界面进程仍在，MPRIS 由 mygo 的 Now Playing 提供。代价是常驻约 190 MB。
+- v1：关窗口默认**缩到托盘**，界面进程仍在，MPRIS 由 mygo 的 Now Playing 提供。代价是常驻约 190 MB。用户也可以选择关窗或退出后让音乐继续（§4.2），这时没有媒体键。
 - v1.1：加一个极小的 `mygo-spotify-agent`（纯 Go、无界面）。它连 Soloist 的 WebSocket，导出 MPRIS（macOS 上是 Now Playing）。之后关窗口就让界面进程直接退出，常驻目标 ≤ 80 MB（Soloist + agent）。
 
 ### 4.4 备用后端（v1 之后）

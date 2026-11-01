@@ -461,6 +461,31 @@ func (b *Backend) waitActive(d time.Duration) bool {
 // plays are the commands that start playback.
 var plays = map[string]bool{"play": true, "skip_next": true, "skip_prev": true}
 
+// PauseAndWait pauses what this computer plays and waits until Soloist
+// says it paused, or ctx is done, as the app quits. What plays elsewhere,
+// on the listener's phone, say, it leaves be.
+func (b *Backend) PauseAndWait(ctx context.Context) error {
+	playing := func() bool {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		return b.active && (b.status == "playing" || b.status == "buffering")
+	}
+	if !playing() {
+		return nil
+	}
+	if err := b.send(ctx, map[string]any{"command": "pause"}); err != nil {
+		return err
+	}
+	for playing() {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	return nil
+}
+
 func (b *Backend) Resume() error { return b.command("play") }
 func (b *Backend) Pause() error  { return b.command("pause") }
 func (b *Backend) Next() error   { return b.command("skip_next") }

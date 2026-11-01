@@ -3,6 +3,7 @@ package soloist
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -76,14 +77,14 @@ func TestUnitRestartsOnlyWhenChanged(t *testing.T) {
 	if err := s.startUnit(); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(*ran, ", "); got != "systemctl daemon-reload, systemctl restart" {
+	if got := strings.Join(*ran, ", "); got != "systemctl daemon-reload, systemctl disable, systemctl restart" {
 		t.Fatalf("first start ran %s", got)
 	}
 	*ran = nil
 	if err := s.startUnit(); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(*ran, ", "); got != "systemctl start" {
+	if got := strings.Join(*ran, ", "); got != "systemctl disable, systemctl start" {
 		t.Fatalf("starting again ran %s, stopping what plays", got)
 	}
 	*ran = nil
@@ -91,8 +92,50 @@ func TestUnitRestartsOnlyWhenChanged(t *testing.T) {
 	if err := s.startUnit(); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(*ran, ", "); got != "systemctl daemon-reload, systemctl restart" {
+	if got := strings.Join(*ran, ", "); got != "systemctl daemon-reload, systemctl disable, systemctl restart" {
 		t.Fatalf("a new name ran %s", got)
+	}
+}
+
+// Starting Soloist at login, or no longer, leaves the Soloist that plays
+// be, and tells launchd so for the next login, on macOS.
+func TestAgentAtLoginKeepsPlaying(t *testing.T) {
+	s, ran := fakeService(t)
+	if err := s.startAgent(); err != nil {
+		t.Fatal(err)
+	}
+	plist := filepath.Join(s.Dir, agentLabel+".plist")
+	for _, at := range []bool{true, false} {
+		*ran = nil
+		s.AtLogin = at
+		if err := s.startAgent(); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(*ran, ", "); got != "launchctl kickstart" {
+			t.Fatalf("AtLogin %v ran %s, stopping what plays", at, got)
+		}
+		b, _ := os.ReadFile(plist)
+		want := "<key>RunAtLoad</key>\n\t<" + strconv.FormatBool(at) + "/>"
+		if !strings.Contains(string(b), want) {
+			t.Fatalf("AtLogin %v wrote no %q", at, want)
+		}
+	}
+}
+
+// Starting Soloist at login enables the unit, and no longer disables it,
+// without restarting it, on Linux.
+func TestUnitAtLogin(t *testing.T) {
+	s, ran := fakeService(t)
+	if err := s.startUnit(); err != nil {
+		t.Fatal(err)
+	}
+	*ran = nil
+	s.AtLogin = true
+	if err := s.startUnit(); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(*ran, ", "); got != "systemctl enable, systemctl start" {
+		t.Fatalf("AtLogin ran %s", got)
 	}
 }
 

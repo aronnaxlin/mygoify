@@ -16,8 +16,8 @@ import (
 
 // Service runs Soloist as the listener's own service, a launchd agent on
 // macOS and a systemd user unit on Linux, so that it plays on once the
-// window is closed (DESIGN.md §4.2). It isn't started at login: the app
-// starts it as it starts.
+// window is closed (DESIGN.md §4.2). The app starts it as it starts, and
+// launchd or systemd at login too if AtLogin.
 //
 // Soloist takes its API key only as an argument (POC.md P9), so the key
 // goes into a file only the listener can read, and the service reads it
@@ -27,6 +27,9 @@ type Service struct {
 	Key        string // its API key
 	DeviceName string
 	DataDir    string // where it keeps its pairing and writes ws.port
+	// AtLogin starts it as the listener logs in, so that Spotify Connect
+	// lists the computer with the app closed.
+	AtLogin bool
 	// Dir holds the agent's or unit's file: ~/Library/LaunchAgents or
 	// ~/.config/systemd/user, as Start finds it when empty.
 	Dir string
@@ -125,9 +128,15 @@ func (s *Service) startAgent() error {
 		return err
 	}
 	plist := filepath.Join(dir, agentLabel+".plist")
-	agentChanged, err := writeIfChanged(plist, s.agent(), 0o644)
+	old, _ := os.ReadFile(plist)
+	agentChanged, err := writeIfChanged(plist, s.agent(s.AtLogin), 0o644)
 	if err != nil {
 		return err
+	}
+	// Whether it starts at login, launchd reads from the file only as the
+	// listener logs in: the Soloist that plays plays on.
+	if agentChanged && bytes.Equal(old, s.agent(!s.AtLogin)) {
+		agentChanged = false
 	}
 	domain := "gui/" + strconv.Itoa(os.Getuid())
 	target := domain + "/" + agentLabel
@@ -144,14 +153,14 @@ func (s *Service) startAgent() error {
 			return err
 		}
 	}
-	// Starts it unless it runs, as RunAtLoad is off.
+	// Starts it unless it runs, as RunAtLoad may be off.
 	return s.run("launchctl", "kickstart", target)
 }
 
-// agent is the launch agent's property list. A shell reads the key from
-// its file and hands Soloist the rest as its own arguments, so nothing in
-// them needs quoting.
-func (s *Service) agent() []byte {
+// agent is the launch agent's property list, which starts Soloist at
+// login if atLogin. A shell reads the key from its file and hands Soloist
+// the rest as its own arguments, so nothing in them needs quoting.
+func (s *Service) agent(atLogin bool) []byte {
 	args := []string{
 		"/bin/sh", "-c", `exec "$0" -n "$1" -k "$(cat "$2")" -D "$3" -w 127.0.0.1:0`,
 		s.Bin, s.DeviceName, s.keyFile(), s.DataDir,
@@ -171,7 +180,7 @@ func (s *Service) agent() []byte {
 	}
 	b.WriteString(`	</array>
 	<key>RunAtLoad</key>
-	<false/>
+	<` + strconv.FormatBool(atLogin) + `/>
 	<key>KeepAlive</key>
 	<dict>
 		<!-- Again after a crash, but not after it exits: it exits with 10
@@ -215,6 +224,14 @@ func (s *Service) startUnit() error {
 			return err
 		}
 	}
+	// Whether it starts at login, by the link of its [Install] section.
+	login := "disable"
+	if s.AtLogin {
+		login = "enable"
+	}
+	if err := s.run("systemctl", "--user", login, unitName); err != nil {
+		return err
+	}
 	if keyChanged || unitChanged {
 		// Starts it too if it doesn't run.
 		return s.run("systemctl", "--user", "restart", unitName)
@@ -237,6 +254,9 @@ ExecStart=` + strings.Join([]string{
 # Again after a crash, but not after it exits: it exits with 10 once its
 # version expires, and starting it again won't help.
 Restart=on-abnormal
+
+[Install]
+WantedBy=default.target
 `)
 }
 

@@ -136,7 +136,7 @@ func (a *app) vault() secret.Store {
 
 // soloistService is Soloist's service as cfg and key set it up.
 func soloistService(cfg spotifySettings, key string) *soloist.Service {
-	return &soloist.Service{Bin: expandHome(cfg.SoloistBin), Key: key, DeviceName: cfg.DeviceName, DataDir: soloistDataDir(), Logs: filepath.Join(dataDir(), "soloist.log")}
+	return &soloist.Service{Bin: expandHome(cfg.SoloistBin), Key: key, DeviceName: cfg.DeviceName, DataDir: soloistDataDir(), Logs: filepath.Join(dataDir(), "soloist.log"), AtLogin: cfg.SoloistAtLogin}
 }
 
 // soloistDataDir is where Soloist keeps its pairing, as connectSpotify has
