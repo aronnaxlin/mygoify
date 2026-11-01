@@ -175,3 +175,36 @@ func TestFindBusy(t *testing.T) {
 		t.Fatalf("found %+v, %v once up", lines, err)
 	}
 }
+
+// A track without a name isn't looked for, nor kept: Soloist names the
+// first track of a context another device plays only later. LRCLIB was
+// asked for it, refused it, and was asked again and again.
+func TestFindUnnamed(t *testing.T) {
+	l, _, asked := lrclib(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "", http.StatusBadRequest)
+	})
+	unnamed := spring
+	unnamed.Name = ""
+	if lines, err := l.Find(context.Background(), unnamed); lines != nil || err != nil || asked.Load() != 0 {
+		t.Fatalf("found %+v, %v, asking %d times", lines, err, asked.Load())
+	}
+	if _, ok := l.load(unnamed.ID); ok {
+		t.Error("kept a track without a name")
+	}
+}
+
+// A track LRCLIB refuses to look for is kept as having no lyrics, rather
+// than being asked for again and again as if LRCLIB were down.
+func TestFindRefused(t *testing.T) {
+	l, _, asked := lrclib(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "", http.StatusBadRequest)
+	})
+	for range 2 {
+		if lines, err := l.Find(context.Background(), spring); lines != nil || err != nil {
+			t.Fatalf("found %+v, %v", lines, err)
+		}
+	}
+	if n := asked.Load(); n != 1 {
+		t.Errorf("asked %d times, want once", n)
+	}
+}
