@@ -46,9 +46,9 @@
 
 ## M2 · 登录与播放（约 2 周）
 
-- [x] 引导页：创建应用、填 client ID → PKCE 登录 → 下载或选择 Soloist → 填 API key → 配对（#20；走完后重启 App 生效，不热切换；macOS 上新用户从零走完已实测，能播放；Linux 待测）
+- [x] 引导页：创建应用、填 client ID → PKCE 登录 → 下载或选择 Soloist → 填 API key → 配对（#20；走完后重启 App 生效，不热切换；macOS 上新用户从零走完已实测，能播放；2026-11-01 Omarchy 上从零走完：下载的 Linux 版 Soloist 能运行，登录和 key 存进 gnome-keyring，手机配对后重启直接能播）
 - [x] 凭据存进钥匙串，token 自动刷新（macOS 钥匙串已实测；2026-11-01 Omarchy 上对 gnome-keyring 实测：存取、删除、从文件搬进钥匙串都正常，`MYGOIFY_KEYCHAIN=1 go test ./internal/secret` 可重测）
-- [x] 填 key 前停掉服务，在 data-dir 副本上验证（`Service.ChangeKey`，引导页的 key 步骤已接入；macOS 上 `CheckKey` 真 Soloist 实测通过，引导页里换 key 的完整流程和 Linux 待测）
+- [x] 填 key 前停掉服务，在 data-dir 副本上验证（`Service.ChangeKey`，引导页的 key 步骤已接入；macOS 上 `CheckKey` 真 Soloist 实测通过；2026-11-01 Omarchy 上引导页里换 key 实测：错的 key 只碰副本，配对和钥匙串里的 key 不变；对的 key 停服务约 2 秒。不成样子的 key，Soloist 报的是 `make sure --api-key is valid`，以前没认出来，要等满 30 秒并提示"没能启动"，#26 已修）
 - [ ] Soloist 服务管理：systemd user unit / launchd agent，安装、启动、停止（App 启动时安装并拉起已完成，macOS 已实测；2026-11-01 Omarchy 实测：2 秒内装好并拉起，unit 不含 key，配置不变时重开 App 不重启 Soloist，崩溃后 1 秒内重启并恢复会话，退出码 10 不重启，三种退出方式、关窗时退出、切换登录时启动都符合预期，登录时真的自启未实测（要注销）；设置页"播放"可选退出时停止 / 暂停 / 继续播放、关窗时退出、登录时启动 Soloist，均已有单元测试；2026-11-01 macOS 真机实测：三种退出方式和关窗时退出符合预期，登录时启动 Soloist 未实测（要注销或重启）；key 在钥匙串，路径和设备名在设置文件，`.env` 只在开发时补空缺）
 - [ ] Soloist 和账户相关的配置全部运行时读取（DESIGN §4.2 "运行时配置"）：设置页可更换 key、可执行文件、设备名（key 和可执行文件可在引导页单步重做，从设置页"账号"进入；设备名还不能改；改完要重启 App）
 - [ ] 过期处理：`soloist --version` 算出到期日，设置页显示，到期前 14 天提醒；退出码 `10` → 只走"更新 Soloist"一步（launchd 和 systemd 已设置为退出码 10 时不重启；到期日、提醒和更新流程未做）
