@@ -594,8 +594,17 @@ func (b *Backend) SetVolume(v float64) error {
 	return err
 }
 
+// SetShuffle takes on as Soloist's once it is sent, rather than once
+// Soloist says so: the play button turns shuffle off and plays at once,
+// and Play would still find it on.
 func (b *Backend) SetShuffle(on bool) error {
-	return b.command("set_shuffle", "enabled", on)
+	if err := b.command("set_shuffle", "enabled", on); err != nil {
+		return err
+	}
+	b.mu.Lock()
+	b.options.Shuffle = on
+	b.mu.Unlock()
+	return nil
 }
 
 func (b *Backend) SetRepeat(r playback.RepeatMode) error {

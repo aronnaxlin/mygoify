@@ -360,6 +360,32 @@ func TestPlayFromStart(t *testing.T) {
 	}
 }
 
+// Turning shuffle off and playing from the start at once, as the play
+// button does with shuffle on, asks Soloist alone. It went through the
+// Web API: Play still took shuffle as on, until Soloist said otherwise.
+func TestPlayFromStartAfterShuffleOff(t *testing.T) {
+	calls := webAPI(t, http.StatusOK)
+	f := newFakeSoloist(t)
+	b := New(Config{DataDir: f.dir, DeviceName: "MyGoify", API: &spotify.Client{Token: token}})
+	states := watch(b)
+	f.connected(t, 1)
+	f.send(t, `{"type":"device_changed","is_active":true,"options":{"shuffle":true,"repeat":"off"}}`)
+	until(t, states, func(playback.State) bool { b.mu.Lock(); defer b.mu.Unlock(); return b.active && b.options.Shuffle })
+	if err := b.SetShuffle(false); err != nil {
+		t.Fatal(err)
+	}
+	f.next(t)
+	if err := b.Play(playback.Request{Context: "spotify:album:al", Tracks: tracks("a", "b"), Start: 0}); err != nil {
+		t.Fatal(err)
+	}
+	if cmd := f.next(t); cmd["command"] != "play" || cmd["uri"] != "spotify:album:al" {
+		t.Fatalf("sent %v", cmd)
+	}
+	if *calls != 0 {
+		t.Fatalf("%d calls to the Web API", *calls)
+	}
+}
+
 // While Spotify limits the app's calls, playing from a track of a context
 // fails, saying until when, and asks Soloist nothing: played as the track
 // alone, with those after it queued, it changed what the listener's other
