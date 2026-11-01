@@ -129,6 +129,7 @@
 | v1.2 | Spotify Connect 设备切换（播到其他设备、从其他设备接管） |
 | v1.3 | 跟随 Omarchy 主题配色；Waybar 模块示例 |
 | v1.4 | go-librespot 纯 Go 备用后端（DESIGN §4.4），支持 Intel Mac |
+| 待定 | 歌词源插件化：主程序只留 LRCLIB 和插件机制（goja 跑 `.js` 插件，只给 `fetch` 和 md5、AES、base64；不能读文件、拿不到凭据；导入后默认关闭），非公开源改成插件，放在另一个仓库，不随主程序发布。在此之前非公开源先内置（2026-11-01 决定） |
 | 待定 | Windows 发布；律动视图；播客（明确排在最后） |
 
 **明确不做**：下载和导出音频、PlayPlay、绕过任何 Spotify 限制。
