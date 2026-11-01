@@ -49,6 +49,9 @@ type settings struct {
 	// Quit is what quitting the app does with the music (quitModes):
 	// stop, pause, or play on.
 	Quit string `json:"quit"`
+	// ClickPlays plays a song as its row is clicked once; else it takes
+	// a double click, as in Spotify's own app.
+	ClickPlays bool `json:"clickPlays,omitempty"`
 	// CloseQuits quits the app as its window closes, rather than hiding
 	// it with the music playing on.
 	CloseQuits bool `json:"closeQuits,omitempty"`
