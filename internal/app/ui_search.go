@@ -67,7 +67,7 @@ func (a *app) moreResults(r route, d *searchData) {
 		return
 	}
 	d.page.loading, d.page.err = true, ""
-	offset := d.res.Len()
+	offset := d.res.Len() + d.res.Skipped
 	go func() {
 		res, err := a.lib.Search(r.query, r.kind, searchLimit, offset)
 		a.post(func() {

@@ -184,6 +184,10 @@ type SearchResult struct {
 	Albums    []AlbumProfile
 	Playlists []Playlist
 	More      bool
+	// Skipped is how many Spotify found that the page leaves out, as
+	// tracks that won't play and playlists taken down: the next page
+	// starts past them too.
+	Skipped int
 }
 
 // Len is how many the page has.
@@ -197,6 +201,7 @@ func (r *SearchResult) Append(next SearchResult) {
 	r.Artists = append(r.Artists, next.Artists...)
 	r.Albums = append(r.Albums, next.Albums...)
 	r.Playlists = append(r.Playlists, next.Playlists...)
+	r.Skipped += next.Skipped
 	r.More = next.More
 }
 

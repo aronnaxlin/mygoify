@@ -639,6 +639,8 @@ func (l *Library) Search(query string, kind music.SearchType, limit, offset int)
 		for i := range res.Tracks.Items {
 			if t := &res.Tracks.Items[i]; t.playable() {
 				out.Tracks = append(out.Tracks, t.music(nil))
+			} else {
+				out.Skipped++
 			}
 		}
 		out.More = res.Tracks.Next != ""
@@ -657,6 +659,8 @@ func (l *Library) Search(query string, kind music.SearchType, limit, offset int)
 		for _, p := range res.Playlists.Items {
 			if p != nil {
 				out.Playlists = append(out.Playlists, p.music())
+			} else {
+				out.Skipped++
 			}
 		}
 		out.More = res.Playlists.Next != ""

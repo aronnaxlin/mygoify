@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"mygoify/internal/music"
 )
 
 // A playlist's tracks are read under item, or track, its old name, but
@@ -184,5 +186,22 @@ func TestPlaylistKept(t *testing.T) {
 	limited = true
 	if got := read(); got != "s2" {
 		t.Fatalf("limited: %s", got)
+	}
+}
+
+// A search counts the playlists taken down, which Spotify lists as null,
+// so that the next page starts past them: paged from what showed, the
+// app showed results twice.
+func TestSearchSkipped(t *testing.T) {
+	c := client(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"playlists":{"items":[{"id":"a","name":"甲","owner":{"id":"x"}},null,{"id":"b","name":"乙","owner":{"id":"x"}}],"next":"more"}}`))
+	})
+	l := &Library{API: c}
+	res, err := l.Search("春日影", music.SearchPlaylists, 10, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Len() != 2 || res.Skipped != 1 || !res.More {
+		t.Fatalf("got %d, skipped %d, more %v", res.Len(), res.Skipped, res.More)
 	}
 }

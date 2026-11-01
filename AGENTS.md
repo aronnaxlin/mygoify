@@ -31,4 +31,15 @@ Only write a test for behaviour that can actually break. If the code under test 
 - Set up what plays with the player's fixtures (`Cue`, `Hold`, `Start`) and lyrics with `a.setLyrics`.
 - Look at visuals instead of asserting on them. The `NM_FRAMES` tests save PNGs into that directory and skip when it isn't set. Check pixels only for coverage, such as whether a layer still covers the window.
 - Start each test with a one-sentence comment saying the behaviour it checks, in the style of the code.
-- Run `go test ./internal/...` before committing, and run a new UI test with `-count=5`. Fix or delete a flaky test; don't retry it.
+- Run a new UI test with `-count=5`. Fix or delete a flaky test; don't retry it.
+
+## Before committing
+
+Run what CI runs, and commit only once all of it passes:
+
+```sh
+gofmt -l .                # must print nothing
+go vet ./...
+go test ./internal/...
+CGO_ENABLED=0 go build -o /dev/null .
+```

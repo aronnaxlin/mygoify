@@ -105,21 +105,23 @@ func TestSearchKindFromSongs(t *testing.T) {
 }
 
 // A search's next page loads once its foot comes into view, from where the
-// last ended, and a search done again loads from its start.
+// last ended, past what it left out, and a search done again loads from
+// its start. Paged from what showed, playlists taken down made results
+// show twice.
 func TestSearchLoadsMore(t *testing.T) {
 	a := newTestApp()
 	asked := fakeSearch(a)
 	a.settings = defaultSettings()
 	r := route{page: pageSearch, query: "春日影", kind: music.SearchPlaylists}
 	a.searches[r] = &searchData{
-		res:  music.SearchResult{Playlists: []music.Playlist{{ID: "1", Name: "甲"}, {ID: "2", Name: "乙"}}, More: true},
+		res:  music.SearchResult{Playlists: []music.Playlist{{ID: "1", Name: "甲"}, {ID: "2", Name: "乙"}}, More: true, Skipped: 1},
 		page: paged{loaded: true, more: true},
 	}
 	a.open(r)
 	tt := ui.NewTester(a.view, 1200, 800)
 	tt.Frame()
 	tt.Frame()
-	if got := wait(t, asked, "the next page"); got != (searchRequest{"春日影", music.SearchPlaylists, 2}) {
+	if got := wait(t, asked, "the next page"); got != (searchRequest{"春日影", music.SearchPlaylists, 3}) {
 		t.Fatalf("asked for %+v", got)
 	}
 
