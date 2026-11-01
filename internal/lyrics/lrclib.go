@@ -8,26 +8,22 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 )
 
 // LRCLIB finds timed lyrics on LRCLIB (lrclib.net), an open library of
-// lyrics that needs no key (DESIGN.md §7), and keeps what it finds, and
-// what it doesn't, in Cache.
+// lyrics that needs no key (DESIGN.md §7).
 type LRCLIB struct {
 	HTTP *http.Client
 	// Base is LRCLIB's address, https://lrclib.net unless a test sets it.
 	Base string
-	// Cache is the directory of what was found, by track; none if empty.
-	Cache string
 
-	now   func() time.Time
 	pause time.Duration // before asking again a server too busy
 }
+
+func (l *LRCLIB) Name() string { return "lrclib" }
 
 // A Query is the track to find lyrics of.
 type Query struct {
@@ -39,9 +35,6 @@ type Query struct {
 }
 
 const (
-	// missAgain is how long a track with no lyrics waits before LRCLIB is
-	// asked again: someone may have added them.
-	missAgain = 7 * 24 * time.Hour
 	// near is how far apart a track and its lyrics' track can be in
 	// length: as LRCLIB's own matching allows, and a little more.
 	near = 3 * time.Second
@@ -64,30 +57,9 @@ type record struct {
 	SyncedLyrics string  `json:"syncedLyrics"`
 }
 
-// kept is what the cache keeps of a track: its timed lyrics in LRC, empty
-// when there are none, and when LRCLIB was asked.
-type kept struct {
-	At  time.Time
-	LRC string
-}
-
 // Find returns the timed lines of q, or none if LRCLIB has none, and an
-// error only if it couldn't be asked: that isn't kept, and asking again
-// may find them.
-func (l *LRCLIB) Find(ctx context.Context, q Query) ([]Line, error) {
-	now := time.Now
-	if l.now != nil {
-		now = l.now
-	}
-	// A track not named yet, as Soloist's first of a context another
-	// device plays, has nothing to look for: LRCLIB refuses it. It isn't
-	// kept, as the name may come.
-	if strings.TrimSpace(q.Name) == "" {
-		return nil, nil
-	}
-	if k, ok := l.load(q.ID); ok && (k.LRC != "" || now().Sub(k.At) < missAgain) {
-		return Build(k.LRC, "", ""), nil
-	}
+// error only if it couldn't be asked.
+func (l *LRCLIB) Find(ctx context.Context, q Query) (Found, error) {
 	lrc, err := l.lookup(ctx, q)
 	// What LRCLIB refuses it refuses again: kept as none, not asked again
 	// and again as if it were down.
@@ -95,10 +67,9 @@ func (l *LRCLIB) Find(ctx context.Context, q Query) ([]Line, error) {
 		lrc, err = "", nil
 	}
 	if err != nil {
-		return nil, err
+		return Found{}, err
 	}
-	l.store(q.ID, kept{now(), lrc})
-	return Build(lrc, "", ""), nil
+	return Found{LRC: lrc}, nil
 }
 
 // lookup asks LRCLIB for q's track as it is named, then searches for it,
@@ -150,25 +121,20 @@ func (l *LRCLIB) lookup(ctx context.Context, q Query) (string, error) {
 }
 
 // best is the one of found nearest q in length with timed lyrics, of q's
-// album if there are several as near: soundtracks and singles carry the
-// same song.
+// album if there are several as near.
 func best(found []record, q Query, near time.Duration) (record, bool) {
-	var out record
-	gap := near + 1
-	for _, r := range found {
-		if r.SyncedLyrics == "" || r.Instrumental {
-			continue
-		}
-		g := time.Duration(math.Abs(r.Duration*float64(time.Second) - float64(q.Duration)))
-		g = g.Round(500 * time.Millisecond)
-		if g > near {
-			continue
-		}
-		if g < gap || g == gap && strings.EqualFold(r.AlbumName, q.Album) && !strings.EqualFold(out.AlbumName, q.Album) {
-			out, gap = r, g
+	picks := make([]pick, len(found))
+	for i, r := range found {
+		picks[i] = pick{
+			Length:    time.Duration(r.Duration * float64(time.Second)),
+			Album:     r.AlbumName,
+			HasLyrics: r.SyncedLyrics != "" && !r.Instrumental,
 		}
 	}
-	return out, gap <= near
+	if i := nearestOf(picks, q, near); i >= 0 {
+		return found[i], true
+	}
+	return record{}, false
 }
 
 // added is what Spotify adds to a name that LRCLIB's track names mostly
@@ -240,41 +206,4 @@ func (l *LRCLIB) get(ctx context.Context, tries int, path string, query url.Valu
 		return err
 	}
 	return err
-}
-
-func (l *LRCLIB) file(id string) string {
-	if l.Cache == "" || id == "" || strings.ContainsAny(id, `/\.`) {
-		return ""
-	}
-	return filepath.Join(l.Cache, id+".json")
-}
-
-func (l *LRCLIB) load(id string) (kept, bool) {
-	var k kept
-	f := l.file(id)
-	if f == "" {
-		return k, false
-	}
-	b, err := os.ReadFile(f)
-	if err != nil || json.Unmarshal(b, &k) != nil {
-		return k, false
-	}
-	return k, true
-}
-
-func (l *LRCLIB) store(id string, k kept) {
-	f := l.file(id)
-	if f == "" {
-		return
-	}
-	b, err := json.Marshal(k)
-	if err != nil {
-		return
-	}
-	os.MkdirAll(filepath.Dir(f), 0o700)
-	// Written whole, then renamed: a crash leaves the old file.
-	tmp := f + ".tmp"
-	if os.WriteFile(tmp, b, 0o600) == nil {
-		os.Rename(tmp, f)
-	}
 }

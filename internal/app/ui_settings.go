@@ -149,6 +149,16 @@ func (a *app) settingsView(c *ui.Context) {
 					a.changed()
 				}
 			})
+			row("网易云音乐", "也从网易云音乐找：有逐字时间和翻译，中日文歌更全。这是它的桌面客户端接口，不是公开接口，可能失效", func() {
+				if ui.Switch(c.Key("lyrics-netease"), &s.LyricsNetEase).Label("网易云音乐").Changed() {
+					a.lyricsSourceChanged()
+				}
+			})
+			row("QQ 音乐", "也从 QQ 音乐找：有逐行歌词和翻译。这是它的网页接口，不是公开接口，可能失效；逐字歌词加密，用不了", func() {
+				if ui.Switch(c.Key("lyrics-qq"), &s.LyricsQQ).Label("QQ 音乐").Changed() {
+					a.lyricsSourceChanged()
+				}
+			})
 		})
 
 		// Only on macOS, the one with a notch player.

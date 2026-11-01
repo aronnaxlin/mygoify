@@ -4,13 +4,16 @@
 
 ## 1. 现状
 
-- 唯一的歌词源是 [LRCLIB](https://lrclib.net)：开放、免 key，只取逐行同步的 `syncedLyrics`。
+> 2026-11-01 起有三个源，`lyrics.Sources` 组合，见 DESIGN §7。本节保留接入前的基线。
+
+- 第一版只有 [LRCLIB](https://lrclib.net)：开放、免 key，只取逐行同步的 `syncedLyrics`。
 - 已点赞歌曲抽 50 首（中日英混合，2026-11-01）：找到 32 首，LRCLIB 没有 7 首，网络错误 11 首。
   - 网络错误是 503 或连接断开，每首约 15 秒后放弃。
   - 耗时中位数约 2 秒，p90 约 15 秒。
 - 没有逐字歌词：LRCLIB 只给逐行时间。界面上的逐字动画用的是平摊出来的假时间，见 §6.3。
 - 兜底已经做了：预取下一首、后台重试、骨架屏最多 4 秒、可换 LRCLIB 地址（§5）。
 - 加别的源，就是为了补上这两块：LRCLIB 没有的歌，以及逐字时间和翻译。
+- 现在：网易云（默认开，逐字 YRC + 翻译）和 QQ 音乐（默认关，逐行 + 翻译）已接上；同一天再抽 50 首，至少一个源找到 49 首，数字见 DESIGN §7。
 
 ## 2. 红线和已定的事
 
@@ -26,18 +29,18 @@
   - 真要接，做成设置里**默认关闭**、由用户自己打开的选项，并在 DESIGN §7 写清楚风险。
   - **不做 QRC 解密**：QQ 音乐的逐字歌词是加密的。
   - **不用 `sp_dc`**。
-- 用户这次说的是"完善其他歌词源"。具体接哪些、默认开不开，要先让用户确认。
+- 2026-11-01 用户定了：**网易云默认开，QQ 音乐默认关**，先做这两个；酷狗、Musixmatch、Apple Music 不做（KRC 要解码、Musixmatch 要非官方 token、Apple 要用户自己的订阅 token）。
 
 **候选来源（参考 [Lyricify Lyrics Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper)，Apache-2.0）**
 
 | 来源 | 凭据 | 能拿到什么 | 备注 |
 |---|---|---|---|
 | LRCLIB | 无 | 逐行、纯文本 | 已接。官方开放 |
-| 网易云 | 无 | 逐行 LRC、逐字 YRC、翻译 | 非公开接口。`lyrics.Build` 现成支持 YRC 和翻译（从 cloudmusic 继承） |
-| QQ 音乐 | 无 | 逐行、逐字 QRC（加密）、翻译 | 逐字要解密，不做 |
-| 酷狗 | 无 | 逐字 KRC | 非公开接口；KRC 也要解码 |
-| Musixmatch | 非官方 user token | 逐行、逐字、翻译 | 官方 API 免费档只给预览；完整同步歌词要签商用授权，起价据二手资料约 2.5 万美元 |
-| Apple Music | 用户的 Media User Token | TTML 逐字 | 要用户自己的订阅 token |
+| 网易云 | 无 | 逐行 LRC、逐字 YRC、翻译 | 已接，默认开。非公开接口；`Build` 现成支持 YRC 和翻译（从 cloudmusic 继承） |
+| QQ 音乐 | 无 | 逐行 LRC、翻译 | 已接，默认关。逐字是 QRC（加密），不做 |
+| 酷狗 | 无 | 逐字 KRC | 不做：KRC 也要解码，中文库和网易云重叠 |
+| Musixmatch | 非官方 user token | 逐行、逐字、翻译 | 不做：官方 API 免费档只给预览；完整同步歌词要签商用授权，起价据二手资料约 2.5 万美元 |
+| Apple Music | 用户的 Media User Token | TTML 逐字 | 不做：要用户自己的订阅 token |
 | Spotify | `sp_dc` | 逐字、逐行 | **不做** |
 
 上游 egoist/mygo-cloudmusic 有网易云取歌词的代码，在提交 eb97f6d 里随 `internal/netease` 一起删掉了。只剩解析部分：`parseYRC`、`Build` 的翻译合并。
@@ -48,12 +51,15 @@
 
 | 位置 | 作用 |
 |---|---|
-| `internal/lyrics/lyrics.go` | 数据模型和解析：`Line`、`Word`、`parseLRC`、`parseYRC`、`Build(lrc, translation, yrc)`、`SpreadWords`、`Index`、`Quiets`、`IsCredit` |
-| `internal/lyrics/lrclib.go` | LRCLIB 客户端：`LRCLIB.Find(ctx, Query)`、匹配（`lookup`、`best`、`bareName`）、重试（`get`）、磁盘缓存（`load`、`store`） |
-| `internal/lyrics/lrclib_test.go` | 用 httptest 假服务器测匹配、缓存、503 |
-| `internal/app/lyrics.go` | App 这边的接入：`fetchLyrics`（包变量）、`useLRCLIB`、`playbackChanged`、`askLyrics`、`currentLyrics`、`setLyrics` |
+| `internal/lyrics/lyrics.go` | 数据模型和解析：`Line`、`Word`、`parseLRC`（含增强 LRC 的 `<mm:ss.xx>`）、`parseYRC`、`Build(lrc, translation, yrc)`、`SpreadWords`、`Index`、`Quiets`、`IsCredit` |
+| `internal/lyrics/sources.go` | `Source` 接口、`Found`、组合层 `Sources`（挑逐字/逐行/翻译）、匹配（`pick`、`nearestOf`）、磁盘缓存（`load`、`store`） |
+| `internal/lyrics/lrclib.go` | LRCLIB 客户端：`lookup`、`best`、`bareName`、重试（`get`） |
+| `internal/lyrics/netease.go` | 网易云：搜索、eapi 签名（`eapiSign`）、一次取 LRC + 翻译 + YRC |
+| `internal/lyrics/qq.go` | QQ 音乐：mobile 搜索、`fcg_query_lyric_new.fcg`、base64 + HTML 实体 |
+| `internal/lyrics/*_test.go` | 用 httptest 假服务器测匹配、缓存、错误；`netease_test.go` 里有一份 eapi 签名的已知答案 |
+| `internal/app/lyrics.go` | App 这边的接入：`fetchLyrics`（包变量）、`lyricsSources`、`useLyricSources`、`playbackChanged`、`askLyrics`、`currentLyrics`、`setLyrics` |
 | `internal/app/lyrics_test.go` | `newLyricsRig`：手动驱动请求、post 和定时器，测兜底 |
-| `internal/app/app.go:217` | 连上 Spotify 后调用 `useLRCLIB()`；假曲库（`go tool mygo dev` 没配置时）不接，`fetchLyrics` 一直返回空 |
+| `internal/app/app.go:217` | 连上 Spotify 后调用 `useLyricSources()`；假曲库（`go tool mygo dev` 没配置时）不接，`fetchLyrics` 一直返回空 |
 | `internal/app/app.go:221` | `a.pl.Changed = a.playbackChanged` |
 | `internal/app/settings.go` | `settings.LyricsServer` |
 | `internal/app/ui_settings.go:~141` | 设置页"歌词"分组 |
@@ -71,10 +77,10 @@
    - 按 `PlayOrder()` 找到下一首，也调 `askLyrics`，结果只为写进磁盘缓存。
 3. `askLyrics`：
    - 用 `a.lyrAsking` 去重，同一首同时只问一次；
-   - 在主线程读出 `a.settings.LyricsServer`，然后开 goroutine 调 `fetchLyrics(track, server)`；
+   - 在主线程读出 `a.settings` 里的 `lyricsSources`（服务器地址和两个开关），然后开 goroutine 调 `fetchLyrics(track, src)`；
    - 结果通过 `a.post` 回到主线程：不是当前曲目就丢掉；是的话设 `lines` 和 `loaded=true`；出错就按 `lyricsRetries` 排一次重试（30 秒、1 分钟、2 分钟）。
-4. `fetchLyrics` 由 `useLRCLIB` 设置。它新建一个 `lyrics.LRCLIB`（共用一个 20 秒超时的 `http.Client`），在 1 分钟的 ctx 下调 `Find`。
-5. `Find` 先查磁盘缓存，没有再查 LRCLIB，查到后存缓存，最后用 `Build(lrc, "", "")` 转成 `[]Line`。
+4. `fetchLyrics` 由 `useLyricSources` 设置。它按设置拼出 `lyrics.Sources`（网易云在前，LRCLIB 其次，QQ 打开时加在最后），共用一个 20 秒超时的 `http.Client`，在 1 分钟的 ctx 下调 `Find`。
+5. `Sources.Find` 先查磁盘缓存；没有再同时问所有源，挑逐字、逐行和翻译，存缓存，最后用 `Build` 转成 `[]Line`。拿到逐字时间和翻译就立刻返回，取消其余请求；只有逐字或只有逐行时再等 1.5 秒看有没有更好的，到点就返回，不必等 LRCLIB 超时——网易云 0.3 秒找到的歌词不该晚一分钟才显示。
 
 **返回值约定（加源时要保持）**
 - `lines, nil`：有歌词。
@@ -98,9 +104,10 @@
 - LRCLIB 要求带 User-Agent，现在发的是 `MyGoify (https://github.com/aronnaxlin/mygoify)`。
 - 艺人名写法不同：Spotify 写 `Rene Liu`、`Hebe Tien`，LRCLIB 写 `刘若英`、`田馥甄`，所以有第 4 步。
 - 数据质量：有的条目是繁体中文；有的在 00:00 放一行标题或制作人员。`IsCredit` 只认"作词："这类格式。
-- **缓存**：
-  - 位置：`os.UserCacheDir()/mygoify/lyrics/<Spotify 曲目 ID>.json`，内容是 `{"At": 时间, "LRC": "…"}`。
-  - `LRC` 不为空就一直留着；为空表示"没有"，7 天后再问；错误不缓存。
+- **缓存**（2026-11-01 起在组合层 `lyrics.Sources`）：
+  - 位置：`os.UserCacheDir()/mygoify/lyrics/<Spotify 曲目 ID>.json`，内容是 `{"At", "LRC", "Translation", "YRC", "Source", "Asked"}`。
+  - `LRC` 或 `YRC` 不为空就一直留着；都为空表示"没有"，7 天后再问，且 `Asked`（写的时候启用了哪些源）和当前开关不一致时立即重问；错误不缓存。
+  - 旧文件只有 `At` 和 `LRC`，照读；`Asked` 空当作只有 lrclib。
   - 写入时先写 `.tmp` 再改名，文件权限 0600。
   - 曲目 ID 含 `/`、`\` 或 `.` 时不缓存（防路径穿越）。
 - 时长：`music.Track.Duration` 是毫秒，`Query.Duration` 是 `time.Duration`。
@@ -108,7 +115,7 @@
 
 ## 6. 加新源要改的地方
 
-### 6.1 建议的结构
+### 6.1 建议的结构（2026-11-01 已按此实现）
 
 现在只有一个具体类型 `LRCLIB`，缓存也写在它里面。加源前先抽出来：
 
@@ -182,7 +189,7 @@ type Found struct {
 
 ## 8. 实测命中率
 
-- 用户的已点赞歌曲缓存在 `~/Library/Caches/mygoify/spotify/<用户 ID>/liked.json`，`V.Tracks` 里约 2000 首。这是用户的曲目信息，不是密钥。
+- 用户的已点赞歌曲缓存在 `~/Library/Caches/mygoify/spotify/<用户 ID>/liked.json`（Linux 上是 `~/.cache/mygoify/spotify/<用户 ID>/liked.json`），`V.Tracks` 里约 2000 首。这是用户的曲目信息，不是密钥。
 - 之前的做法：
   1. 从里面随机抽 50 首，把名字、艺人、专辑、时长写进 scratchpad。
   2. 写一个临时 `_test.go`，用环境变量控制开关，对每首调 `Find` 并记录结果和耗时。

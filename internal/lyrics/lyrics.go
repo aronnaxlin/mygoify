@@ -30,7 +30,12 @@ type Word struct {
 	Start, End time.Duration
 }
 
-var lrcTime = regexp.MustCompile(`\[(\d+):(\d+)(?:[.:](\d+))?\]`)
+var (
+	lrcTime = regexp.MustCompile(`\[(\d+):(\d+)(?:[.:](\d+))?\]`)
+	// lrcWordTime is when a word is sung, in the enhanced LRC that times
+	// words: "[00:12.00]春日影 <00:12.00>春<00:12.50>日影".
+	lrcWordTime = regexp.MustCompile(`<(\d+):(\d+)(?:[.:](\d+))?>`)
+)
 
 // parseLRC reads lyrics in the LRC format, as NetEase serves them: a line
 // may carry several times, and credits come as lines of their own.
@@ -43,23 +48,58 @@ func parseLRC(lrc string) []Line {
 		}
 		text := strings.TrimSpace(raw[times[len(times)-1][1]:])
 		for _, m := range times {
-			min, _ := strconv.Atoi(raw[m[2]:m[3]])
-			sec, _ := strconv.Atoi(raw[m[4]:m[5]])
-			var frac time.Duration
-			if m[6] >= 0 {
-				f := raw[m[6]:m[7]]
-				n, _ := strconv.Atoi(f)
-				frac = time.Duration(n) * time.Second
-				for range len(f) {
-					frac /= 10
-				}
-			}
-			at := time.Duration(min)*time.Minute + time.Duration(sec)*time.Second + frac
-			out = append(out, Line{At: at, Text: text})
+			out = append(out, timed(text, tagTime(raw, m)))
 		}
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].At < out[j].At })
 	return out
+}
+
+// tagTime is when what tag m of raw is, at a minute and a second with their
+// fraction, of as many digits as there are.
+func tagTime(raw string, m []int) time.Duration {
+	min, _ := strconv.Atoi(raw[m[2]:m[3]])
+	sec, _ := strconv.Atoi(raw[m[4]:m[5]])
+	var frac time.Duration
+	if m[6] >= 0 {
+		f := raw[m[6]:m[7]]
+		n, _ := strconv.Atoi(f)
+		frac = time.Duration(n) * time.Second
+		for range len(f) {
+			frac /= 10
+		}
+	}
+	return time.Duration(min)*time.Minute + time.Duration(sec)*time.Second + frac
+}
+
+// timed returns the line of text sung at at, its words timed if it marks
+// them, as enhanced LRC does.
+func timed(text string, at time.Duration) Line {
+	l := Line{At: at, Text: strings.TrimSpace(lrcWordTime.ReplaceAllString(text, ""))}
+	marks := lrcWordTime.FindAllStringSubmatchIndex(text, -1)
+	if len(marks) == 0 {
+		return l
+	}
+	l.Timed = true
+	for i, m := range marks {
+		end := len(text)
+		if i+1 < len(marks) {
+			end = marks[i+1][0]
+		}
+		w := strings.TrimSpace(text[m[1]:end])
+		if w == "" {
+			continue
+		}
+		start := tagTime(text, m)
+		// The last word ends where its line does, which Build knows.
+		l.Words = append(l.Words, Word{Text: w, Start: start, End: start})
+	}
+	if len(l.Words) > 0 {
+		for i := 0; i+1 < len(l.Words); i++ {
+			l.Words[i].End = l.Words[i+1].Start
+		}
+	}
+	return l
 }
 
 var (
@@ -127,7 +167,13 @@ func Build(lrc, translation, yrc string) []Line {
 				end = min(end, lines[i+1].At)
 			}
 			lines[i].End = end
-			lines[i].Words = SpreadWords(lines[i].Text, lines[i].At, end)
+			words := lines[i].Words
+			switch {
+			case len(words) == 0:
+				lines[i].Words = SpreadWords(lines[i].Text, lines[i].At, end)
+			case words[len(words)-1].End <= words[len(words)-1].Start:
+				words[len(words)-1].End = end
+			}
 		}
 	}
 	// Translations go to the line nearest their time: word-timed lines
