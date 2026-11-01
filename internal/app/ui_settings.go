@@ -138,6 +138,14 @@ func (a *app) settingsView(c *ui.Context) {
 			})
 		})
 
+		group("歌词", func() {
+			row("歌词服务器", "从这个 LRCLIB 地址获取歌词；lrclib.net 连不上时，可换成镜像或自建的", func() {
+				if ui.TextInput(c.Key("lyrics-server"), &s.LyricsServer).Placeholder("https://lrclib.net").Label("歌词服务器").FontSize(13).Width(200).Changed() {
+					a.changed()
+				}
+			})
+		})
+
 		// Only on macOS, the one with a notch player.
 		if a.notch != nil {
 			group("刘海播放器", func() {

@@ -52,6 +52,9 @@ type settings struct {
 	// CloseQuits quits the app as its window closes, rather than hiding
 	// it with the music playing on.
 	CloseQuits bool `json:"closeQuits,omitempty"`
+	// LyricsServer is the address of the LRCLIB lyrics are asked of, or
+	// empty for lrclib.net: another can stand in while it is down.
+	LyricsServer string `json:"lyricsServer,omitempty"`
 	// SearchHistory keeps submitted keywords, most recent first.
 	SearchHistory []string `json:"searchHistory,omitempty"`
 	// Spotify is what the app logs in with and plays through, as
