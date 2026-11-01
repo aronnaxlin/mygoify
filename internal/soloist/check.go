@@ -213,7 +213,8 @@ func (r *refusal) Write(p []byte) (int, error) {
 			break
 		}
 		s := string(r.line[:i])
-		if strings.Contains(s, "oauth_invalid_credentials") || strings.Contains(s, "Access denied") {
+		// Spotify's refusal, or Soloist's own of a key that is no key.
+		if strings.Contains(s, "oauth_invalid_credentials") || strings.Contains(s, "Access denied") || strings.Contains(s, "make sure --api-key is valid") {
 			r.hit = true
 		}
 		if r.key != "" {

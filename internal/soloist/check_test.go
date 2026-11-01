@@ -20,8 +20,9 @@ import (
 
 // The test binary stands in for Soloist as CheckKey runs it, with
 // FAKE_SOLOIST set: the key "good" logs in; "bad" is refused, and the
-// pairing in its data deleted as Soloist deletes it; any other never
-// logs in.
+// pairing in its data deleted as Soloist deletes it; "garbled" is
+// refused as Soloist refuses a key that is no key at all; any other
+// never logs in.
 func TestMain(m *testing.M) {
 	if os.Getenv("FAKE_SOLOIST") != "" {
 		keyCheckSoloist()
@@ -40,6 +41,9 @@ func keyCheckSoloist() {
 	if *key == "bad" {
 		fmt.Println("Permanent OAuth error: oauth_invalid_credentials")
 		os.RemoveAll(filepath.Join(*data, "settings", "Users"))
+	}
+	if *key == "garbled" {
+		fmt.Println("2026-11-01 20:41:29.939: login failed: make sure --api-key is valid")
 	}
 	ln, _ := net.Listen("tcp", "127.0.0.1:0")
 	os.WriteFile(filepath.Join(*data, "ws.addr"), []byte("127.0.0.1"), 0o600)
@@ -100,6 +104,21 @@ func TestCheckKeyTimesOut(t *testing.T) {
 	err := CheckKey(context.Background(), bin, "quiet-key", pairedData(t))
 	if err == nil || errors.Is(err, ErrBadKey) || strings.Contains(err.Error(), "quiet-key") {
 		t.Errorf("err %v, want a timeout that doesn't name the key", err)
+	}
+}
+
+// A key that is no key at all is told apart at once. Soloist refuses it
+// in other words than one Spotify refuses, which CheckKey didn't know:
+// it waited out the 30 seconds, the music stopped meanwhile, and the
+// listener was told Soloist didn't start rather than that the key was
+// wrong.
+func TestCheckKeyGarbled(t *testing.T) {
+	t.Setenv("FAKE_SOLOIST", "1")
+	defer func(d time.Duration) { checkWait = d }(checkWait)
+	checkWait = 5 * time.Second
+	bin, _ := os.Executable()
+	if err := CheckKey(context.Background(), bin, "garbled", pairedData(t)); !errors.Is(err, ErrBadKey) {
+		t.Errorf("err %v, want ErrBadKey", err)
 	}
 }
 
