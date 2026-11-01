@@ -490,6 +490,10 @@ func summary(data []byte) string {
 	}
 	if ev.Item != nil {
 		s += fmt.Sprintf(" %q", ev.Item.Decorations.Identity.Name)
+		// What Soloist leaves out of a track it doesn't name, to see.
+		if ev.Item.Decorations.Identity.Name == "" {
+			s += " " + string(rawItem(data))
+		}
 	}
 	if p := ev.Position; p != nil {
 		s += fmt.Sprintf(" at %dms speed %g", p.PositionMs, p.Speed)
@@ -498,6 +502,13 @@ func summary(data []byte) string {
 		s += " " + ev.Message
 	}
 	return s
+}
+
+// rawItem is the item of an event as Soloist sent it.
+func rawItem(data []byte) json.RawMessage {
+	var ev struct{ Item json.RawMessage }
+	json.Unmarshal(data, &ev)
+	return ev.Item
 }
 
 func (b *Backend) command(name string, args ...any) error {

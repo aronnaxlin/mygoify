@@ -79,10 +79,21 @@ func (l *LRCLIB) Find(ctx context.Context, q Query) ([]Line, error) {
 	if l.now != nil {
 		now = l.now
 	}
+	// A track not named yet, as Soloist's first of a context another
+	// device plays, has nothing to look for: LRCLIB refuses it. It isn't
+	// kept, as the name may come.
+	if strings.TrimSpace(q.Name) == "" {
+		return nil, nil
+	}
 	if k, ok := l.load(q.ID); ok && (k.LRC != "" || now().Sub(k.At) < missAgain) {
 		return Build(k.LRC, "", ""), nil
 	}
 	lrc, err := l.lookup(ctx, q)
+	// What LRCLIB refuses it refuses again: kept as none, not asked again
+	// and again as if it were down.
+	if errors.Is(err, errRefused) {
+		lrc, err = "", nil
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +182,7 @@ func bareName(name string) string {
 var (
 	errNotFound = errors.New("lyrics: not on LRCLIB")
 	errBusy     = errors.New("lyrics: LRCLIB is busy")
+	errRefused  = errors.New("lyrics: LRCLIB refused the query")
 )
 
 // get asks LRCLIB at path, decoding its answer into v, up to tries times
@@ -216,6 +228,9 @@ func (l *LRCLIB) get(ctx context.Context, tries int, path string, query url.Valu
 			res.Body.Close()
 			err = fmt.Errorf("%w: %s", errBusy, res.Status)
 			continue
+		case res.StatusCode == http.StatusBadRequest:
+			res.Body.Close()
+			return errRefused
 		case res.StatusCode != http.StatusOK:
 			res.Body.Close()
 			return fmt.Errorf("lyrics: LRCLIB: %s", res.Status)
