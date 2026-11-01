@@ -17,6 +17,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"mygoify/internal/levels"
 	"mygoify/internal/library"
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
@@ -470,5 +471,62 @@ func TestPauseAndWait(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("still waiting once Soloist paused")
+	}
+}
+
+// Soloist restarting as another process, the backend stops hearing the
+// one gone and taps the new one as it plays.
+func TestTapsSoloistAgain(t *testing.T) {
+	type tapped struct {
+		pid     int
+		stopped chan struct{}
+	}
+	taps := make(chan tapped, 4)
+	old := tapProcess
+	defer func() { tapProcess = old }()
+	tapProcess = func(pid int, m *levels.Meter) (func(), error) {
+		tp := tapped{pid, make(chan struct{})}
+		taps <- tp
+		return func() { close(tp.stopped) }, nil
+	}
+	wait := func(what string, ch <-chan struct{}) {
+		t.Helper()
+		select {
+		case <-ch:
+		case <-time.After(2 * time.Second):
+			t.Fatal(what)
+		}
+	}
+	next := func() tapped {
+		t.Helper()
+		select {
+		case tp := <-taps:
+			return tp
+		case <-time.After(2 * time.Second):
+			t.Fatal("not tapped")
+			return tapped{}
+		}
+	}
+
+	f := newFakeSoloist(t)
+	os.WriteFile(filepath.Join(f.dir, "soloist.pid"), []byte("4242\n"), 0o600)
+	b := New(Config{DataDir: f.dir})
+	watch(b)
+	f.connected(t, 1)
+	f.send(t, `{"type":"playback_changed","status":"playing"}`)
+	first := next()
+	if first.pid != 4242 {
+		t.Fatalf("tapped %d, want 4242", first.pid)
+	}
+
+	os.WriteFile(filepath.Join(f.dir, "soloist.pid"), []byte("4343\n"), 0o600)
+	f.mu.Lock()
+	f.conn.CloseNow()
+	f.mu.Unlock()
+	wait("the tap of the Soloist gone wasn't stopped", first.stopped)
+	f.connected(t, 2)
+	f.send(t, `{"type":"playback_changed","status":"playing"}`)
+	if again := next(); again.pid != 4343 {
+		t.Fatalf("tapped %d again, want 4343", again.pid)
 	}
 }

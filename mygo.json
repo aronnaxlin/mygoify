@@ -10,7 +10,10 @@
   },
   "macos": {
     "icon": "icon/AppIcon.icon",
-    "minimumSystemVersion": "13.0"
+    "minimumSystemVersion": "13.0",
+    "infoPlist": {
+      "NSAudioCaptureUsageDescription": "MyGoify 听 Soloist 正在播放的声音，只在内存里分析频谱，让音柱和背景随音乐起伏；不保存，也不发送到任何地方。"
+    }
   },
   "linux": {
     "comment": "第三方 Spotify 桌面客户端",

@@ -35,7 +35,7 @@
 - [x] 新建 `internal/music`（数据模型）、`internal/library`、`internal/playback`（接口 + 假实现）
 - [x] 新建 `internal/auth`（PKCE，从 `cmd/poc` 挪入；接入 App 和存进钥匙串在 M2）
 - [x] 界面全部改为只依赖接口，能在假数据下运行和测试
-- [ ] 音频可视化（播放条音柱、刘海音柱、背景随低音起伏的雾）：Soloist 不提供音频数据，`Levels()` 暂无数据，界面退回空闲动画；以后考虑按节奏模拟
+- [ ] 音频可视化（播放条音柱、刘海音柱、背景随低音起伏的雾）（macOS 已完成：process tap 听 Soloist 的声音算频谱，DESIGN §4.5；Linux 未做，打算读 PipeWire 里 Soloist 的流）
 - [x] 测试规范沿用 cloudmusic 的 `AGENTS.md`（测试改用 `stubLib` 和播放器夹具）
 - [x] CI：`go test ./...`，Linux 和 macOS 都要 `CGO_ENABLED=0` 交叉编译通过（`.github/workflows/ci.yml`）
 - [x] 在假数据上重建截图工具：`NM_SHOTS=<目录> go run .`（`internal/app/debug_shots.go`）
@@ -60,6 +60,7 @@
 - [x] 少用 Web API 播放：从头播放专辑或歌单走 WebSocket；Soloist 的设备 ID 存盘，启动时不再查设备列表；限流时点中间某一首直接提示"限流中"，不退回本地播放，以免打乱其他设备的播放来源和队列；空闲时不发请求的测试（DESIGN §4.2）
 - [x] MPRIS / Now Playing、媒体键（mygo 内置）
 - [x] 关窗口缩到托盘（菜单栏或通知区域图标、托盘菜单；没有托盘的 Linux 桌面上关窗口直接退出）
+- [ ] 只开一个实例：再启动时把已开的窗口叫到前面，自己退出。现在没有拦（2026-11-01 `go tool mygo dev` 一次起了两个，都连着 Soloist、都能发命令）；打包的 `.app` 双击时系统会切到已开的那个，dev 和直接运行可执行文件时没有
 
 **退出条件**：新用户按引导页从零走完，能播放一首歌，媒体键可用。
 
@@ -77,6 +78,7 @@
 - [x] 歌单编辑（只限自己的）：新建、改名、添加、删除曲目
 - [x] 专辑页、艺人页（专辑列表 + 用搜索拼出的"热门"）
 - [x] 歌曲右键菜单：加入队列、加入歌单、去专辑、去艺人、复制链接
+- [ ] 为你推荐（daylist、Discover Weekly、Daily Mix）：开发模式的 Web API 对 `37i9` 个性化歌单返回 404，改走 Soloist。2026-11-01 实测：按 URI `play` 能播 daylist（`37i9dQZF1EP…`，从最近播放里拿到）和 Discover Weekly（`37i9dQZEVX…`，用户贴的分享链接）；context 事件带名字（Discover Weekly 刚开播的一两个事件里为空），不带封面；`get_queue` 列出全部曲目（来源都是 `context`）。封面：oEmbed（`open.spotify.com/oembed`，免 token）给 Discover Weekly 官方封面，daylist 只给通用名和默认图，对不上当期，退回曲目封面拼图。Daily Mix 未测（缺链接）。链接当作会过期的缓存：Discover Weekly、daylist 每个账号一个、ID 应该稳定（未验证）；Daily Mix 按口味分组，可能换 ID 或消失；链接只属于当前账号。做法：从最近播放和 Soloist 的 context 事件里认出 `37i9` 歌单就记下或更新，按账号存；失效时卡片上提示重新粘贴分享链接，不报错；加 `MYGOIFY_REAL` 测试定期检查记下的链接还能不能播。动手前先改 DESIGN.md:180
 
 **退出条件**：日常听歌不需要打开官方客户端；连续使用 1 小时不触发 `QUOTA_EXCEEDED`。
 

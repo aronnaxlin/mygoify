@@ -401,6 +401,10 @@ func (p *Player) Duration() time.Duration {
 }
 
 // Levels returns the spectrum of what plays now, and false when there is
-// none to show. Spotify's players keep their audio to themselves: there
-// is none.
-func (p *Player) Levels() ([Bands]float32, bool) { return [Bands]float32{}, false }
+// none to show: from the backend, if it hears what it plays.
+func (p *Player) Levels() ([Bands]float32, bool) {
+	if l, ok := p.b.(interface{ Levels() ([Bands]float32, bool) }); ok {
+		return l.Levels()
+	}
+	return [Bands]float32{}, false
+}
