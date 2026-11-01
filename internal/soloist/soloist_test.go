@@ -556,3 +556,32 @@ func TestTapsSoloistAgain(t *testing.T) {
 		t.Fatalf("tapped %d again, want 4343", again.pid)
 	}
 }
+
+// Going back plays the track before however far this one has played:
+// Soloist's skip_prev starts a track a few seconds in again, and the
+// listener had to press twice, the app showing the track before and then
+// this one again. A Soloist that doesn't play isn't sent seeking, which
+// would move another device's playback.
+func TestPrevGoesBack(t *testing.T) {
+	f := newFakeSoloist(t)
+	b := New(Config{DataDir: f.dir, DeviceName: "MyGoify"})
+	active(t, f, b)
+	if err := b.Prev(); err != nil {
+		t.Fatal(err)
+	}
+	if cmd := f.next(t); cmd["command"] != "seek" || cmd["position_ms"] != float64(0) {
+		t.Fatalf("sent %v first, want a seek to the start", cmd)
+	}
+	if cmd := f.next(t); cmd["command"] != "skip_prev" {
+		t.Fatalf("sent %v, want skip_prev", cmd)
+	}
+
+	f.send(t, `{"type":"device_changed","is_active":false}`)
+	states := watch(b)
+	f.send(t, `{"type":"playback_state","status":"paused"}`)
+	until(t, states, func(playback.State) bool { b.mu.Lock(); defer b.mu.Unlock(); return !b.active })
+	go b.Prev()
+	if cmd := f.next(t); cmd["command"] == "seek" {
+		t.Fatal("seeked the playback of another device")
+	}
+}

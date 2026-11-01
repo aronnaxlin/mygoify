@@ -267,3 +267,29 @@ func TestSourcesReadOlderKept(t *testing.T) {
 }
 
 var timeless = "[00:01.00]春日影\n"
+
+// Of tracks as long as the one asked for, to the second, the song itself
+// wins over a sped-up cover a little nearer. Spotify's queue gave 麥恩莉
+// as 288 seconds, and "麦恩莉(1.2X)", 0.2 seconds off, beat the song
+// itself, 0.36 seconds off: its lyrics didn't keep time.
+func TestNearestOfPrefersTheSong(t *testing.T) {
+	q := Query{Name: "麥恩莉", Album: "回到未來", Duration: 288 * time.Second}
+	picks := []pick{
+		{Name: "麦恩莉 (Cover 方大同)", Length: 288 * time.Second, HasLyrics: true},
+		{Name: "麦恩莉", Album: "回到未来", Length: 288360 * time.Millisecond, HasLyrics: true},
+		{Name: "麦恩莉(1.2X)", Length: 288206 * time.Millisecond, HasLyrics: true},
+		{Name: "麦恩莉", Length: 288360 * time.Millisecond, HasLyrics: true},
+	}
+	if i := nearestOf(picks, q, near); i != 1 {
+		t.Errorf("chose %q, want the song itself", picks[i].Name)
+	}
+	// Asked for a live take, a live take is the song.
+	live := Query{Name: "麥恩莉 (Live)", Duration: 288 * time.Second}
+	picks = []pick{
+		{Name: "麦恩莉", Length: 288 * time.Second, HasLyrics: true},
+		{Name: "麦恩莉 (Live)", Length: 288 * time.Second, HasLyrics: true},
+	}
+	if i := nearestOf(picks, live, near); i != 1 {
+		t.Errorf("asked for a live take, chose %q", picks[i].Name)
+	}
+}

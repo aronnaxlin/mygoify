@@ -66,6 +66,7 @@ func (q *QQ) Find(ctx context.Context, query Query) (Found, error) {
 		picks := make([]pick, len(songs))
 		for i, s := range songs {
 			picks[i] = pick{
+				Name:      qqHighlight.Replace(s.Name),
 				Length:    time.Duration(s.Interval * float64(time.Second)),
 				Album:     qqHighlight.Replace(s.Album.Name),
 				HasLyrics: s.Mid != "",

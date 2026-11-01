@@ -83,6 +83,7 @@ func (n *NetEase) Find(ctx context.Context, q Query) (Found, error) {
 		picks := make([]pick, len(songs))
 		for i, s := range songs {
 			picks[i] = pick{
+				Name:      s.Name,
 				Length:    time.Duration(s.Duration * float64(time.Millisecond)),
 				Album:     s.Album.Name,
 				HasLyrics: true,
