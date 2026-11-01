@@ -20,10 +20,18 @@ type lyricsState struct {
 	loaded bool
 }
 
-// fetchLyrics finds a track's timed lyrics, or none, on the lyrics server
-// chosen in the settings; tests replace it. Made-up music has none:
-// Spotify's, from LRCLIB (useLRCLIB).
-var fetchLyrics = func(tr music.Track, server string) ([]lyrics.Line, error) { return nil, nil }
+// lyricsSources is what the settings say of where a track's lyrics are
+// asked: the LRCLIB server to ask, and the sources the listener turned on.
+type lyricsSources struct {
+	Server  string
+	NetEase bool
+	QQ      bool
+}
+
+// fetchLyrics finds a track's timed lyrics, or none, on the lyrics
+// sources chosen in the settings; tests replace it. Made-up music has
+// none: Spotify's, from them (useLyricSources).
+var fetchLyrics = func(tr music.Track, src lyricsSources) ([]lyrics.Line, error) { return nil, nil }
 
 // lyricsLater runs f after d, off the main thread; tests run it by hand.
 var lyricsLater = func(d time.Duration, f func()) { time.AfterFunc(d, f) }
@@ -38,23 +46,48 @@ const lyricsWait = 4 * time.Second
 // for.
 var lyricsRetries = []time.Duration{30 * time.Second, time.Minute, 2 * time.Minute}
 
-// useLRCLIB has fetchLyrics ask LRCLIB, keeping what it finds in the
-// cache directory.
-func useLRCLIB() {
+// useLyricSources has fetchLyrics ask the lyrics sources, keeping what
+// they find in the cache directory.
+func useLyricSources() {
 	client := &http.Client{Timeout: 20 * time.Second}
 	var cache string
 	if c, err := os.UserCacheDir(); err == nil {
 		cache = filepath.Join(c, "mygoify", "lyrics")
 	}
-	fetchLyrics = func(tr music.Track, server string) ([]lyrics.Line, error) {
-		l := &lyrics.LRCLIB{HTTP: client, Base: strings.TrimRight(strings.TrimSpace(server), "/"), Cache: cache}
+	fetchLyrics = func(tr music.Track, src lyricsSources) ([]lyrics.Line, error) {
+		// NetEase first: it has word-timed lines, and translations, where
+		// LRCLIB has neither (DESIGN.md §7).
+		s := &lyrics.Sources{Cache: cache}
+		if src.NetEase {
+			s.All = append(s.All, &lyrics.NetEase{HTTP: client})
+		}
+		s.All = append(s.All, &lyrics.LRCLIB{HTTP: client, Base: strings.TrimRight(strings.TrimSpace(src.Server), "/")})
+		if src.QQ {
+			s.All = append(s.All, &lyrics.QQ{HTTP: client})
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 		q := lyrics.Query{ID: tr.ID, Name: tr.Name, Album: tr.Album.Name, Duration: time.Duration(tr.Duration) * time.Millisecond}
 		if len(tr.Artists) > 0 {
 			q.Artist = tr.Artists[0].Name
 		}
-		return l.Find(ctx, q)
+		return s.Find(ctx, q)
+	}
+}
+
+// lyricsSourceChanged saves a change of the sources lyrics are asked of,
+// and asks again for those of the track playing if none show: the source
+// turned on may have them.
+func (a *app) lyricsSourceChanged() {
+	a.changed()
+	a.askLyricsIfNone()
+}
+
+// askLyricsIfNone asks again for the lyrics of the track playing, if none
+// show.
+func (a *app) askLyricsIfNone() {
+	if tr := a.pl.Current(); tr != nil && len(a.lyr.lines) == 0 {
+		a.askLyrics(*tr, 0)
 	}
 }
 
@@ -91,8 +124,8 @@ func (a *app) playbackChanged() {
 }
 
 // askLyrics fetches t's lyrics, unless they are being fetched already, and
-// shows them if t plays as they come. Of a track playing that LRCLIB
-// couldn't be asked for, it asks again later, the retry'th time.
+// shows them if t plays as they come. Of a track playing that no source
+// could be asked for, it asks again later, the retry'th time.
 func (a *app) askLyrics(t music.Track, retry int) {
 	if a.lyrAsking[t.ID] {
 		return
@@ -101,9 +134,9 @@ func (a *app) askLyrics(t music.Track, retry int) {
 		a.lyrAsking = map[string]bool{}
 	}
 	a.lyrAsking[t.ID] = true
-	server := a.settings.LyricsServer
+	src := lyricsSources{Server: a.settings.LyricsServer, NetEase: a.settings.LyricsNetEase, QQ: a.settings.LyricsQQ}
 	go func() {
-		lines, err := fetchLyrics(t, server)
+		lines, err := fetchLyrics(t, src)
 		a.post(func() {
 			delete(a.lyrAsking, t.ID)
 			if err != nil {

@@ -100,3 +100,22 @@ func TestIsCredit(t *testing.T) {
 		}
 	}
 }
+
+// Words an enhanced LRC times, as "<00:12.00>", are sung at their own
+// times, and the last of them lasts until the line ends.
+func TestParseEnhancedLRC(t *testing.T) {
+	lines := Build("[00:12.00]<00:12.00>春<00:12.50>日影<00:13.75>よ\n[00:20.00]次\n", "", "")
+	if len(lines) != 2 || !lines[0].Timed {
+		t.Fatalf("lines %+v", lines)
+	}
+	l := lines[0]
+	if l.Text != "春日影よ" {
+		t.Errorf("text %q", l.Text)
+	}
+	if len(l.Words) != 3 || l.Words[1].Start != 12500*time.Millisecond || l.Words[0].End != 12500*time.Millisecond {
+		t.Fatalf("words %+v", l.Words)
+	}
+	if l.Words[2].End != l.End {
+		t.Errorf("last word ends %v, the line %v", l.Words[2].End, l.End)
+	}
+}

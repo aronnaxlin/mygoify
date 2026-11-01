@@ -58,6 +58,13 @@ type settings struct {
 	// LyricsServer is the address of the LRCLIB lyrics are asked of, or
 	// empty for lrclib.net: another can stand in while it is down.
 	LyricsServer string `json:"lyricsServer,omitempty"`
+	// LyricsNetEase asks NetEase Cloud Music for lyrics too: it has
+	// word-timed lines, and translations, of songs LRCLIB lacks. Its API
+	// isn't public (DESIGN.md §7).
+	LyricsNetEase bool `json:"lyricsNetease"`
+	// LyricsQQ asks QQ Music for lyrics too: timed lines and translations
+	// of Chinese songs. Its API isn't public either.
+	LyricsQQ bool `json:"lyricsQQ,omitempty"`
 	// SearchHistory keeps submitted keywords, most recent first.
 	SearchHistory []string `json:"searchHistory,omitempty"`
 	// Spotify is what the app logs in with and plays through, as
@@ -71,7 +78,7 @@ type settings struct {
 }
 
 func defaultSettings() settings {
-	return settings{NotchActivity: true, Appearance: "system", Volume: 0.8, AppIcon: "dock-and-menubar", Quit: "stop"}
+	return settings{NotchActivity: true, Appearance: "system", Volume: 0.8, AppIcon: "dock-and-menubar", Quit: "stop", LyricsNetEase: true}
 }
 
 func settingsPath() (string, error) {

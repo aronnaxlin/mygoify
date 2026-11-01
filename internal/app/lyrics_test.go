@@ -11,8 +11,9 @@ import (
 
 // A lyricsAsk is the app asking for a track's lyrics, waiting for reply.
 type lyricsAsk struct {
-	id, server string
-	reply      chan lyricsReply
+	id    string
+	src   lyricsSources
+	reply chan lyricsReply
 }
 
 type lyricsReply struct {
@@ -36,9 +37,9 @@ func newLyricsRig(t *testing.T) *lyricsRig {
 	r.a.inline = func(f func()) { r.posted <- f }
 	fetch, later := fetchLyrics, lyricsLater
 	t.Cleanup(func() { fetchLyrics, lyricsLater = fetch, later })
-	fetchLyrics = func(tr music.Track, server string) ([]lyrics.Line, error) {
+	fetchLyrics = func(tr music.Track, src lyricsSources) ([]lyrics.Line, error) {
 		reply := make(chan lyricsReply)
-		r.asks <- lyricsAsk{tr.ID, server, reply}
+		r.asks <- lyricsAsk{tr.ID, src, reply}
 		v := <-reply
 		return v.lines, v.err
 	}
@@ -118,19 +119,21 @@ func TestLyricsWaitCapped(t *testing.T) {
 	r.shows(1, true)
 }
 
-// Lyrics of the track playing that LRCLIB couldn't be asked for are asked
-// for again later, of the server chosen, and not once another plays.
+// Lyrics of the track playing that no source could be asked for are asked
+// for again later, of the sources chosen, and not once another plays.
 func TestLyricsAskedAgain(t *testing.T) {
 	r := newLyricsRig(t)
 	r.a.settings.LyricsServer = "https://mirror.example"
+	r.a.settings.LyricsNetEase = true
+	r.a.settings.LyricsQQ = true
 	r.play("1")
 	r.answer(r.ask(), nil, errors.New("LRCLIB: 503"))
 	again := r.later[len(r.later)-1]
 	again()
 	r.run()
 	q := r.ask()
-	if q.id != "1" || q.server != "https://mirror.example" {
-		t.Fatalf("asked for %s of %q", q.id, q.server)
+	if q.id != "1" || q.src.Server != "https://mirror.example" || !q.src.NetEase || !q.src.QQ {
+		t.Fatalf("asked for %s of %+v", q.id, q.src)
 	}
 	r.answer(q, nil, errors.New("LRCLIB: 503"))
 	again = r.later[len(r.later)-1]
@@ -164,6 +167,28 @@ func TestLyricsOfNextFetched(t *testing.T) {
 	select {
 	case q := <-r.asks:
 		t.Fatalf("asked again for %s", q.id)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+// Turning a lyrics source on asks again for the lyrics of the track
+// playing, once none show: the source turned on may have them.
+func TestLyricsAskedAgainWhenNoLyrics(t *testing.T) {
+	r := newLyricsRig(t)
+	r.play("1")
+	r.answer(r.ask(), nil, nil)
+	r.shows(0, true)
+	r.a.askLyricsIfNone()
+	q := r.ask()
+	if q.id != "1" {
+		t.Fatalf("asked for %s", q.id)
+	}
+	r.answer(q, oneLine, nil)
+	r.shows(1, true)
+	r.a.askLyricsIfNone()
+	select {
+	case q := <-r.asks:
+		t.Fatalf("asked again for %s, which has lyrics", q.id)
 	case <-time.After(200 * time.Millisecond):
 	}
 }

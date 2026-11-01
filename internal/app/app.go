@@ -214,7 +214,7 @@ func Run() error {
 		a.backend = playback.NewFake()
 		if lib, b, svc := connectSpotify(a.settings.Spotify, secrets()); lib != nil {
 			a.lib, a.backend, a.svc, a.live = lib, b, svc, true
-			useLRCLIB()
+			useLyricSources()
 		}
 		a.pl = playback.New(a.post, a.backend)
 		a.pl.Artwork = fetchArt
