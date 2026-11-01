@@ -44,9 +44,10 @@ func (f Found) Lines() []Line {
 	return Build(f.LRC, f.Translation, f.YRC)
 }
 
-// Sources asks its sources one after another for a track's lyrics: the
-// first with word-timed lines wins, or else the first with timed ones,
-// with the translation of a source that has one. What it finds, and what
+// Sources asks all its sources at once for a track's lyrics: word-timed
+// lines win over lines timed by line, with the translation of a source
+// that has one. Once something shows, the others are waited for only
+// grace longer. What it finds, and what
 // it doesn't, it keeps in Cache, by track.
 type Sources struct {
 	All   []Source
