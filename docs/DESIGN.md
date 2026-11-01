@@ -151,6 +151,16 @@ App 空闲时不调 Web API：窗口隐藏或静止、歌曲自然切换，都�
 
 把 go-librespot 裁剪成纯 Go：切掉 `session → events/impl → player` 引入的 cgo 解码器，用 mygo 的 `audio/vorbis` 解码。实现同一个 `Backend` 接口，给 Intel Mac、不想装 Soloist 的用户用，明确标注"部分账号或曲目可能无法播放"。
 
+### 4.5 音频可视化（internal/levels）
+
+Soloist 不提供音频数据，播放条的烟雾光点、歌曲行和刘海里的音柱、烟雾背景要的频谱，从系统混音时听到的 Soloist 的声音里算。
+
+- **macOS 14.2+**：Core Audio 的 process tap 只听 Soloist 这一个进程（按 data-dir 里的 `soloist.pid` 找），放进一个只有它的私有聚合设备，IO 回调拿到 48 kHz 浮点立体声。全部用 purego，不用 cgo。tap 设为 private、不静音，Soloist 照常从原来的输出设备出声。首次会弹"录制系统音频"授权（`NSAudioCaptureUsageDescription`，在 mygo.json 里）；不给授权时 tap 只收到静音，界面退回空闲动画。`go tool mygo dev` 从终端启动时，授权记在终端名下，终端已有授权就不再弹。
+- **何时开**：Soloist 第一次报 `playing` 时建 tap，连接断开（Soloist 重启，换了进程）时拆掉，下次播放再按新 pid 建。暂停时系统不再混 Soloist 的声音，回调停止，不耗电。刚启动时 Core Audio 可能还不认识这个进程，隔 2 秒重试，最多 3 次。
+- **怎么算**：只保留最近约 0.7 秒的单声道样本（环形缓冲，不断覆盖），界面要时取 1024 点加 Hann 窗做 FFT，按音高从 40 Hz 到 14 kHz 均分 24 段（沿用 cloudmusic 的算法）。取的是"现在听到的"那一段：减去默认输出设备的延迟（蓝牙耳机一两百毫秒）。Soloist 的音量和响度均衡会作用在听到的声音上（2026-11-01 实测，音量 25% 时 RMS 只有约 1/40），所以按最近最响的一段做自动增益：它立即跟上，每秒回落 4 dB，最低 −70 dB。
+- **红线**：样本只在内存里，用来算 24 个数，不写盘、不发送，也不能导出（§9）。
+- **Linux**：未做。打算从 PipeWire 读 Soloist 的流，现在 `Levels()` 返回没有数据，界面是空闲动画。
+
 ## 5. 数据层（internal/library）
 
 ### 5.1 授权（internal/auth）
@@ -229,7 +239,7 @@ App 空闲时不调 Web API：窗口隐藏或静止、歌曲自然切换，都�
 
 - **许可证**：沿用 cloudmusic 的代码，所以整个项目是 **AGPL-3.0**，保留原作者署名。备用后端用到的 go-librespot 是 GPL-3.0，与 AGPL-3.0 兼容。
 - **命名**：Spotify 的开发者条款和品牌规范不允许 App 名称里包含 "Spotify"。App 名称为 MyGoify。
-- **红线**：不实现 PlayPlay，不做任何形式的音频下载或导出，不缓存明文音频。Spotify 下架过的 SpotiFLAC、EeveeSpotify、SpotifyDL 都越过了这些线。
+- **红线**：不实现 PlayPlay，不做任何形式的音频下载或导出，不缓存明文音频。音频可视化听到的声音只在内存里算频谱，留最近不到一秒，不写盘（§4.5）。Spotify 下架过的 SpotiFLAC、EeveeSpotify、SpotifyDL 都越过了这些线。
 - **外部依赖风险**：
   - Soloist 是新产品，Spotify 可能改条款或停止提供 → 播放层用接口隔离，保留 §4.4 的备用后端。
   - Web API 开发模式可能继续收紧 → 数据层集中在 `library` 一个包里，方便应对。

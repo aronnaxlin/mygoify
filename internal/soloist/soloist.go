@@ -15,12 +15,14 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/coder/websocket"
 
+	"mygoify/internal/levels"
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
 	"mygoify/internal/spotify"
@@ -66,9 +68,18 @@ type Backend struct {
 	// still bare.
 	reasks int
 	states chan playback.State
+
+	// meter hears what Soloist plays, through a tap of its process
+	// from as it first plays to as the connection drops.
+	meter   *levels.Meter
+	tapping bool // a tap runs, or is being made
+	stopTap func()
+	noTap   bool // the system can't tap it
+	tapErrs int  // taps failed in a row
+	tapGen  int  // counts the connections, as each is another Soloist
 }
 
-func New(cfg Config) *Backend { return &Backend{cfg: cfg} }
+func New(cfg Config) *Backend { return &Backend{cfg: cfg, meter: levels.NewMeter()} }
 
 // Watch reports each state to fn, in order, and starts following Soloist.
 func (b *Backend) Watch(fn func(playback.State)) {
@@ -135,7 +146,14 @@ func (b *Backend) session(ctx context.Context) error {
 		if b.conn == conn {
 			b.conn = nil
 		}
+		// Soloist restarts, as another process to tap.
+		stop := b.stopTap
+		b.tapping, b.stopTap, b.tapErrs = false, nil, 0
+		b.tapGen++
 		b.mu.Unlock()
+		if stop != nil {
+			stop()
+		}
 	}()
 	for _, cmd := range []string{"get_auth_state", "get_state", "get_queue"} {
 		if err := b.send(ctx, map[string]any{"command": cmd}); err != nil {
@@ -254,6 +272,10 @@ func (b *Backend) handle(data []byte) {
 		if ev.Status != "" {
 			b.status = ev.Status
 		}
+		if b.status == "playing" && !b.tapping && !b.noTap {
+			b.tapping = true
+			go b.tap(b.tapGen)
+		}
 	case "error":
 		b.err = ev.Message
 	case "auth_state":
@@ -292,6 +314,72 @@ func (b *Backend) handle(data []byte) {
 	}
 	b.emit()
 }
+
+// tap starts hearing what Soloist plays, for Levels, or gives up until
+// it plays again. Soloist writes its process ID into its data directory.
+func (b *Backend) tap(gen int) {
+	stop, err := func() (func(), error) {
+		data, err := os.ReadFile(filepath.Join(b.cfg.DataDir, "soloist.pid"))
+		if err != nil {
+			return nil, err
+		}
+		pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+		if err != nil {
+			return nil, err
+		}
+		return tapProcess(pid, b.meter)
+	}()
+	if err != nil && debug {
+		log.Printf("soloist: no levels: %v", err)
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	switch {
+	case gen != b.tapGen:
+		// The connection dropped meanwhile: another Soloist plays.
+		if err == nil {
+			stop()
+		}
+	case err != nil:
+		b.tapping = false
+		b.noTap = errors.Is(err, levels.ErrUnsupported)
+		// As it starts, Soloist may not have opened its output yet.
+		if b.tapErrs++; !b.noTap && b.tapErrs < maxTapTries {
+			time.AfterFunc(tapAgain, func() {
+				b.mu.Lock()
+				defer b.mu.Unlock()
+				if b.status == "playing" && !b.tapping && b.tapGen == gen {
+					b.tapping = true
+					go b.tap(gen)
+				}
+			})
+		}
+	default:
+		b.stopTap, b.tapErrs = stop, 0
+		if debug {
+			log.Print("soloist: tapped for levels")
+			// Silence alone, as without leave to record, shows as none.
+			time.AfterFunc(3*time.Second, func() {
+				_, ok := b.meter.Levels()
+				log.Printf("soloist: levels heard: %v", ok)
+			})
+		}
+	}
+}
+
+// tapProcess is levels.Tap, unless a test swaps it.
+var tapProcess = levels.Tap
+
+// tapAgain is how long tap waits to try again, up to maxTapTries times.
+const (
+	tapAgain    = 2 * time.Second
+	maxTapTries = 3
+)
+
+// Levels returns the spectrum of what Soloist plays now, as the system
+// hears it, and false when it hears none: paused, or without the
+// listener's leave to record the system's audio.
+func (b *Backend) Levels() ([playback.Bands]float32, bool) { return b.meter.Levels() }
 
 // reaskAfter is how long Backend waits to ask again for a queue that came
 // with tracks still bare, and maxReasks how many times it asks.
