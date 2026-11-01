@@ -34,6 +34,9 @@ type spotifySettings struct {
 	// DeviceName is how Spotify Connect lists Soloist, "MyGoify" unless
 	// the listener names it.
 	DeviceName string `json:"deviceName,omitempty"`
+	// SoloistAtLogin starts Soloist as the listener logs in, so that
+	// Spotify Connect lists the computer with the app closed.
+	SoloistAtLogin bool `json:"soloistAtLogin,omitempty"`
 }
 
 // withEnv fills in what s leaves empty from the environment.
@@ -68,31 +71,27 @@ func dataDir() string {
 func secrets() secret.Store { return secret.Default(dataDir()) }
 
 // connectSpotify returns the library and the backend of Spotify, as cfg
-// and the secrets kept set them up, or nils with no login.
-func connectSpotify(cfg spotifySettings, keep secret.Store) (library.Library, playback.Backend) {
+// and the secrets kept set them up, or nils with no login, and Soloist's
+// service, started, unless the app plays through a Soloist started by
+// hand.
+func connectSpotify(cfg spotifySettings, keep secret.Store) (library.Library, playback.Backend, service) {
 	cfg = cfg.withEnv()
 	if cfg.ClientID == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	data := dataDir()
-	dir := os.Getenv("SOLOIST_DATA_DIR")
-	if dir == "" {
-		dir = filepath.Join(data, "soloist")
-	}
+	dir := soloistDataDir()
 	adoptPOCLogin(keep, filepath.Join(data, "poc-token.json"))
 	sess := auth.NewSession(auth.Config{ClientID: cfg.ClientID, RedirectURI: cfg.RedirectURI}, secret.Entry{Store: keep, Name: secret.SpotifyLogin})
 	if !sess.Restore() {
-		return nil, nil
+		return nil, nil, nil
 	}
-	if bin, key := cfg.SoloistBin, soloistKey(keep); bin != "" && key != "" {
-		home, _ := os.UserHomeDir()
-		if rest, ok := strings.CutPrefix(bin, "~/"); ok {
-			bin = filepath.Join(home, rest)
-		}
-		svc := &soloist.Service{Bin: bin, Key: key, DeviceName: cfg.DeviceName, DataDir: dir, Logs: filepath.Join(data, "soloist.log")}
+	var svc service
+	if key := soloistKey(keep); cfg.SoloistBin != "" && key != "" {
+		svc = &soloistRunner{svc: soloistService(cfg, key)}
 		// The backend connects once it listens.
 		go func() {
-			if err := svc.Start(); err != nil {
+			if err := svc.Start(cfg.SoloistAtLogin); err != nil {
 				log.Print(err)
 			}
 		}()
@@ -102,7 +101,7 @@ func connectSpotify(cfg spotifySettings, keep secret.Store) (library.Library, pl
 	if c, err := os.UserCacheDir(); err == nil {
 		lib.Cache = filepath.Join(c, "mygoify", "spotify")
 	}
-	return lib, soloist.New(soloist.Config{DataDir: dir, DeviceName: cfg.DeviceName, API: api, DeviceFile: filepath.Join(data, "soloist-device")})
+	return lib, soloist.New(soloist.Config{DataDir: dir, DeviceName: cfg.DeviceName, API: api, DeviceFile: filepath.Join(data, "soloist-device")}), svc
 }
 
 // soloistKey is the API key kept, or else SOLOIST_API_KEY's.

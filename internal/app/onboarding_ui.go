@@ -346,6 +346,8 @@ func (a *app) onboardingFoot(c *ui.Context) {
 				a.closeOnboarding()
 			}
 			if a.action(c, "restart", "重新启动", true).Clicked() {
+				// The app comes back at once: Soloist plays on.
+				a.relaunching = true
 				relaunch()
 			}
 		case a.complete():

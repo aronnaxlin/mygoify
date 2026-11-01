@@ -42,6 +42,10 @@ type app struct {
 	lib   library.Library
 	pl    *playback.Player
 	pal   palette
+	// backend is what pl plays through, and svc Soloist's service, nil
+	// unless the app runs it (connectSpotify).
+	backend playback.Backend
+	svc     service
 
 	route   route
 	history []route
@@ -114,6 +118,7 @@ type app struct {
 	wallState             wallState     // the wall of the queue's covers, as it is dragged
 	sig                   playerSig
 	quitting              bool
+	relaunching           bool // the app quits to start again at once
 
 	settings    settings
 	settingsWin *mygo.Window
@@ -162,6 +167,27 @@ func (a *app) showMain() {
 	}
 }
 
+// closing hides the window as it closes: music plays on, and the Dock
+// icon or the tray's brings it back. A Linux desktop without a tray has
+// neither, so there closing it quits, as it does if the listener says so.
+func (a *app) closing(e *mygo.CloseEvent) {
+	if a.quitting {
+		return
+	}
+	e.PreventDefault()
+	if a.canHide() && !a.settings.CloseQuits {
+		a.win.Hide()
+	} else {
+		quitApp()
+	}
+}
+
+// canHide says whether something brings the window back once it hides.
+func (a *app) canHide() bool { return runtime.GOOS == "darwin" || a.tray != nil }
+
+// quitApp quits; a test sees it.
+var quitApp = func() { mygo.App.Quit() }
+
 // Run runs the app until it quits.
 func Run() error {
 	a := &app{
@@ -184,11 +210,11 @@ func Run() error {
 		// Before the window: on Windows it lays out its content as it is
 		// made, and the view asks the player what plays.
 		a.art = newArtCache(a.post)
-		var backend playback.Backend = playback.NewFake()
-		if lib, b := connectSpotify(a.settings.Spotify, secrets()); lib != nil {
-			a.lib, backend, a.live = lib, b, true
+		a.backend = playback.NewFake()
+		if lib, b, svc := connectSpotify(a.settings.Spotify, secrets()); lib != nil {
+			a.lib, a.backend, a.svc, a.live = lib, b, svc, true
 		}
-		a.pl = playback.New(a.post, backend)
+		a.pl = playback.New(a.post, a.backend)
 		a.pl.Artwork = fetchArt
 		a.pl.Changed = a.playbackChanged
 		// While Spotify limits the app's calls, until when.
@@ -232,20 +258,7 @@ func Run() error {
 		if shotHook != nil {
 			shotHook(a)
 		}
-		// Closing the window hides it: music plays on, and the Dock icon
-		// or the tray's brings it back. A Linux desktop without a tray
-		// has neither, so there closing it quits.
-		a.win.OnClose(func(e *mygo.CloseEvent) {
-			if a.quitting {
-				return
-			}
-			e.PreventDefault()
-			if runtime.GOOS == "darwin" || a.tray != nil {
-				a.win.Hide()
-			} else {
-				mygo.App.Quit()
-			}
-		})
+		a.win.OnClose(a.closing)
 	})
 	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) {
 		a.quitting = true
@@ -259,6 +272,8 @@ func Run() error {
 			a.tray.Destroy()
 		}
 	})
+	// Once the windows have gone, so that quitting shows at once.
+	mygo.App.OnQuit(a.leaveSoloist)
 	mygo.App.OnWindowAllClosed(func() {})
 	mygo.App.OnActivate(func(bool) { a.showMain() })
 	return mygo.App.Run()

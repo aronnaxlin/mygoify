@@ -46,6 +46,12 @@ type settings struct {
 	// AppIcon is where the app's icon shows on macOS (appIcons); elsewhere
 	// it is always in the notification area.
 	AppIcon string `json:"appIcon"`
+	// Quit is what quitting the app does with the music (quitModes):
+	// stop, pause, or play on.
+	Quit string `json:"quit"`
+	// CloseQuits quits the app as its window closes, rather than hiding
+	// it with the music playing on.
+	CloseQuits bool `json:"closeQuits,omitempty"`
 	// SearchHistory keeps submitted keywords, most recent first.
 	SearchHistory []string `json:"searchHistory,omitempty"`
 	// Spotify is what the app logs in with and plays through, as
@@ -59,7 +65,7 @@ type settings struct {
 }
 
 func defaultSettings() settings {
-	return settings{NotchActivity: true, Appearance: "system", Volume: 0.8, AppIcon: "dock-and-menubar"}
+	return settings{NotchActivity: true, Appearance: "system", Volume: 0.8, AppIcon: "dock-and-menubar", Quit: "stop"}
 }
 
 func settingsPath() (string, error) {
