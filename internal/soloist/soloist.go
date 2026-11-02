@@ -63,7 +63,10 @@ type Backend struct {
 	upcoming []queueEntry
 	active   bool
 	device   string // its ID in the Web API, once found
-	err      string
+	// volume is the volume the app last set, from 0 to 100, set again
+	// each time Soloist logs in; nil before the app sets one.
+	volume *int
+	err    string
 	// reasks counts the queues asked for again, which came with tracks
 	// still bare.
 	reasks int
@@ -281,8 +284,14 @@ func (b *Backend) handle(data []byte) {
 	case "auth_state":
 		if ev.LoggedIn != nil && !*ev.LoggedIn {
 			b.err = "Soloist 未登录"
-		} else if ev.LoggedIn != nil && b.cfg.LoggedIn != nil {
-			go b.cfg.LoggedIn()
+		} else if ev.LoggedIn != nil {
+			if b.volume != nil {
+				v := *b.volume
+				go b.command("set_volume", "volume", v)
+			}
+			if b.cfg.LoggedIn != nil {
+				go b.cfg.LoggedIn()
+			}
 		}
 	case "queue_changed":
 		b.previous, b.upcoming = ev.Previous, ev.Upcoming
@@ -611,11 +620,16 @@ func (b *Backend) Seek(t time.Duration) error {
 	return b.command("seek", "position_ms", t.Milliseconds())
 }
 
-// SetVolume sets Soloist's volume. Before it connects, as the app sets
-// the volume it kept as it starts, there is none to set: Soloist keeps
-// its own.
+// SetVolume sets Soloist's volume, and again each time it logs in. The
+// app sets the volume it kept as it starts, before Soloist connects:
+// that was dropped, and Soloist played at a volume of its own, quieter
+// than the full one the app showed, until the slider was moved.
 func (b *Backend) SetVolume(v float64) error {
-	err := b.command("set_volume", "volume", int(v*100+0.5))
+	vol := int(v*100 + 0.5)
+	b.mu.Lock()
+	b.volume = &vol
+	b.mu.Unlock()
+	err := b.command("set_volume", "volume", vol)
 	if errors.Is(err, errNotConnected) {
 		return nil
 	}

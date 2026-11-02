@@ -222,15 +222,6 @@ func TestCommands(t *testing.T) {
 	}
 }
 
-// Before it connects, setting the volume is no failure: Soloist keeps its
-// own. It was shown as playback failing as the app started.
-func TestVolumeBeforeConnecting(t *testing.T) {
-	b := New(Config{DataDir: t.TempDir()})
-	if err := b.SetVolume(0.8); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // Soloist restarting, the backend connects again and asks where
 // playback is.
 func TestReconnects(t *testing.T) {
@@ -583,5 +574,23 @@ func TestPrevGoesBack(t *testing.T) {
 	go b.Prev()
 	if cmd := f.next(t); cmd["command"] == "seek" {
 		t.Fatal("seeked the playback of another device")
+	}
+}
+
+// The volume the app sets before Soloist connects is no failure, which
+// showed as playback failing as the app started, and is set once Soloist
+// logs in. It was dropped: the app showed its full volume, and Soloist
+// played quieter until the slider was moved.
+func TestVolumeBeforeConnecting(t *testing.T) {
+	f := newFakeSoloist(t)
+	b := New(Config{DataDir: f.dir, DeviceName: "MyGoify"})
+	if err := b.SetVolume(1); err != nil {
+		t.Fatal(err)
+	}
+	watch(b)
+	f.connected(t, 1)
+	f.send(t, `{"type":"auth_state","logged_in":true}`)
+	if cmd := f.next(t); cmd["command"] != "set_volume" || cmd["volume"] != float64(100) {
+		t.Fatalf("sent %v, want the volume set", cmd)
 	}
 }
