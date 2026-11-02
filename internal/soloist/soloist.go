@@ -66,6 +66,13 @@ type Backend struct {
 	// volume is the volume the app last set, from 0 to 100, set again
 	// each time Soloist logs in; nil before the app sets one.
 	volume *int
+	// ends is where the track playing ends, as Soloist last said where it
+	// was; paused is when the app last paused it (playOn).
+	ends struct {
+		uri string
+		at  time.Time
+	}
+	paused time.Time
 	err    string
 	// reasks counts the queues asked for again, which came with tracks
 	// still bare.
@@ -321,7 +328,43 @@ func (b *Backend) handle(data []byte) {
 	if ev.Type != "error" && ev.Type != "auth_state" {
 		b.err = ""
 	}
+	b.playOn(ev.Position != nil)
 	b.emit()
+}
+
+// endSlack is how near its end a track ended, and how long a pause of the
+// app's keeps playOn from playing.
+const endSlack = 3 * time.Second
+
+// playOn plays the track Soloist moved to as the one playing ended, if it
+// left it paused, as it does the first track of its autoplay once what
+// the listener played has played through (seen twice, 2026-11-01): the
+// listener had to press play. moved says Soloist said where it is. b.mu
+// is held.
+func (b *Backend) playOn(moved bool) {
+	if !b.active || b.item == nil {
+		return
+	}
+	switch b.status {
+	case "playing":
+		// Only where Soloist says it is: a track it moves to is said
+		// before where in it it is.
+		if moved && b.position.Speed > 0 {
+			left := time.Duration(b.item.Decorations.Playback.DurationMs-b.position.PositionMs) * time.Millisecond
+			b.ends.uri, b.ends.at = b.item.URI, time.UnixMilli(b.position.TimestampMs).Add(left)
+		}
+	case "paused":
+		// Once Soloist says where it is in the track it moved to: it may
+		// say it paused first, where the one before ended.
+		if !moved || b.ends.uri == "" || b.ends.uri == b.item.URI {
+			return
+		}
+		ended := time.Now().After(b.ends.at.Add(-endSlack))
+		b.ends.uri = ""
+		if ended && b.position.PositionMs < 1000 && time.Since(b.paused) > endSlack {
+			go b.command("play")
+		}
+	}
 }
 
 // tap starts hearing what Soloist plays, for Levels, or gives up until
@@ -581,6 +624,9 @@ func (b *Backend) PauseAndWait(ctx context.Context) error {
 	if !playing() {
 		return nil
 	}
+	b.mu.Lock()
+	b.paused = time.Now()
+	b.mu.Unlock()
 	if err := b.send(ctx, map[string]any{"command": "pause"}); err != nil {
 		return err
 	}
@@ -595,8 +641,13 @@ func (b *Backend) PauseAndWait(ctx context.Context) error {
 }
 
 func (b *Backend) Resume() error { return b.command("play") }
-func (b *Backend) Pause() error  { return b.command("pause") }
-func (b *Backend) Next() error   { return b.command("skip_next") }
+func (b *Backend) Pause() error {
+	b.mu.Lock()
+	b.paused = time.Now()
+	b.mu.Unlock()
+	return b.command("pause")
+}
+func (b *Backend) Next() error { return b.command("skip_next") }
 
 // Prev plays the track before, however far this one has played, as the
 // player does: a few seconds into a track, Soloist's skip_prev starts it
