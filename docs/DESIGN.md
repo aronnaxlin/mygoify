@@ -27,7 +27,7 @@
 | 方案 | 结论 |
 |---|---|
 | go-librespot 放进同一进程播放 | **不选作主力**。2025 年底起，新账号和部分曲目取不到旧的 AES 音频密钥（[go-librespot #279](https://github.com/devgianlu/go-librespot/issues/279)、[librespot #1649](https://github.com/librespot-org/librespot/issues/1649)，2026-10 仍未解决）。唯一的修法是 PlayPlay DRM，有 DMCA 风险。 |
-| **Spotify Soloist**（2026-08 官方发布） | **选为播放后端**。官方无头 Connect 播放器，和官方 App 同一个引擎，支持无损，Linux、Apple Silicon Mac、Windows 都有版本，带本地 WebSocket API。 |
+| **Spotify Soloist**（2026-08 官方发布） | **选为播放后端**。官方无头 Connect 播放器，和官方 App 同一个引擎，支持无损（音质由 Spotify 按设备记住，只能在手机或电脑上的官方 App 里点设备图标选，网页版不行，Soloist 和 App 都没有接口；默认约 160 kbps，改成无损后约 1.3 Mbps，2026-11-02 按缓存文件大小实测），Linux、Apple Silicon Mac、Windows 都有版本，带本地 WebSocket API。 |
 | 官方 Web API（开发模式） | **选为数据层**。2026 年 2 月起限制很多（§5.3），但搜索、曲库、歌单、播放控制都还能用。 |
 | Omarchy-Spotify（QML 插件） | 作为参考，借鉴它的限流、授权、Connect 处理经验。它只支持 Omarchy；我们的定位是跨平台的独立 App。 |
 
