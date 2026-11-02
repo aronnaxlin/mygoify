@@ -45,7 +45,6 @@ var (
 	iconCheck = strokeIcon(`<path d="m5 12 4 4L19 6"/>`)
 	iconX     = strokeIcon(`<path d="M18 6 6 18"/><path d="m6 6 12 12"/>`)
 	iconMore  = fillIcon(`<circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/>`)
-	iconHelp  = strokeIcon(`<circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4"/><path d="M12 17.5h.01"/>`)
 )
 
 var (
