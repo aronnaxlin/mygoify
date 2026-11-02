@@ -1,6 +1,8 @@
 # ROADMAP
 
-设计见 [docs/DESIGN.md](docs/DESIGN.md)。v1.0 只做音乐：播放、曲库、歌单、搜索、歌词。不做播客。
+设计见 [docs/DESIGN.md](docs/DESIGN.md)。v1.0.0 只做音乐：播放、曲库、歌单、搜索、歌词。不做播客。
+
+版本号用三段：v1.0.0 发布后，修问题依次发 v1.0.1、v1.0.2……；新功能从 v1.1.0 起进次版本。Web API 不提供、要另想办法拿到的功能，不放进 v1.0.0，放到 v1.1.0。
 
 每个里程碑都要通过退出条件才能进入下一个。时间是按一个人全职的粗略估计。
 
@@ -78,7 +80,6 @@
 - [x] 歌单编辑（只限自己的）：新建、改名、添加、删除曲目
 - [x] 专辑页、艺人页（专辑列表 + 用搜索拼出的"热门"）
 - [x] 歌曲右键菜单：加入队列、加入歌单、去专辑、去艺人、复制链接
-- [ ] 为你推荐（daylist、Discover Weekly、Daily Mix）：开发模式的 Web API 对 `37i9` 个性化歌单返回 404，改走 Soloist。2026-11-01 实测：按 URI `play` 能播 daylist（`37i9dQZF1EP…`，从最近播放里拿到）和 Discover Weekly（`37i9dQZEVX…`，用户贴的分享链接）；context 事件带名字（Discover Weekly 刚开播的一两个事件里为空），不带封面；`get_queue` 列出全部曲目（来源都是 `context`）。封面：oEmbed（`open.spotify.com/oembed`，免 token）给 Discover Weekly 官方封面，daylist 只给通用名和默认图，对不上当期，退回曲目封面拼图。Daily Mix 未测（缺链接）。链接当作会过期的缓存：Discover Weekly、daylist 每个账号一个、ID 应该稳定（未验证）；Daily Mix 按口味分组，可能换 ID 或消失；链接只属于当前账号。做法：从最近播放和 Soloist 的 context 事件里认出 `37i9` 歌单就记下或更新，按账号存；失效时卡片上提示重新粘贴分享链接，不报错；加 `MYGOIFY_REAL` 测试定期检查记下的链接还能不能播。动手前先改 DESIGN.md:180
 
 **退出条件**：日常听歌不需要打开官方客户端；连续使用 1 小时不触发 `QUOTA_EXCEEDED`。
 
@@ -109,7 +110,7 @@
 
 ---
 
-## M6 · v1.0 发布（约 1 周）
+## M6 · v1.0.0 发布（约 1 周）
 
 - [ ] 内存门槛：Linux 上窗口打开时界面 PSS ≤ 200 MB，写进 `perf_test.go` 或基准脚本
 - [ ] 空闲 CPU：窗口静止时不请求新帧（沿用 cloudmusic 的帧预算测试）（`perf_test.go` 已覆盖正在播放页和背景；其他页面、窗口隐藏时的 CPU 未测）
@@ -122,14 +123,14 @@
 
 ---
 
-## v1.0 之后
+## v1.0.0 之后
 
 | 版本 | 内容 |
 |---|---|
-| v1.1 | `mygo-spotify-agent`：后台提供 MPRIS / Now Playing；关窗口时界面进程直接退出，常驻 ≤ 80 MB |
-| v1.2 | Spotify Connect 设备切换（播到其他设备、从其他设备接管） |
-| v1.3 | 跟随 Omarchy 主题配色；Waybar 模块示例 |
-| v1.4 | go-librespot 纯 Go 备用后端（DESIGN §4.4），支持 Intel Mac |
+| v1.1.0 | Web API 不提供、要另想办法的功能：为你推荐（daylist、Discover Weekly、Daily Mix）：开发模式的 Web API 对 `37i9` 个性化歌单返回 404，改走 Soloist。2026-11-01 实测：按 URI `play` 能播 daylist（`37i9dQZF1EP…`，从最近播放里拿到）和 Discover Weekly（`37i9dQZEVX…`，用户贴的分享链接）；context 事件带名字（Discover Weekly 刚开播的一两个事件里为空），不带封面；`get_queue` 列出全部曲目（来源都是 `context`）。封面：oEmbed（`open.spotify.com/oembed`，免 token）给 Discover Weekly 官方封面，daylist 只给通用名和默认图，对不上当期，退回曲目封面拼图。Daily Mix 未测（缺链接）。链接当作会过期的缓存：Discover Weekly、daylist 每个账号一个、ID 应该稳定（未验证）；Daily Mix 按口味分组，可能换 ID 或消失；链接只属于当前账号。做法：从最近播放和 Soloist 的 context 事件里认出 `37i9` 歌单就记下或更新，按账号存；失效时卡片上提示重新粘贴分享链接，不报错；加 `MYGOIFY_REAL` 测试定期检查记下的链接还能不能播。动手前先改 DESIGN.md:180。`mygo-spotify-agent`：后台提供 MPRIS / Now Playing；关窗口时界面进程直接退出，常驻 ≤ 80 MB |
+| v1.2.0 | Spotify Connect 设备切换（播到其他设备、从其他设备接管） |
+| v1.3.0 | 跟随 Omarchy 主题配色；Waybar 模块示例 |
+| v1.4.0 | go-librespot 纯 Go 备用后端（DESIGN §4.4），支持 Intel Mac |
 | 待定 | 歌词源插件化：主程序只留 LRCLIB 和插件机制（goja 跑 `.js` 插件，只给 `fetch` 和 md5、AES、base64；不能读文件、拿不到凭据；导入后默认关闭），非公开源改成插件，放在另一个仓库，不随主程序发布。在此之前非公开源先内置（2026-11-01 决定） |
 | 待定 | Windows 发布；律动视图；播客（明确排在最后） |
 

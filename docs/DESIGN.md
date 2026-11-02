@@ -1,7 +1,7 @@
 # mygo-spotify 设计文档
 
 > 状态：草案 v0.1（2026-10-30）。App 名称已定为 **MyGoify**（仓库 `aronnaxlin/mygoify`）
-> 范围：第一版（v1.0）只做音乐：播放、歌单、搜索、曲库、歌词。不做播客、有声书。
+> 范围：第一版（v1.0.0）只做音乐：播放、歌单、搜索、曲库、歌词。不做播客、有声书。
 
 ## 1. 目标与非目标
 
@@ -140,12 +140,12 @@ App 空闲时不调 Web API：窗口隐藏或静止、歌曲自然切换，都�
 - WebSocket 没有任何认证，只绑定 `127.0.0.1`。
 - 连接时校验 data-dir 里的 `ws.port`，并确认端口属于我们拉起的那个 Soloist 进程。
 
-### 4.3 后台控制（v1.1）
+### 4.3 后台控制（v1.1.0）
 
 界面关掉以后，媒体键、Waybar、`playerctl` 需要 MPRIS 才能控制，但 Soloist 本身不提供 MPRIS。
 
 - v1：关窗口默认**缩到托盘**，界面进程仍在，MPRIS 由 mygo 的 Now Playing 提供。代价是常驻约 190 MB。用户也可以选择关窗或退出后让音乐继续（§4.2），这时没有媒体键。
-- v1.1：加一个极小的 `mygo-spotify-agent`（纯 Go、无界面）。它连 Soloist 的 WebSocket，导出 MPRIS（macOS 上是 Now Playing）。之后关窗口就让界面进程直接退出，常驻目标 ≤ 80 MB（Soloist + agent）。
+- v1.1.0：加一个极小的 `mygo-spotify-agent`（纯 Go、无界面）。它连 Soloist 的 WebSocket，导出 MPRIS（macOS 上是 Now Playing）。之后关窗口就让界面进程直接退出，常驻目标 ≤ 80 MB（Soloist + agent）。
 
 ### 4.4 备用后端（v1 之后）
 
@@ -256,7 +256,7 @@ Soloist 不提供音频数据，播放条的烟雾光点、歌曲行和刘海里
 | 界面 | MyGo 原生 UI，GTK3 + OpenGL | MyGo 原生 UI，Metal |
 | 播放 | Soloist（x86_64 / aarch64，PipeWire） | Soloist（osx_arm64，macOS 13+） |
 | Soloist 服务 | systemd user unit | launchd agent |
-| 系统媒体控制 | MPRIS（mygo 内置；v1.1 由 agent 提供） | Now Playing（同上） |
+| 系统媒体控制 | MPRIS（mygo 内置；v1.1.0 由 agent 提供） | Now Playing（同上） |
 | 特有功能 | Hyprland 快捷键说明；跟随 Omarchy 主题（v1 之后） | 刘海播放器 |
 | 凭据存储 | libsecret / GNOME Keyring | 钥匙串 |
 | 安装 | mygo 的 `install.sh`（用户级）、`.tar.gz` | `.dmg`（签名和公证需要 Apple 开发者账号） |
