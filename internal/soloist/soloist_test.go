@@ -594,3 +594,63 @@ func TestVolumeBeforeConnecting(t *testing.T) {
 		t.Fatalf("sent %v, want the volume set", cmd)
 	}
 }
+
+// A track that plays through to a next one Soloist leaves paused, as it
+// leaves the first of its autoplay once what the listener played has
+// played through, plays on. The listener had to press play. One the app
+// paused, or that moved on before its end, stays paused.
+func TestPlayOnAfterTheEnd(t *testing.T) {
+	item := func(uri string) string {
+		return fmt.Sprintf(`{"uri":%q,"entity_type":"track","decorations":{"identity":{"name":"x"},"playback":{"duration_ms":200000}}}`, uri)
+	}
+	at := func(ms int64, speed int) string {
+		return fmt.Sprintf(`{"position_ms":%d,"timestamp_ms":%d,"speed":%d}`, ms, time.Now().UnixMilli(), speed)
+	}
+	// play plays a to at, then has Soloist move to b and pause, as it says
+	// so: what moved first, then that it paused, then where it is.
+	play := func(t *testing.T, f *fakeSoloist, b *Backend, states chan playback.State, from int64) {
+		f.send(t, `{"type":"playback_state","status":"playing","is_active":true,"item":`+item("spotify:track:a")+`,"position":`+at(from, 1)+`}`)
+		until(t, states, func(st playback.State) bool { return st.Playing && st.Position == time.Duration(from)*time.Millisecond })
+		f.send(t, `{"type":"track_changed","item":`+item("spotify:track:b")+`}`)
+		f.send(t, `{"type":"playback_changed","status":"paused"}`)
+		f.send(t, `{"type":"playback_state","status":"paused","is_active":true,"item":`+item("spotify:track:b")+`,"position":`+at(0, 0)+`}`)
+		until(t, states, func(st playback.State) bool { return !st.Playing && st.Position == 0 })
+	}
+	quiet := func(t *testing.T, f *fakeSoloist) {
+		t.Helper()
+		select {
+		case cmd := <-f.commands:
+			if cmd["command"] == "play" {
+				t.Fatalf("played on: %v", cmd)
+			}
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	newBackend := func(t *testing.T) (*fakeSoloist, *Backend, chan playback.State) {
+		f := newFakeSoloist(t)
+		b := New(Config{DataDir: f.dir, DeviceName: "MyGoify"})
+		states := watch(b)
+		f.connected(t, 1)
+		return f, b, states
+	}
+
+	f, b, states := newBackend(t)
+	play(t, f, b, states, 199000)
+	if cmd := f.next(t); cmd["command"] != "play" {
+		t.Fatalf("sent %v, want play", cmd)
+	}
+
+	f, b, states = newBackend(t)
+	play(t, f, b, states, 10000)
+	quiet(t, f)
+
+	f, b, states = newBackend(t)
+	f.send(t, `{"type":"device_changed","is_active":true}`)
+	until(t, states, func(playback.State) bool { b.mu.Lock(); defer b.mu.Unlock(); return b.active })
+	go b.Pause()
+	if cmd := f.next(t); cmd["command"] != "pause" {
+		t.Fatalf("sent %v, want pause", cmd)
+	}
+	play(t, f, b, states, 199000)
+	quiet(t, f)
+}
