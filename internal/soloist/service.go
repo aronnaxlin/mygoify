@@ -107,6 +107,28 @@ func (s *Service) ChangeKey(ctx context.Context, key string) error {
 // keyFile is where the service reads the key from.
 func (s *Service) keyFile() string { return filepath.Join(filepath.Dir(s.DataDir), "soloist.key") }
 
+// volumeFile is where Soloist's volume as it starts is kept, which the
+// backend writes as the app sets the volume: Soloist starts at 40
+// otherwise, and played quieter than the app showed until the app set it
+// again. A change of it doesn't restart Soloist, as one of the key does.
+func volumeFile(dataDir string) string {
+	return filepath.Join(filepath.Dir(dataDir), "soloist.volume")
+}
+
+// keepVolume writes the volume Soloist starts at, from 0 to 100.
+func keepVolume(dataDir string, v int) error {
+	return os.WriteFile(volumeFile(dataDir), []byte("SOLOIST_VOLUME="+strconv.Itoa(v)+"\n"), 0o600)
+}
+
+// haveVolume writes Soloist's own volume as it starts, 40, where the app
+// never set one, so that the service always has one to read.
+func (s *Service) haveVolume() error {
+	if _, err := os.Stat(volumeFile(s.DataDir)); err == nil {
+		return nil
+	}
+	return keepVolume(s.DataDir, 40)
+}
+
 func (s *Service) startAgent() error {
 	dir := s.Dir
 	if dir == "" {
@@ -126,6 +148,9 @@ func (s *Service) startAgent() error {
 	}
 	keyChanged, err := writeIfChanged(s.keyFile(), []byte(s.Key), 0o600)
 	if err != nil {
+		return err
+	}
+	if err := s.haveVolume(); err != nil {
 		return err
 	}
 	plist := filepath.Join(dir, agentLabel+".plist")
@@ -184,8 +209,8 @@ func (s *Service) bootout(target string) error {
 // the rest as its own arguments, so nothing in them needs quoting.
 func (s *Service) agent(atLogin bool) []byte {
 	args := []string{
-		"/bin/sh", "-c", `exec "$0" -n "$1" -k "$(cat "$2")" -D "$3" -w 127.0.0.1:0`,
-		s.Bin, s.DeviceName, s.keyFile(), s.DataDir,
+		"/bin/sh", "-c", `. "$4"; exec "$0" -n "$1" -k "$(cat "$2")" -D "$3" -i "$SOLOIST_VOLUME" -w 127.0.0.1:0`,
+		s.Bin, s.DeviceName, s.keyFile(), s.DataDir, volumeFile(s.DataDir),
 	}
 	var b bytes.Buffer
 	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>
@@ -237,6 +262,9 @@ func (s *Service) startUnit() error {
 	if err != nil {
 		return err
 	}
+	if err := s.haveVolume(); err != nil {
+		return err
+	}
 	unitChanged, err := writeIfChanged(filepath.Join(dir, unitName), s.unit(), 0o644)
 	if err != nil {
 		return err
@@ -269,9 +297,11 @@ Description=Spotify Soloist, for MyGoify
 
 [Service]
 EnvironmentFile=` + s.keyFile() + `
+EnvironmentFile=` + volumeFile(s.DataDir) + `
 ExecStart=` + strings.Join([]string{
 		systemdQuote(s.Bin), "-n", systemdQuote(s.DeviceName),
-		"-k", `"${SOLOIST_API_KEY}"`, "-D", systemdQuote(s.DataDir), "-w", "127.0.0.1:0",
+		"-k", `"${SOLOIST_API_KEY}"`, "-D", systemdQuote(s.DataDir),
+		"-i", `"${SOLOIST_VOLUME}"`, "-w", "127.0.0.1:0",
 	}, " ") + `
 # Again after a crash, but not after it exits: it exits with 10 once its
 # version expires, and starting it again won't help.

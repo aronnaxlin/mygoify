@@ -671,7 +671,8 @@ func (b *Backend) Seek(t time.Duration) error {
 	return b.command("seek", "position_ms", t.Milliseconds())
 }
 
-// SetVolume sets Soloist's volume, and again each time it logs in. The
+// SetVolume sets Soloist's volume, and again each time it logs in, and
+// keeps it for Soloist to start at. The
 // app sets the volume it kept as it starts, before Soloist connects:
 // that was dropped, and Soloist played at a volume of its own, quieter
 // than the full one the app showed, until the slider was moved.
@@ -680,6 +681,11 @@ func (b *Backend) SetVolume(v float64) error {
 	b.mu.Lock()
 	b.volume = &vol
 	b.mu.Unlock()
+	if b.cfg.DataDir != "" {
+		if err := keepVolume(b.cfg.DataDir, vol); err != nil {
+			log.Print(err)
+		}
+	}
 	err := b.command("set_volume", "volume", vol)
 	if errors.Is(err, errNotConnected) {
 		return nil

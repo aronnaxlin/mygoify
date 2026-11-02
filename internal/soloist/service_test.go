@@ -218,3 +218,27 @@ func TestAgentWaitsForBootout(t *testing.T) {
 		t.Fatal("Stop returned while launchd still had the agent")
 	}
 }
+
+// Soloist starts at the volume the app last set, kept apart from the
+// unit, so that a new volume doesn't restart what plays. It started at
+// 40, quieter than the app showed, until the app set the volume.
+func TestStartsAtTheAppsVolume(t *testing.T) {
+	s, ran := fakeService(t)
+	if err := s.startUnit(); err != nil {
+		t.Fatal(err)
+	}
+	b := New(Config{DataDir: s.DataDir})
+	if err := b.SetVolume(0.7); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(volumeFile(s.DataDir)); string(got) != "SOLOIST_VOLUME=70\n" {
+		t.Errorf("kept %q", got)
+	}
+	*ran = nil
+	if err := s.startUnit(); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(*ran, ", "); got != "systemctl disable, systemctl start" {
+		t.Fatalf("a new volume ran %s, stopping what plays", got)
+	}
+}
