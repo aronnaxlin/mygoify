@@ -13,9 +13,9 @@ import (
 // §4.2), with their names: stop it and Soloist, pause it and leave
 // Soloist running, or play on.
 var quitModes = []struct{ id, label, desc string }{
-	{"stop", "停止并关闭 Soloist", "从手机投放到这台电脑的播放也会停止"},
-	{"pause", "暂停", "Soloist 留在后台，约占 60 MB 内存，下次打开更快"},
-	{"play", "继续播放", "退出后，要回到 App 才能暂停或切歌"},
+	{"stop", "停止并关闭 Soloist", "从手机投放到这台电脑的也会停"},
+	{"pause", "暂停", "Soloist 留在后台（约 60 MB），下次打开更快"},
+	{"play", "继续播放", "要回到 App 才能暂停或切歌"},
 }
 
 // pauser is a backend that can pause as the app quits: Soloist's.
