@@ -57,22 +57,18 @@ func (a *app) settingsView(c *ui.Context) {
 	s := &a.settings
 
 	ui.Scroll(c).Fill().Padding(24, 28, 32, 28).Gap(8).Children(func() {
-		group := func(title string, rows func()) {
+		// group is a card of settings, and under it a note of what isn't
+		// plain from their names, if anything is, as macOS's settings do.
+		group := func(title, note string, rows func()) {
 			ui.Text(c, title).FontSize(12).FontWeight(600).TextColor(p.muted).Margin(14, 4, 4, 4)
 			ui.Column(c).Radius(12).Background(p.bg).Border(1, p.hairline).Dividers(1, p.hairline).Children(rows)
+			if note != "" {
+				ui.Text(c, note).FontSize(12).TextColor(p.muted).LineHeight(1.45).Margin(6, 16, 0, 16)
+			}
 		}
-		// row is a setting, with what isn't plain from its name behind a
-		// question mark, shown as the pointer rests on it.
-		row := func(label, help string, control func()) {
+		row := func(label string, control func()) {
 			ui.Row(c).Padding(12, 16).Gap(16).AlignItems(ui.Center).MinHeight(48).Children(func() {
-				ui.Row(c).Grow(1).Shrink(1).MinWidth(0).Gap(6).AlignItems(ui.Center).Children(func() {
-					ui.Text(c, label).FontSize(13.5).FontWeight(500)
-					if help != "" {
-						ui.Box(c.Key("help-"+label)).Size(16, 16).Center().Label(help).Tooltip(help).Children(func() {
-							ui.Icon(c, iconHelp).Size(14, 14).TextColor(p.muted)
-						})
-					}
-				})
+				ui.Text(c, label).FontSize(13.5).FontWeight(500).Grow(1).Shrink(1).MinWidth(0)
 				control()
 			})
 		}
@@ -80,8 +76,8 @@ func (a *app) settingsView(c *ui.Context) {
 		// Only on macOS: elsewhere the icon is always in the notification
 		// area.
 		if runtime.GOOS == "darwin" {
-			group("通用", func() {
-				row("应用图标", "显示在菜单栏时，关窗后从菜单栏图标打开", func() {
+			group("通用", "", func() {
+				row("应用图标", func() {
 					labels := make([]string, len(appIcons))
 					chosen := appIcons[0].label
 					for i, ic := range appIcons {
@@ -104,13 +100,13 @@ func (a *app) settingsView(c *ui.Context) {
 		}
 
 		// What happens to the music as the app goes (DESIGN.md §4.2):
-		// Soloist plays apart from the window.
-		group("播放", func() {
-			// Soloist has no quality to set: Spotify keeps one for each
-			// Connect device, chosen in its own apps but not on the web,
-			// and Soloist played at 160 kbps until it was (2026-11-02).
-			device := s.Spotify.withEnv().DeviceName
-			row("音质", "默认约 160 kbps。用 "+device+" 播放时，在手机或电脑上的 Spotify 官方 App 里点设备图标，选中 "+device+"，把音质改成无损。只需一次；Soloist 更新或重新配对后可能要再选。网页版没有这一项", func() {
+		// Soloist plays apart from the window. Soloist has no quality to
+		// set: Spotify keeps one for each Connect device, chosen in its own
+		// apps but not on the web, and Soloist played at 160 kbps until it
+		// was (2026-11-02).
+		device := s.Spotify.withEnv().DeviceName
+		group("播放", "音质在手机或电脑上的 Spotify 官方 App 里选：点设备图标，选中 "+device+"，改成无损。只需一次，Soloist 更新后可能要再选；网页版不行。", func() {
+			row("音质", func() {
 				ui.Text(c, "在官方 App 里选").FontSize(12.5).TextColor(p.muted)
 			})
 			mode := quitModes[0]
@@ -119,7 +115,7 @@ func (a *app) settingsView(c *ui.Context) {
 					mode = m
 				}
 			}
-			row("退出 App 时", mode.desc, func() {
+			row("退出 App 时", func() {
 				labels := make([]string, len(quitModes))
 				for i, m := range quitModes {
 					labels[i] = m.label
@@ -134,19 +130,19 @@ func (a *app) settingsView(c *ui.Context) {
 					a.changed()
 				}
 			})
-			row("单击歌曲即播放", "", func() {
+			row("单击歌曲即播放", func() {
 				if ui.Switch(c.Key("click-plays"), &s.ClickPlays).Label("单击歌曲即播放").Changed() {
 					a.changed()
 				}
 			})
 			if a.canHide() {
-				row("关闭窗口时退出", "关闭时只隐藏窗口，音乐继续", func() {
+				row("关闭窗口时退出", func() {
 					if ui.Switch(c.Key("close-quits"), &s.CloseQuits).Label("关闭窗口时退出").Changed() {
 						a.changed()
 					}
 				})
 			}
-			row("登录时启动 Soloist", "不开 App 也能在 Spotify Connect 里选这台电脑", func() {
+			row("登录时启动 Soloist", func() {
 				if ui.Switch(c.Key("soloist-at-login"), &s.Spotify.SoloistAtLogin).Label("登录时启动 Soloist").Changed() {
 					a.changed()
 					a.changeAtLogin()
@@ -154,18 +150,18 @@ func (a *app) settingsView(c *ui.Context) {
 			})
 		})
 
-		group("歌词", func() {
-			row("歌词服务器", "LRCLIB 的地址。连不上 lrclib.net 时，可换成镜像或自建的", func() {
+		group("歌词", "网易云和 QQ 音乐是非公开接口，可能失效。", func() {
+			row("歌词服务器", func() {
 				if ui.TextInput(c.Key("lyrics-server"), &s.LyricsServer).Placeholder("https://lrclib.net").Label("歌词服务器").FontSize(13).Width(200).Changed() {
 					a.changed()
 				}
 			})
-			row("网易云音乐", "有逐字时间和翻译，中日文歌更全。非公开接口，可能失效", func() {
+			row("网易云音乐", func() {
 				if ui.Switch(c.Key("lyrics-netease"), &s.LyricsNetEase).Label("网易云音乐").Changed() {
 					a.lyricsSourceChanged()
 				}
 			})
-			row("QQ 音乐", "有逐行歌词和翻译。非公开接口，可能失效", func() {
+			row("QQ 音乐", func() {
 				if ui.Switch(c.Key("lyrics-qq"), &s.LyricsQQ).Label("QQ 音乐").Changed() {
 					a.lyricsSourceChanged()
 				}
@@ -174,18 +170,18 @@ func (a *app) settingsView(c *ui.Context) {
 
 		// Only on macOS, the one with a notch player.
 		if a.notch != nil {
-			group("刘海播放器", func() {
-				row("刘海播放器", "鼠标移到刘海上时展开", func() {
+			group("刘海播放器", "", func() {
+				row("刘海播放器", func() {
 					if ui.Switch(c.Key("notch"), &s.Notch).Label("刘海播放器").Changed() {
 						a.changed()
 					}
 				})
-				row("播放时显示实时活动", "刘海两侧显示封面和音柱，可能挡住旁边的菜单栏图标", func() {
+				row("播放时显示实时活动", func() {
 					if ui.Switch(c.Key("activity"), &s.NotchActivity).Label("播放时显示实时活动").Disabled(!s.Notch).Changed() {
 						a.changed()
 					}
 				})
-				row("无刘海的屏幕上常驻", "关闭时，鼠标移到屏幕顶部中央才出现", func() {
+				row("无刘海的屏幕上常驻", func() {
 					if ui.Switch(c.Key("virtual"), &s.NotchVirtual).Label("无刘海的屏幕上常驻").Disabled(!s.Notch).Changed() {
 						a.changed()
 					}
@@ -193,8 +189,8 @@ func (a *app) settingsView(c *ui.Context) {
 			})
 		}
 
-		group("外观", func() {
-			row("外观", "", func() {
+		group("外观", "", func() {
+			row("外观", func() {
 				modes := []string{"system", "light", "dark"}
 				i := 0
 				for k, m := range modes {
@@ -209,21 +205,21 @@ func (a *app) settingsView(c *ui.Context) {
 			})
 		})
 
-		group("实验性功能", func() {
-			row("进度条烟雾", "更耗电", func() {
+		group("实验性功能", "会多耗一些电。", func() {
+			row("进度条烟雾", func() {
 				if ui.Switch(c.Key("smoke"), &s.Smoke).Label("进度条烟雾").Changed() {
 					a.changed()
 				}
 			})
-			row("烟雾背景", "试验中，更耗电", func() {
+			row("烟雾背景", func() {
 				if ui.Switch(c.Key("fog"), &s.Fog).Label("烟雾背景").Changed() {
 					a.changed()
 				}
 			})
 		})
 
-		group("账号", func() {
-			row("连接 Spotify", "每一步都可以单独重做", func() {
+		group("账号", "", func() {
+			row("连接 Spotify", func() {
 				if ui.Button(c.Key("onboarding"), "设置…").Clicked() {
 					a.showMain()
 					a.openOnboarding()
@@ -231,7 +227,7 @@ func (a *app) settingsView(c *ui.Context) {
 				}
 			})
 			if a.profile == nil {
-				row("未登录", "", func() {
+				row("未登录", func() {
 					if ui.PrimaryButton(c.Key("login"), "登录").Clicked() {
 						a.showMain()
 						a.openOnboarding()
@@ -254,24 +250,24 @@ func (a *app) settingsView(c *ui.Context) {
 		})
 
 		if a.updates {
-			group("更新", func() {
-				desc := "每天一次"
-				if t := lastUpdateCheck(); !t.IsZero() {
-					desc += "，上次：" + relativeTime(t, time.Now())
-				}
-				row("自动检查更新", desc, func() {
+			var checked string
+			if t := lastUpdateCheck(); !t.IsZero() {
+				checked = "上次检查：" + relativeTime(t, time.Now())
+			}
+			group("更新", checked, func() {
+				row("自动检查更新", func() {
 					on := updateChecks()
 					if ui.Switch(c.Key("update-checks"), &on).Label("自动检查更新").Changed() {
 						setUpdateChecks(on)
 					}
 				})
-				row("自动下载并安装", "下次打开时生效", func() {
+				row("自动下载并安装", func() {
 					on := updateDownloads()
 					if ui.Switch(c.Key("update-downloads"), &on).Label("自动下载并安装").Disabled(!updateChecks()).Changed() {
 						setUpdateDownloads(on)
 					}
 				})
-				row("当前版本 "+mygo.App.Version(), "", func() {
+				row("当前版本 "+mygo.App.Version(), func() {
 					if ui.Button(c.Key("check-updates"), "检查更新").Clicked() {
 						checkForUpdates()
 					}

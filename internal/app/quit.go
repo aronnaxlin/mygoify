@@ -12,10 +12,10 @@ import (
 // quitModes are what quitting the app does with the music (DESIGN.md
 // §4.2), with their names: stop it and Soloist, pause it and leave
 // Soloist running, or play on.
-var quitModes = []struct{ id, label, desc string }{
-	{"stop", "停止并关闭 Soloist", "从手机投放到这台电脑的也会停"},
-	{"pause", "暂停", "Soloist 留在后台（约 60 MB），下次打开更快"},
-	{"play", "继续播放", "要回到 App 才能暂停或切歌"},
+var quitModes = []struct{ id, label string }{
+	{"stop", "停止并关闭 Soloist"},
+	{"pause", "暂停"},
+	{"play", "继续播放"},
 }
 
 // pauser is a backend that can pause as the app quits: Soloist's.
