@@ -273,5 +273,15 @@
   "dismiss": "後で設定",
   "nowPlaying": "再生中",
   "newPlaylistEllipsis": "新しいプレイリスト…",
-  "selectLanguage": "言語を選択"
+  "selectLanguage": "言語を選択",
+  "likedSongs": "お気に入りの曲",
+  "loadFailed": "読み込みに失敗しました。後でもう一度お試しください",
+  "soloistNotLoggedIn": "Soloist 未ログイン",
+  "playbackFailed": "再生に失敗しました。後でもう一度お試しください",
+  "loginSuccessTitle": "ログイン完了",
+  "loginSuccessBody": "このタブを閉じて MyGoify に戻ってください。",
+  "loginFailureTitle": "ログインが完了していません",
+  "loginFailureBody": "MyGoify に戻ってもう一度お試しください。",
+  "loginMismatch": "MyGoify：ログインリクエストが一致しません。MyGoifyに戻って再度ログインしてください。",
+  "weekday": "{when, date, ::EEEE}"
 }

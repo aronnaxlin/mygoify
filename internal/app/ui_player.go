@@ -8,6 +8,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/playback"
+	"mygoify/internal/soloist"
 	"mygoify/locales"
 )
 
@@ -420,7 +421,7 @@ func (a *app) playerBar(c *ui.Context) {
 					case pl.Loading():
 						sub = locales.Buffering()
 					case pl.Err() != "":
-						sub, color = pl.Err(), p.danger
+						sub, color = a.explainError(pl.Err()), p.danger
 					}
 					if sub == "" {
 						a.artistLinks(c, tr, p.muted, p.text).FontSize(12).SingleLine()
@@ -460,4 +461,17 @@ func (a *app) playerBar(c *ui.Context) {
 			a.volumeButton(c, p.text.Alpha(0.75))
 		})
 	})
+}
+
+// explainError translates known backend and playback error codes into
+// localized strings for the listener.
+func (a *app) explainError(err string) string {
+	switch err {
+	case soloist.ErrNotLoggedIn, "Soloist 未登录":
+		return locales.SoloistNotLoggedIn()
+	case playback.ErrPlaybackFailed.Error(), "播放失败，请稍后再试":
+		return locales.PlaybackFailed()
+	default:
+		return err
+	}
 }

@@ -96,13 +96,22 @@ func (a *app) trackCards(c *ui.Context, tracks []music.Track) {
 }
 
 func weekday(t time.Time) string {
-	return [...]string{"星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"}[t.Weekday()]
+	return locales.Weekday(t)
+}
+
+// playlistName returns the playlist's title, using the localized Liked Songs
+// title when pl.Liked is true.
+func playlistName(pl *music.Playlist) string {
+	if pl.Liked {
+		return locales.LikedSongs()
+	}
+	return pl.Name
 }
 
 // playlistCard is a square cover with the playlist's name below: it lifts
 // under the pointer, where a play button shows on it.
 func (a *app) playlistCard(c *ui.Context, pl *music.Playlist) {
-	if a.coverCard(c, pl.Name, pl.Images, pl.Owner.Name, func() { a.loadPlaylist(pl.ID, true) }) {
+	if a.coverCard(c, playlistName(pl), pl.Images, pl.Owner.Name, func() { a.loadPlaylist(pl.ID, true) }) {
 		a.open(route{page: pagePlaylist, id: pl.ID})
 	}
 }
@@ -231,7 +240,7 @@ func (a *app) playlistHeader(c *ui.Context, pl *music.Playlist) {
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
 			ui.Text(c, locales.Playlist()).FontSize(12).FontWeight(600).TextColor(p.muted)
-			ui.Text(c, pl.Name).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
+			ui.Text(c, playlistName(pl)).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
 			var meta []string
 			if pl.Owner.Name != "" {
 				meta = append(meta, pl.Owner.Name)

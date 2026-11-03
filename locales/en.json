@@ -273,5 +273,15 @@
   "dismiss": "Not now",
   "nowPlaying": "Now Playing",
   "newPlaylistEllipsis": "New Playlist…",
-  "selectLanguage": "Select language"
+  "selectLanguage": "Select language",
+  "likedSongs": "Liked Songs",
+  "loadFailed": "Failed to load, please try again later",
+  "soloistNotLoggedIn": "Soloist not logged in",
+  "playbackFailed": "Playback failed, please try again later",
+  "loginSuccessTitle": "Logged in",
+  "loginSuccessBody": "You can close this tab and return to MyGoify.",
+  "loginFailureTitle": "Login not completed",
+  "loginFailureBody": "Please return to MyGoify and try again.",
+  "loginMismatch": "MyGoify: login request mismatch, please return to MyGoify to log in again.",
+  "weekday": "{when, date, ::EEEE}"
 }

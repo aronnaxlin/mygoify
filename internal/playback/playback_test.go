@@ -222,7 +222,7 @@ func TestExplainFailure(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("the failure was not shown")
 	}
-	if got := p.Err(); got != "limited: 播放失败，请稍后再试" {
+	if got := p.Err(); got != "limited: playback failed" {
 		t.Fatalf("shown %q", got)
 	}
 }

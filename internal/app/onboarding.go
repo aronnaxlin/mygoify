@@ -36,6 +36,13 @@ var (
 	// spotifyLogin has the listener log in in the browser, and keeps the
 	// login in keep.
 	spotifyLogin = func(ctx context.Context, cfg auth.Config, keep secret.Store) error {
+		cfg.Messages = auth.Messages{
+			SuccessTitle: locales.LoginSuccessTitle(),
+			SuccessBody:  locales.LoginSuccessBody(),
+			FailureTitle: locales.LoginFailureTitle(),
+			FailureBody:  locales.LoginFailureBody(),
+			Mismatch:     locales.LoginMismatch(),
+		}
 		sess := auth.NewSession(cfg, secret.Entry{Store: keep, Name: secret.SpotifyLogin})
 		return sess.Login(ctx, openURL)
 	}

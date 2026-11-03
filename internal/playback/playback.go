@@ -5,6 +5,7 @@
 package playback
 
 import (
+	"errors"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -133,11 +134,14 @@ func (p *Player) Follow() {
 	p.b.Watch(func(st State) { p.post(func() { p.apply(st) }) })
 }
 
+// ErrPlaybackFailed is returned when a playback command fails and Explain is not set.
+var ErrPlaybackFailed = errors.New("playback failed")
+
 // run sends the commands to the backend in the order they were given.
 func (p *Player) run() {
 	for cmd := range p.cmds {
 		if err := cmd(); err != nil {
-			msg := "播放失败，请稍后再试"
+			msg := ErrPlaybackFailed.Error()
 			if p.Explain != nil {
 				msg = p.Explain(err, msg)
 			}

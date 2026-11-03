@@ -2787,3 +2787,103 @@ func SelectLanguage() string { return In(i18n.Locale()).SelectLanguage() }
 func (msgs Messages) SelectLanguage() string {
 	return Catalog.Format(msgs.locale, "selectLanguage", nil)
 }
+
+// LikedSongs says "喜欢的歌曲"
+// in the language the app shows.
+func LikedSongs() string { return In(i18n.Locale()).LikedSongs() }
+
+// LikedSongs says "喜欢的歌曲"
+// in the language of msgs.
+func (msgs Messages) LikedSongs() string {
+	return Catalog.Format(msgs.locale, "likedSongs", nil)
+}
+
+// LoadFailed says "加载失败，请稍后再试"
+// in the language the app shows.
+func LoadFailed() string { return In(i18n.Locale()).LoadFailed() }
+
+// LoadFailed says "加载失败，请稍后再试"
+// in the language of msgs.
+func (msgs Messages) LoadFailed() string {
+	return Catalog.Format(msgs.locale, "loadFailed", nil)
+}
+
+// SoloistNotLoggedIn says "Soloist 未登录"
+// in the language the app shows.
+func SoloistNotLoggedIn() string { return In(i18n.Locale()).SoloistNotLoggedIn() }
+
+// SoloistNotLoggedIn says "Soloist 未登录"
+// in the language of msgs.
+func (msgs Messages) SoloistNotLoggedIn() string {
+	return Catalog.Format(msgs.locale, "soloistNotLoggedIn", nil)
+}
+
+// PlaybackFailed says "播放失败，请稍后再试"
+// in the language the app shows.
+func PlaybackFailed() string { return In(i18n.Locale()).PlaybackFailed() }
+
+// PlaybackFailed says "播放失败，请稍后再试"
+// in the language of msgs.
+func (msgs Messages) PlaybackFailed() string {
+	return Catalog.Format(msgs.locale, "playbackFailed", nil)
+}
+
+// LoginSuccessTitle says "已登录"
+// in the language the app shows.
+func LoginSuccessTitle() string { return In(i18n.Locale()).LoginSuccessTitle() }
+
+// LoginSuccessTitle says "已登录"
+// in the language of msgs.
+func (msgs Messages) LoginSuccessTitle() string {
+	return Catalog.Format(msgs.locale, "loginSuccessTitle", nil)
+}
+
+// LoginSuccessBody says "可以关闭这个页面，回到 MyGoify。"
+// in the language the app shows.
+func LoginSuccessBody() string { return In(i18n.Locale()).LoginSuccessBody() }
+
+// LoginSuccessBody says "可以关闭这个页面，回到 MyGoify。"
+// in the language of msgs.
+func (msgs Messages) LoginSuccessBody() string {
+	return Catalog.Format(msgs.locale, "loginSuccessBody", nil)
+}
+
+// LoginFailureTitle says "登录未完成"
+// in the language the app shows.
+func LoginFailureTitle() string { return In(i18n.Locale()).LoginFailureTitle() }
+
+// LoginFailureTitle says "登录未完成"
+// in the language of msgs.
+func (msgs Messages) LoginFailureTitle() string {
+	return Catalog.Format(msgs.locale, "loginFailureTitle", nil)
+}
+
+// LoginFailureBody says "请回到 MyGoify 再试一次。"
+// in the language the app shows.
+func LoginFailureBody() string { return In(i18n.Locale()).LoginFailureBody() }
+
+// LoginFailureBody says "请回到 MyGoify 再试一次。"
+// in the language of msgs.
+func (msgs Messages) LoginFailureBody() string {
+	return Catalog.Format(msgs.locale, "loginFailureBody", nil)
+}
+
+// LoginMismatch says "MyGoify：登录请求不匹配，请回到 MyGoify 重新登录。"
+// in the language the app shows.
+func LoginMismatch() string { return In(i18n.Locale()).LoginMismatch() }
+
+// LoginMismatch says "MyGoify：登录请求不匹配，请回到 MyGoify 重新登录。"
+// in the language of msgs.
+func (msgs Messages) LoginMismatch() string {
+	return Catalog.Format(msgs.locale, "loginMismatch", nil)
+}
+
+// Weekday says "{when, date, ::EEEE}"
+// in the language the app shows.
+func Weekday(when time.Time) string { return In(i18n.Locale()).Weekday(when) }
+
+// Weekday says "{when, date, ::EEEE}"
+// in the language of msgs.
+func (msgs Messages) Weekday(when time.Time) string {
+	return Catalog.Format(msgs.locale, "weekday", map[string]any{"when": when})
+}

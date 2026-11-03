@@ -498,7 +498,7 @@ func (a *app) moreLiked() {
 				return
 			}
 			if err != nil {
-				pg.err = failed(err, "加载失败，请稍后再试")
+				pg.err = failed(err, locales.LoadFailed())
 				return
 			}
 			pg.more, pl.More = more, more

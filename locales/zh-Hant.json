@@ -273,5 +273,15 @@
   "dismiss": "稍後再說",
   "nowPlaying": "現正播放",
   "newPlaylistEllipsis": "建立播放清單…",
-  "selectLanguage": "選取語言"
+  "selectLanguage": "選取語言",
+  "likedSongs": "已按讚的歌曲",
+  "loadFailed": "載入失敗，請稍後再試",
+  "soloistNotLoggedIn": "Soloist 未登入",
+  "playbackFailed": "播放失敗，請稍後再試",
+  "loginSuccessTitle": "已登入",
+  "loginSuccessBody": "可以關閉此分頁，返回 MyGoify。",
+  "loginFailureTitle": "登入未完成",
+  "loginFailureBody": "請返回 MyGoify 再試一次。",
+  "loginMismatch": "MyGoify：登入請求不符，請返回 MyGoify 重新登入。",
+  "weekday": "{when, date, ::EEEE}"
 }

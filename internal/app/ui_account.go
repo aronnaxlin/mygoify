@@ -171,8 +171,9 @@ func (a *app) myPlaylists(c *ui.Context, title string, lists []music.Playlist, m
 	}
 	for i := range lists {
 		pl := &lists[i]
+		name := playlistName(pl)
 		selected := a.route.page == pagePlaylist && a.route.id == pl.ID && !a.nowPlaying
-		b := ui.ButtonBase(c.Key(pl.ID)).Height(34).PaddingX(8).Gap(10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).FocusRing(false).Label(pl.Name)
+		b := ui.ButtonBase(c.Key(pl.ID)).Height(34).PaddingX(8).Gap(10).Radius(8).AlignItems(ui.Center).Justify(ui.Start).FocusRing(false).Label(name)
 		switch {
 		case selected:
 			b.Background(p.press)
@@ -181,7 +182,7 @@ func (a *app) myPlaylists(c *ui.Context, title string, lists []music.Playlist, m
 		}
 		b.Children(func() {
 			a.cover(c, pl.Images, 80, 22, 5)
-			ui.Text(c, pl.Name).FontSize(13).SingleLine().Shrink(1).MinWidth(0)
+			ui.Text(c, name).FontSize(13).SingleLine().Shrink(1).MinWidth(0)
 		})
 		if mine && !pl.Liked {
 			b.ContextMenu(func(m *ui.Menu) {
