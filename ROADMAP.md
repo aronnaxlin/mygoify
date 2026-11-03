@@ -114,7 +114,7 @@
 
 - [ ] 内存门槛：Linux 上窗口打开时界面 PSS ≤ 200 MB，写进 `perf_test.go` 或基准脚本
 - [ ] 空闲 CPU：窗口静止时不请求新帧（沿用 cloudmusic 的帧预算测试）（`perf_test.go` 已覆盖正在播放页和背景；其他页面、窗口隐藏时的 CPU 未测）
-- [ ] 打包：Linux `.tar.gz` + `install.sh`；macOS arm64 `.dmg`（有 Developer ID 就签名和公证，升级不弹钥匙串授权；没有就 ad-hoc 签名，每个新版本弹一次，README 写明 Gatekeeper 怎么放行）
+- [ ] 打包：Linux `.tar.gz` + `install.sh`；macOS arm64 `.dmg`，ad-hoc 签名、不公证（2026-11-03 定，没有 Developer ID）。2026-11-03 在 macOS 27 真机实测：首次打开被 Gatekeeper 拦（"could not verify … free of malware"），"隐私与安全性"里点"仍要打开"并输密码放行；钥匙串要输一次密码点"始终允许"；首次播放要允许录音。手动下载新版本覆盖安装后，这三项都要再来一遍。应用内自动更新是否免掉 Gatekeeper 那一步待发版后实测。README 四语已写明
 - [ ] 签名的自动更新（mygo update，配置 Ed25519 公钥）（公钥已写进 `mygo.json`，App 已接入更新器；还没发布过版本，未实测）
 - [ ] README：安装、申请 Spotify 开发者应用和 Soloist key 的步骤、已知限制（§5.3）、Hyprland 快捷键示例
 - [ ] CHANGELOG、Release 流程（沿用 cloudmusic 的 `release.yml`）（两者都已沿用；`release.yml` 还带着 Windows 构建，未按 v1 的平台调整，也没走过一次）

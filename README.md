@@ -60,7 +60,12 @@ MyGoify features an onboarding wizard on first launch that guides you through ev
 Pre-built packages will be available starting with the first formal release:
 
 - **Linux**: Distributed as a `.tar.gz` archive with an `install.sh` script, installing to `~/.local` for the current user.
-- **macOS (Apple Silicon)**: Distributed as a `.dmg` disk image (code signing and notarization status TBD).
+- **macOS (Apple Silicon)**: Distributed as a `.dmg` disk image. The app is ad-hoc signed and not notarized, as the project has no Apple Developer ID, so macOS asks you to confirm it:
+  1. Drag MyGoify to Applications and open it. macOS says it "could not verify MyGoify is free of malware"; click **Done**.
+  2. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to MyGoify, then confirm with your password or Touch ID.
+  3. On first launch, allow MyGoify to use its keychain items (enter your password and choose **Always Allow**), and allow audio recording when a song first plays: the visualizer listens to Soloist only, in memory.
+
+  Because each version has a new ad-hoc signature, macOS asks these three again after you install a new version.
 
 ### Building from Source
 
