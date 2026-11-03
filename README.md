@@ -65,7 +65,7 @@ Pre-built packages will be available starting with the first formal release:
   2. Open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to MyGoify, then confirm with your password or Touch ID.
   3. On first launch, allow MyGoify to use its keychain items (enter your password and choose **Always Allow**), and allow audio recording when a song first plays: the visualizer listens to Soloist only, in memory.
 
-  Because each version has a new ad-hoc signature, macOS asks these three again after you install a new version.
+  Because each version has a new ad-hoc signature, macOS asks these three again after you install a new version by hand. Updating from within the app skips the Gatekeeper step, but still asks for the keychain once.
 
 ### Building from Source
 
