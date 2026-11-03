@@ -21,6 +21,8 @@ type Library interface {
 	// first, and those they saved.
 	MyPlaylists() (made, saved []music.Playlist, err error)
 	// Playlist returns a playlist with its tracks, unless it is Hidden.
+	// The liked songs come a page at a time: More says whether more
+	// follow, which LikedMore reads.
 	Playlist(id string) (*music.Playlist, error)
 	// Album returns an album with its songs.
 	Album(id string) (*music.AlbumProfile, error)
@@ -32,8 +34,12 @@ type Library interface {
 	// Search returns limit of what matches query, of a kind, from offset.
 	Search(query string, kind music.SearchType, limit, offset int) (music.SearchResult, error)
 
-	// LikedIDs are the tracks the listener likes.
-	LikedIDs() ([]string, error)
+	// LikedMore reads the page of the liked songs after those their
+	// playlist returned, and reports whether more follow.
+	LikedMore() ([]music.Track, bool, error)
+	// Likes reports which of the tracks the listener likes, the ones the
+	// app shows or is about to.
+	Likes(trackIDs []string) (map[string]bool, error)
 	Like(trackID string, like bool) error
 	FollowArtist(id string, follow bool) error
 

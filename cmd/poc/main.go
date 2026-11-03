@@ -380,7 +380,30 @@ func readLibrary() error {
 		if err != nil {
 			return "", err
 		}
-		return fmt.Sprintf("%d tracks; %s", len(p.Tracks), first(p.Tracks)), nil
+		return fmt.Sprintf("%d of %d tracks, more %v; %s", len(p.Tracks), p.TrackCount, p.More, first(p.Tracks)), nil
+	})
+	step("LikedMore", func() (string, error) {
+		tracks, more, err := l.LikedMore()
+		return fmt.Sprintf("%d more, more %v; %s", len(tracks), more, first(tracks)), err
+	})
+	step("Likes", func() (string, error) {
+		liked, err := l.Playlist("liked")
+		if err != nil || len(liked.Tracks) == 0 {
+			return "-", err
+		}
+		ids := liked.Tracks[:min(2, len(liked.Tracks))]
+		var need []string
+		for _, t := range ids {
+			need = append(need, t.ID)
+		}
+		likes, err := l.Likes(need)
+		var on []string
+		for id, liked := range likes {
+			if liked {
+				on = append(on, id)
+			}
+		}
+		return fmt.Sprintf("%d asked, %d liked: %v", len(need), len(on), on), err
 	})
 	if len(made) > 1 {
 		step("Playlist own", func() (string, error) {
@@ -400,10 +423,6 @@ func readLibrary() error {
 			return fmt.Sprintf("%d tracks, hidden %v (by %s)", len(p.Tracks), p.Hidden, p.Owner.Name), nil
 		})
 	}
-	step("LikedIDs", func() (string, error) {
-		ids, err := l.LikedIDs()
-		return fmt.Sprintf("%d", len(ids)), err
-	})
 	if album != "" {
 		step("Album", func() (string, error) {
 			a, err := l.Album(album)

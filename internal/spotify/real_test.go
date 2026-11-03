@@ -124,7 +124,16 @@ func TestRequestsReal(t *testing.T) {
 			_, err := l.Playlist(p.ID)
 			must(err)
 		}
-		_, err = l.LikedIDs()
+		liked, err := l.Playlist("liked")
+		must(err)
+		if _, _, err := l.LikedMore(); err != nil {
+			must(err)
+		}
+		var ids []string
+		for _, tr := range liked.Tracks[:min(20, len(liked.Tracks))] {
+			ids = append(ids, tr.ID)
+		}
+		_, err = l.Likes(ids)
 		must(err)
 		if len(home.Recent) > 0 {
 			_, err := l.Album(home.Recent[0].Album.ID)

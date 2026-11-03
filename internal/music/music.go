@@ -114,7 +114,10 @@ type Playlist struct {
 	// Development Mode, those of playlists the listener neither owns nor
 	// collaborates on. It still plays, as a whole.
 	Hidden bool
+	// Tracks are the playlist's songs, as many as were read: the liked
+	// songs come a page at a time, and More says whether more follow.
 	Tracks []Track
+	More   bool
 }
 
 // URI names the playlist to play it whole, or is "" for the liked songs,

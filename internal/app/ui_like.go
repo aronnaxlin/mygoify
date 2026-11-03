@@ -9,22 +9,77 @@ import (
 	"mygoify/internal/music"
 )
 
-// likes are the songs the listener likes, which hearts show filled.
+// likes are the songs the listener likes, which hearts show filled: the
+// app asks about those it shows, a batch at a time, and keeps the answers
+// while it runs. The player bar and the notch, which are there whatever
+// plays, only show what is known: asking as songs come and go would spend
+// the app's calls while the listener does nothing (DESIGN.md §4.2).
 
-// loadLiked loads the listener's liked songs.
-func (a *app) loadLiked(uid string) {
+// wantLike notes a song shown, to ask about once the frame is built.
+func (a *app) wantLike(id string) {
+	if id == "" || a.profile == nil {
+		return
+	}
+	if _, known := a.liked[id]; known || a.asking[id] {
+		return
+	}
+	a.want = append(a.want, id)
+}
+
+// askLikes asks which of the songs shown the listener likes, those not
+// asked about yet, and keeps the answers. Songs a call fails for stay
+// unknown, and are not asked about again until the listener signs in: a
+// call while Spotify limits the app fails at once, and asking each frame
+// would not help.
+func (a *app) askLikes() {
+	want := a.want
+	a.want = want[:0]
+	if len(want) == 0 {
+		return
+	}
+	if a.asking == nil {
+		a.asking = map[string]bool{}
+	}
+	var ids []string
+	for _, id := range want {
+		if _, known := a.liked[id]; known || a.asking[id] {
+			continue
+		}
+		a.asking[id] = true
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return
+	}
+	if a.liked == nil {
+		a.liked = map[string]bool{}
+	}
 	go func() {
-		ids, err := a.lib.LikedIDs()
+		likes, err := a.lib.Likes(ids)
 		a.post(func() {
-			if err != nil || a.profile == nil || a.profile.ID != uid {
-				return
-			}
-			a.liked = make(map[string]bool, len(ids))
 			for _, id := range ids {
-				a.liked[id] = true
+				if !a.asking[id] {
+					// Liked or unliked while the answer was coming: what
+					// the listener did stands, not the answer.
+					continue
+				}
+				if liked, ok := likes[id]; ok {
+					a.liked[id] = liked
+				}
+				if err == nil {
+					delete(a.asking, id)
+				}
 			}
 		})
 	}()
+}
+
+// setLikes marks the songs of a page shown as the listener likes them, as
+// the liked songs' own page does.
+func (a *app) setLikes(tracks []music.Track) {
+	for i := range tracks {
+		a.setLiked(tracks[i].ID, true)
+	}
 }
 
 // toggleLike likes a song, or unlikes it, at once in the app
@@ -35,9 +90,6 @@ func (a *app) toggleLike(tr *music.Track) {
 		a.showMain()
 		a.openOnboarding()
 		return
-	}
-	if a.liked == nil {
-		a.liked = map[string]bool{}
 	}
 	id, like := tr.ID, !a.liked[tr.ID]
 	a.setLiked(id, like)
@@ -62,7 +114,8 @@ func (a *app) toggleLike(tr *music.Track) {
 	}()
 }
 
-// isLiked reports whether the listener likes tr.
+// isLiked reports whether the listener likes tr: a song not asked about
+// yet shows as not liked until the answer comes.
 func (a *app) isLiked(tr *music.Track) bool {
 	return a.liked[tr.ID]
 }
@@ -86,11 +139,11 @@ func (a *app) likeCurrent() {
 }
 
 func (a *app) setLiked(id string, like bool) {
-	if like {
-		a.liked[id] = true
-	} else {
-		delete(a.liked, id)
+	if a.liked == nil {
+		a.liked = map[string]bool{}
 	}
+	a.liked[id] = like
+	delete(a.asking, id)
 }
 
 // likeButton is a heart that likes tr: filled in red once liked. Liking

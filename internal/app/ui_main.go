@@ -37,6 +37,8 @@ func headerArt(c *ui.Context) float32 {
 }
 
 func (a *app) view(c *ui.Context) {
+	// The hearts ask about what the frame shows, once it is built.
+	defer a.askLikes()
 	t := *c.Theme()
 	a.pal = paletteFor(&t)
 	p := a.pal
@@ -452,9 +454,44 @@ func (a *app) loadPlaylist(id string, thenPlay bool) {
 				return
 			}
 			a.playlists[id] = pl
+			if pl.Liked {
+				// Its songs are liked, and their hearts show without asking:
+				// they come a page at a time.
+				a.setLikes(pl.Tracks)
+				a.likedPage = paged{more: pl.More}
+			}
 			if thenPlay {
 				a.pl.PlayQueue(pl.URI(), pl.Tracks, firstPlayable(pl.Tracks))
 			}
+		})
+	}()
+}
+
+// moreLiked loads the page of the liked songs after those shown, as the
+// listener scrolls near their foot: the rows after them show as they load.
+func (a *app) moreLiked() {
+	pg := &a.likedPage
+	pl := a.playlists["liked"]
+	if pg.loading || pl == nil || !pl.More {
+		return
+	}
+	pg.loading, pg.err = true, ""
+	go func() {
+		tracks, more, err := a.lib.LikedMore()
+		a.post(func() {
+			pg.loading = false
+			if a.playlists["liked"] != pl {
+				// The songs were read again meanwhile, and the page is in
+				// what it shows already.
+				return
+			}
+			if err != nil {
+				pg.err = failed(err, "加载失败，请稍后再试")
+				return
+			}
+			pg.more, pl.More = more, more
+			pl.Tracks = append(pl.Tracks, tracks...)
+			a.setLikes(tracks)
 		})
 	}()
 }

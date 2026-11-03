@@ -30,7 +30,8 @@ func (a *app) boot() {
 // signedIn shows what is personal to prof, or to nobody.
 func (a *app) signedIn(prof *music.User) {
 	a.profile = prof
-	a.mine, a.saved, a.liked = nil, nil, nil
+	a.mine, a.saved, a.liked, a.asking = nil, nil, nil, nil
+	a.likedPage = paged{}
 	a.home = music.Home{}
 	// What the listener may play, and follows, changed: load the pages
 	// again.
@@ -44,7 +45,6 @@ func (a *app) signedIn(prof *music.User) {
 	}
 	a.load(a.route)
 	a.loadHome()
-	a.loadLiked(prof.ID)
 	a.loadMine(prof.ID)
 }
 

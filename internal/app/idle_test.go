@@ -51,7 +51,14 @@ func (l *countingLib) Search(q string, kind music.SearchType, limit, offset int)
 	l.called("Search")
 	return l.Library.Search(q, kind, limit, offset)
 }
-func (l *countingLib) LikedIDs() ([]string, error) { l.called("LikedIDs"); return l.Library.LikedIDs() }
+func (l *countingLib) Likes(ids []string) (map[string]bool, error) {
+	l.called("Likes")
+	return l.Library.Likes(ids)
+}
+func (l *countingLib) LikedMore() ([]music.Track, bool, error) {
+	l.called("LikedMore")
+	return l.Library.LikedMore()
+}
 func (l *countingLib) Like(id string, like bool) error {
 	l.called("Like")
 	return l.Library.Like(id, like)
@@ -89,12 +96,12 @@ func TestIdleAsksNothing(t *testing.T) {
 	a := newTestApp()
 	a.settings = defaultSettings()
 	f := library.NewFake()
-	// What boot would have loaded.
+	// What boot would have loaded. The hearts know nothing yet: the home
+	// page shows none, and the player bar and the notch ask not.
 	a.profile, _ = f.Me()
 	a.home, _ = f.Home()
 	a.homeAt = time.Now()
 	a.mine, a.saved, _ = f.MyPlaylists()
-	a.liked = map[string]bool{}
 	lib := &countingLib{Library: a.lib}
 	a.lib = lib
 	n := &notch{a: a, w0: 200, h0: 32, winW: notchOpenW + 60, winH: 240}
