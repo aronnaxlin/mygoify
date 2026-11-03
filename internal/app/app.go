@@ -191,6 +191,11 @@ var quitApp = func() { mygo.App.Quit() }
 
 // Run runs the app until it quits.
 func Run() error {
+	// One instance at a time: two both followed Soloist and sent it
+	// commands. Another, started, brings this one's window up and quits.
+	if !mygo.App.RequestSingleInstanceLock() {
+		return nil
+	}
 	a := &app{
 		playlists: map[string]*music.Playlist{},
 		loadingPl: map[string]bool{},
@@ -278,5 +283,6 @@ func Run() error {
 	mygo.App.OnQuit(a.leaveSoloist)
 	mygo.App.OnWindowAllClosed(func() {})
 	mygo.App.OnActivate(func(bool) { a.showMain() })
+	mygo.App.OnSecondInstance(func([]string, string) { a.showMain() })
 	return mygo.App.Run()
 }
