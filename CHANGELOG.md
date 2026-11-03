@@ -1,5 +1,11 @@
 # Changelog / 更新日志
 
+## 1.0.1
+
+- Lyrics show their translations only when the interface is in Chinese: the translations are Chinese, and showed under every line in English or Japanese too.
+
+- 只有界面是中文时才显示歌词翻译：翻译只有中文，之前在英文、日文界面下也会显示在每一行下面。
+
 ## 1.0.0
 
 The first release of MyGoify: a native Spotify desktop client written in Go with MyGo, which plays through Spotify's official Soloist.
