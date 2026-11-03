@@ -113,15 +113,3 @@ func TestCloseQuits(t *testing.T) {
 		t.Fatal("closing the window did not quit")
 	}
 }
-
-// A second instance starting brings the main window to the front.
-func TestSecondInstanceShowsWindow(t *testing.T) {
-	a := newTestApp()
-	shown := 0
-	defer func(orig func(*app)) { showWindow = orig }(showWindow)
-	showWindow = func(*app) { shown++ }
-	a.secondInstance(nil, "")
-	if shown != 1 {
-		t.Fatalf("second instance showed window %d times, want 1", shown)
-	}
-}

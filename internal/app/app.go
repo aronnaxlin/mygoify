@@ -189,15 +189,10 @@ func (a *app) canHide() bool { return runtime.GOOS == "darwin" || a.tray != nil 
 // quitApp quits; a test sees it.
 var quitApp = func() { mygo.App.Quit() }
 
-// secondInstance brings the main window to the front when another
-// instance starts.
-func (a *app) secondInstance([]string, string) { showWindow(a) }
-
-// showWindow brings the window to the front; a test sees it.
-var showWindow = func(a *app) { a.showMain() }
-
 // Run runs the app until it quits.
 func Run() error {
+	// One instance at a time: two both followed Soloist and sent it
+	// commands. Another, started, brings this one's window up and quits.
 	if !mygo.App.RequestSingleInstanceLock() {
 		return nil
 	}
@@ -288,6 +283,6 @@ func Run() error {
 	mygo.App.OnQuit(a.leaveSoloist)
 	mygo.App.OnWindowAllClosed(func() {})
 	mygo.App.OnActivate(func(bool) { a.showMain() })
-	mygo.App.OnSecondInstance(a.secondInstance)
+	mygo.App.OnSecondInstance(func([]string, string) { a.showMain() })
 	return mygo.App.Run()
 }
