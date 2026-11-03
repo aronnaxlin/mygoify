@@ -218,12 +218,20 @@ func (a *app) settingsView(c *ui.Context) {
 			})
 		})
 
-		group("账号", "", func() {
+		// What Soloist is, and what its version has left: renaming it takes
+		// the next start of the app, for the service file carries the name.
+		note := a.soloistAbout() + "设备名改名后，重启 App 生效。"
+		group("账号", note, func() {
 			row("连接 Spotify", func() {
 				if ui.Button(c.Key("onboarding"), "设置…").Clicked() {
 					a.showMain()
 					a.openOnboarding()
 					a.win.Invalidate()
+				}
+			})
+			row("设备名", func() {
+				if ui.TextInput(c.Key("device-name"), &s.Spotify.DeviceName).Placeholder("MyGoify").Label("填写设备名").FontSize(13).Width(200).Changed() {
+					a.keepSettings()
 				}
 			})
 			if a.profile == nil {

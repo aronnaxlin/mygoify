@@ -52,8 +52,8 @@
 - [x] 凭据存进钥匙串，token 自动刷新（macOS 钥匙串已实测；2026-11-01 Omarchy 上对 gnome-keyring 实测：存取、删除、从文件搬进钥匙串都正常，`MYGOIFY_KEYCHAIN=1 go test ./internal/secret` 可重测）
 - [x] 填 key 前停掉服务，在 data-dir 副本上验证（`Service.ChangeKey`，引导页的 key 步骤已接入；macOS 上 `CheckKey` 真 Soloist 实测通过；2026-11-01 Omarchy 上引导页里换 key 实测：错的 key 只碰副本，配对和钥匙串里的 key 不变；对的 key 停服务约 2 秒。不成样子的 key，Soloist 报的是 `make sure --api-key is valid`，以前没认出来，要等满 30 秒并提示"没能启动"，#26 已修）
 - [ ] Soloist 服务管理：systemd user unit / launchd agent，安装、启动、停止（App 启动时安装并拉起已完成，macOS 已实测；2026-11-01 Omarchy 实测：2 秒内装好并拉起，unit 不含 key，配置不变时重开 App 不重启 Soloist，崩溃后 1 秒内重启并恢复会话，退出码 10 不重启，三种退出方式、关窗时退出、切换登录时启动都符合预期，登录时真的自启未实测（要注销）；设置页"播放"可选退出时停止 / 暂停 / 继续播放、关窗时退出、登录时启动 Soloist，均已有单元测试；2026-11-01 macOS 真机实测：三种退出方式和关窗时退出符合预期，登录时启动 Soloist 未实测（要注销或重启）；key 在钥匙串，路径和设备名在设置文件，`.env` 只在开发时补空缺）
-- [ ] Soloist 和账户相关的配置全部运行时读取（DESIGN §4.2 "运行时配置"）：设置页可更换 key、可执行文件、设备名（key 和可执行文件可在引导页单步重做，从设置页"账号"进入；设备名还不能改；改完要重启 App）
-- [ ] 过期处理：`soloist --version` 算出到期日，设置页显示，到期前 14 天提醒；退出码 `10` → 只走"更新 Soloist"一步（launchd 和 systemd 已设置为退出码 10 时不重启；到期日、提醒和更新流程未做）
+- [x] Soloist 和账户相关的配置全部运行时读取（DESIGN §4.2 "运行时配置"）：设置页可更换 key、可执行文件、设备名（key 和可执行文件可在引导页单步重做，从设置页"账号"进入；设备名在设置页"账号"里改，下次启动 App 时写进 unit / agent，改名不影响配对；`--version` 读不出来的版本不显示，也不提醒）
+- [x] 过期处理：`soloist --version` 算出到期日（`internal/soloist` 的 `Version`，构建时间戳 + 90 天），设置页"账号"的脚注显示版本和到期日，到期前 14 天起每次启动用 toast 提醒一次；过期时直接打开引导页"更新 Soloist"一步（launchd 和 systemd 已设置为退出码 10 时不重启；到期日的计算、提醒的时间和进入更新流程都有测试；还没有真的过期过，Soloist 日志说 2026-11-03 还剩 87 天，我们算出的是整天数 86，差在向上取整，到期日都是 2027-01-28）
 - [ ] 实测并处理：key 失效或填错时 Soloist 的表现；换新版本后配对会话是否保留（key 填错已实测：会删掉配对会话，见 POC.md；换版本待测）
 - [x] `playback` 的 Soloist 实现：WebSocket 客户端、断线重连、状态插值
 - [x] 播放条：播放和暂停、上一首和下一首、seek、音量、随机、循环
