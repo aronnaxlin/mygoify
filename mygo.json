@@ -2,7 +2,7 @@
   "name": "MyGoify",
   "identifier": "io.github.aronnaxlin.mygoify",
   "slug": "mygoify",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "out": "build",
   "i18n": {
     "dir": "locales",
