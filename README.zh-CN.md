@@ -11,16 +11,22 @@
 
 MyGoify 是一个用 Go 和 [MyGo](https://github.com/egoist/mygo) 编写的原生轻量第三方 Spotify 桌面客户端，专注于纯粹的音乐体验。
 
-应用架构将界面展示与播放引擎完全分离：播放交由 Spotify 官方的无头播放器 **Soloist**，作为独立的用户级服务在后台运行。这种设计带来了极低的内存占用——在 Linux 上窗口打开时，界面进程实测约 217 MB（开启烟雾特效时），后台常驻的 Soloist 服务约 70 MB（相比之下官方桌面客户端约 900 MB）。关闭界面窗口后，音乐仍可在后台平稳播放。
+应用架构将界面展示与播放引擎完全分离：播放交由 Spotify 官方的无头播放器 **Soloist**，作为独立的用户级服务在后台运行。这种设计带来了极低的内存占用——在 Linux 上窗口打开时，界面进程实测约 110 MB，后台常驻的 Soloist 服务约 60 MB（PSS，正在播放时）（相比之下官方桌面客户端约 900 MB）。关闭界面窗口后，音乐仍可在后台平稳播放。
 
 本项目基于 [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) 分叉而来。衷心感谢 egoist 带来的优秀 UI 设计与交互架构。
 
 > **免责声明**：本项目为独立开源项目，与 Spotify AB 无任何官方关联。Spotify 是 Spotify AB 的注册商标。
 
-<!-- 截图占位
-![主界面（深色）](.github/assets/main-dark.png)
-![正在播放（浅色）](.github/assets/now-playing-light.png)
--->
+<table>
+<tr>
+<td><img src=".github/assets/main-dark.webp" alt="首页（深色）"></td>
+<td><img src=".github/assets/now-playing.webp" alt="正在播放：逐字歌词"></td>
+</tr>
+<tr>
+<td><img src=".github/assets/lyrics-stage.webp" alt="律动舞台"></td>
+<td><img src=".github/assets/playlist.webp" alt="歌单"></td>
+</tr>
+</table>
 
 ---
 

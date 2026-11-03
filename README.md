@@ -11,16 +11,22 @@ English | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [�
 
 MyGoify is a native, lightweight third-party Spotify desktop client built with Go and [MyGo](https://github.com/egoist/mygo), focused exclusively on music playback.
 
-The application architecture separates the user interface from the audio engine: playback is handled by Spotify's official headless player, **Soloist**, which runs as a lightweight user service. This architecture keeps memory usage significantly lower than the official client — roughly 220 MB PSS for the UI process (measured ~217 MB with the reactive smoke visual effect enabled) and ~70 MB for the background Soloist daemon (measured on Linux with the window open, compared to ~900 MB for the official desktop client). Closing the window keeps the music playing smoothly in the background.
+The application architecture separates the user interface from the audio engine: playback is handled by Spotify's official headless player, **Soloist**, which runs as a lightweight user service. This architecture keeps memory usage significantly lower than the official client — about 110 MB for the UI process and 60 MB for Soloist (PSS, measured on Linux with the window open while playing), compared to ~900 MB for the official desktop client. Closing the window keeps the music playing smoothly in the background.
 
 This project was forked from [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic). We extend our sincere gratitude to egoist for the original UI design and architecture.
 
 > **Disclaimer**: MyGoify is an independent open-source project and is not affiliated with, endorsed by, or associated with Spotify AB. Spotify is a registered trademark of Spotify AB.
 
-<!-- Screenshot placeholder
-![Main Window (Dark)](.github/assets/main-dark.png)
-![Now Playing (Light)](.github/assets/now-playing-light.png)
--->
+<table>
+<tr>
+<td><img src=".github/assets/main-dark.webp" alt="Home (dark)"></td>
+<td><img src=".github/assets/now-playing.webp" alt="Now Playing with word-by-word lyrics"></td>
+</tr>
+<tr>
+<td><img src=".github/assets/lyrics-stage.webp" alt="Lyrics stage"></td>
+<td><img src=".github/assets/playlist.webp" alt="Playlist"></td>
+</tr>
+</table>
 
 ---
 

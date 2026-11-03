@@ -11,16 +11,22 @@
 
 MyGoify は、Go 言語と [MyGo](https://github.com/egoist/mygo) で構築された、音楽再生専用の軽量かつネイティブなサードパーティ製 Spotify デスクトップクライアントです。
 
-ユーザーインターフェースと再生エンジンを完全に分離したアーキテクチャを採用しており、再生処理は Spotify 公式のヘッドレスプレイヤー **Soloist** がユーザーサービスとしてバックグラウンドで担います。この設計により、公式クライアント（約 900 MB）と比較して極めて低いメモリ消費量を実現しています。Linux 環境における実測値では、ウィンドウ表示時の UI プロセスが約 217 MB（スモークエフェクト有効時）、常駐する Soloist サービスが約 70 MB です。UI ウィンドウを閉じても、バックグラウンドで音楽を途切れることなく再生し続けることができます。
+ユーザーインターフェースと再生エンジンを完全に分離したアーキテクチャを採用しており、再生処理は Spotify 公式のヘッドレスプレイヤー **Soloist** がユーザーサービスとしてバックグラウンドで担います。この設計により、公式クライアント（約 900 MB）と比較して極めて低いメモリ消費量を実現しています。Linux 環境における実測値では、再生中・ウィンドウ表示時の UI プロセスが約 110 MB、常駐する Soloist サービスが約 60 MB（PSS）です。UI ウィンドウを閉じても、バックグラウンドで音楽を途切れることなく再生し続けることができます。
 
 本プロジェクトは [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) からフォークして開発されています。洗練された UI デザインとアーキテクチャの基礎を築かれた egoist 氏に心より感謝申し上げます。
 
 > **免責事項**：本プロジェクトは独立したオープンソースプロジェクトであり、Spotify AB との提携、承認、または公式な関係はありません。Spotify は Spotify AB の登録商標です。
 
-<!-- スクリーンショット用プレースホルダー
-![メイン画面（ダーク）](.github/assets/main-dark.png)
-![再生中画面（ライト）](.github/assets/now-playing-light.png)
--->
+<table>
+<tr>
+<td><img src=".github/assets/main-dark.webp" alt="ホーム（ダーク）"></td>
+<td><img src=".github/assets/now-playing.webp" alt="再生中：一語ずつの歌詞"></td>
+</tr>
+<tr>
+<td><img src=".github/assets/lyrics-stage.webp" alt="歌詞ステージ"></td>
+<td><img src=".github/assets/playlist.webp" alt="プレイリスト"></td>
+</tr>
+</table>
 
 ---
 
