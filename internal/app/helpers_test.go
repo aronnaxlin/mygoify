@@ -23,16 +23,19 @@ func newTestApp() *app {
 // here, to see what the app asks or to answer otherwise.
 type stubLib struct {
 	*library.Fake
-	like   func(id string, like bool) error
-	album  func(id string) (*music.AlbumProfile, error)
-	artist func(id string) (*music.ArtistProfile, error)
-	follow func(id string, follow bool) error
-	search func(q string, kind music.SearchType, limit, offset int) (music.SearchResult, error)
-	create func(name string) (*music.Playlist, error)
-	rename func(id, name string) error
-	add    func(id string, tracks ...string) error
-	remove func(id string, tracks ...string) error
-	delete func(id string) error
+	like      func(id string, like bool) error
+	album     func(id string) (*music.AlbumProfile, error)
+	artist    func(id string) (*music.ArtistProfile, error)
+	follow    func(id string, follow bool) error
+	search    func(q string, kind music.SearchType, limit, offset int) (music.SearchResult, error)
+	playlist  func(id string) (*music.Playlist, error)
+	likedMore func() ([]music.Track, bool, error)
+	likes     func(ids []string) (map[string]bool, error)
+	create    func(name string) (*music.Playlist, error)
+	rename    func(id, name string) error
+	add       func(id string, tracks ...string) error
+	remove    func(id string, tracks ...string) error
+	delete    func(id string) error
 }
 
 // stub returns the stub library of a test's app.
@@ -71,6 +74,27 @@ func (s *stubLib) Search(q string, kind music.SearchType, limit, offset int) (mu
 		return s.search(q, kind, limit, offset)
 	}
 	return s.Fake.Search(q, kind, limit, offset)
+}
+
+func (s *stubLib) Playlist(id string) (*music.Playlist, error) {
+	if s.playlist != nil {
+		return s.playlist(id)
+	}
+	return s.Fake.Playlist(id)
+}
+
+func (s *stubLib) LikedMore() ([]music.Track, bool, error) {
+	if s.likedMore != nil {
+		return s.likedMore()
+	}
+	return s.Fake.LikedMore()
+}
+
+func (s *stubLib) Likes(ids []string) (map[string]bool, error) {
+	if s.likes != nil {
+		return s.likes(ids)
+	}
+	return s.Fake.Likes(ids)
 }
 
 func (s *stubLib) CreatePlaylist(name string) (*music.Playlist, error) {

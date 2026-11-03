@@ -50,11 +50,9 @@ func TestFakeLike(t *testing.T) {
 		t.Fatalf("liked songs: %+v", p)
 	}
 	f.Like(tr.ID, false)
-	ids, _ := f.LikedIDs()
-	for _, id := range ids {
-		if id == tr.ID {
-			t.Fatal("still liked")
-		}
+	likes, _ := f.Likes([]string{tr.ID})
+	if likes[tr.ID] {
+		t.Fatal("still liked")
 	}
 }
 

@@ -63,7 +63,10 @@ type app struct {
 	accountOpen bool            // the dropdown of the account row shows
 	naming      nameDialog      // the name of a playlist asked for
 	deleting    deleteDialog    // whether to delete a playlist, asked
-	liked       map[string]bool // the songs the listener likes
+	liked       map[string]bool // whether the listener likes each song asked about
+	asking      map[string]bool // the songs asked about, whose answer is coming
+	want        []string        // the songs shown in this frame, to ask about
+	likedPage   paged           // the liked songs, as they load past their first page
 	toast       string          // a message to show once
 
 	home        music.Home
@@ -262,7 +265,8 @@ func Run() error {
 		// From the menu bar alone, the Dock icon shows while the window
 		// does.
 		a.syncDock()
-		a.win.OnShow(a.syncDock)
+		// Shown again, it draws: what it shows may be asked about then.
+		a.win.OnShow(func() { a.syncDock(); a.redraw() })
 		a.win.OnHide(a.syncDock)
 		// Shown or switched to the morning after, it shows the new day's.
 		a.win.OnFocus(a.freshenHome)

@@ -24,12 +24,12 @@ type Library struct {
 
 	mu sync.Mutex
 	me *music.User
-	// The liked songs, as read last, for a while: their playlist and the
-	// hearts both read them.
+	// The liked songs, as read so far: their playlist reads them a page at
+	// a time, and keeps them here while it shows.
 	liked   *likedSongs
 	likedAt time.Time
-	// syncing is held while the liked songs are read: the hearts and
-	// their playlist ask at once, and read them once.
+	// syncing is held while the liked songs are read: their playlist asks
+	// again as it is shown, and reads them once.
 	syncing sync.Mutex
 }
 
@@ -282,23 +282,36 @@ const likedID = "liked"
 // maxLiked is how many liked songs the app reads, the latest liked first.
 const maxLiked = 10000
 
+// likedPage is how many liked songs the app reads at a time: the most
+// Spotify gives.
+const likedPage = 50
+
 // likedFresh is how long the liked songs read stay good.
 const likedFresh = 2 * time.Minute
 
-// likedWhole is how long the liked songs are only read since the latest
-// read, before they are read whole again: songs unliked in another app,
-// as many as were liked, go unnoticed until then.
+// likedWhole is how long the liked songs are read only from the top, since
+// the latest read: a song unliked in another app goes unnoticed until then,
+// which reads them from the top again.
 const likedWhole = 24 * time.Hour
 
-// likedSongs are the liked songs read, the latest liked first: those the
-// app plays, and how many Spotify counted besides, as local files.
+// likedSongs are the liked songs read so far, the latest liked first:
+// those the app plays, and how many Spotify counted besides, as local
+// files. Spotify's list goes on past them as the app pages down.
 type likedSongs struct {
 	Tracks  []music.Track
 	Skipped int
-	Whole   time.Time // when they were last read whole
+	// Read is how many of Spotify's list were read, the skipped among
+	// them: the page after them starts there.
+	Read int
+	// Total is how many Spotify counts.
+	Total int
+	Whole time.Time // when they were last read from the top
 }
 
 func (s *likedSongs) count() int { return len(s.Tracks) + s.Skipped }
+
+// more reports whether Spotify's list goes on past what was read.
+func (s *likedSongs) more() bool { return s.Read > 0 && s.Read < min(s.Total, maxLiked) }
 
 func (s *likedSongs) add(t *track) {
 	if t.playable() {
@@ -312,17 +325,18 @@ type savedPage = page[struct {
 	Track track `json:"track"`
 }]
 
-// likedTracks returns the liked songs, the latest liked first, as read
-// last if lately. Kept from before, they are read only since then, which
-// takes a call; when Spotify limits the app, they answer as they are.
-func (l *Library) likedTracks() ([]music.Track, error) {
+// likedList returns the liked songs read so far, the latest liked first,
+// read from the top once more when what was kept is old: the first page,
+// and the songs liked since. The rest follows as the app pages down. When
+// Spotify limits the app, they answer as read.
+func (l *Library) likedList() (*likedSongs, error) {
 	l.syncing.Lock()
 	defer l.syncing.Unlock()
 	l.mu.Lock()
 	have := l.liked
 	if have != nil && time.Since(l.likedAt) < likedFresh {
 		l.mu.Unlock()
-		return have.Tracks, nil
+		return have, nil
 	}
 	l.mu.Unlock()
 	name, err := l.mine("liked")
@@ -332,12 +346,17 @@ func (l *Library) likedTracks() ([]music.Track, error) {
 	if have == nil {
 		if kept, _, ok := load[likedSongs](l, name); ok {
 			have = &kept
+			if have.Read == 0 && len(have.Tracks) > 0 {
+				// Kept before they were read a page at a time: all of
+				// them were read.
+				have.Read, have.Total = have.count(), have.count()
+			}
 		}
 	}
 	got, err := l.readLiked(have)
 	if err != nil {
 		if have != nil {
-			return have.Tracks, nil
+			return have, nil
 		}
 		return nil, err
 	}
@@ -345,40 +364,59 @@ func (l *Library) likedTracks() ([]music.Track, error) {
 	l.mu.Lock()
 	l.liked, l.likedAt = got, time.Now()
 	l.mu.Unlock()
-	return got.Tracks, nil
+	return got, nil
 }
 
-// readLiked reads the songs liked since have, ahead of have, or all of
-// them, when have is old or no longer adds up to what Spotify counts.
+// readLiked reads the liked songs from the top: the first page, and what
+// was liked since have. What have read past that stays, to be read on
+// from, unless Spotify counts fewer than were read, as when a song was
+// unliked in another app: then it starts over from the first page.
 func (l *Library) readLiked(have *likedSongs) (*likedSongs, error) {
 	var first savedPage
-	if err := l.do("GET", "/me/tracks?limit=50", nil, &first); err != nil {
+	if err := l.do("GET", fmt.Sprintf("/me/tracks?limit=%d", likedPage), nil, &first); err != nil {
 		return nil, err
 	}
-	if have != nil && time.Since(have.Whole) < likedWhole && len(have.Tracks) > 0 && first.Total <= maxLiked {
-		got, ok, err := l.likedSince(have, first)
-		if ok || err != nil {
+	if have != nil && len(have.Tracks) > 0 && time.Since(have.Whole) < likedWhole && first.Total >= have.Total {
+		if got, ok, err := l.likedSince(have, first); ok || err != nil {
 			return got, err
 		}
 	}
-	return l.readAllLiked(first)
+	return likedFirst(first), nil
+}
+
+// likedFirst is the first page of the liked songs, and how far they were
+// read.
+func likedFirst(first savedPage) *likedSongs {
+	got := &likedSongs{Whole: time.Now(), Read: len(first.Items), Total: first.Total}
+	for i := range first.Items {
+		got.add(&first.Items[i].Track)
+	}
+	return got
 }
 
 // likedSince reads the songs liked since have, from the first page on,
-// until the latest of have. Past a few pages, reading them all costs as
-// much.
+// until the latest of have. Past a few pages, reading the first again
+// costs as much.
 func (l *Library) likedSince(have *likedSongs, first savedPage) (*likedSongs, bool, error) {
 	latest := have.Tracks[0].ID
-	got := &likedSongs{Whole: have.Whole}
+	got := &likedSongs{Whole: have.Whole, Total: first.Total}
+	before := 0 // of Spotify's list, read ahead of have
 	p := first
 	for range 4 {
 		for i := range p.Items {
 			t := &p.Items[i].Track
 			if t.playable() && t.ID == latest {
+				if have.Total+before != first.Total {
+					// Liked and unliked since: what have read sits
+					// elsewhere in Spotify's list.
+					return nil, false, nil
+				}
 				got.Tracks = append(got.Tracks, have.Tracks...)
 				got.Skipped += have.Skipped
-				return got, got.count() == first.Total, nil
+				got.Read = have.Read + before
+				return got, true, nil
 			}
+			before++
 			got.add(t)
 		}
 		if p.Next == "" {
@@ -393,41 +431,42 @@ func (l *Library) likedSince(have *likedSongs, first savedPage) (*likedSongs, bo
 	return nil, false, nil
 }
 
-// readAllLiked reads all the liked songs. The first page says how many
-// there are, and the others are read four at a time: a page of 50 takes
-// a third of a second, and one after another 2000 songs took more than
-// ten.
-func (l *Library) readAllLiked(first savedPage) (*likedSongs, error) {
-	total := min(first.Total, maxLiked)
-	pages := make([]savedPage, (total+49)/50)
-	if len(pages) > 0 {
-		pages[0] = first
+// LikedMore reads the page of the liked songs after those read, and
+// reports whether more follow.
+func (l *Library) LikedMore() ([]music.Track, bool, error) {
+	l.syncing.Lock()
+	defer l.syncing.Unlock()
+	l.mu.Lock()
+	have := l.liked
+	l.mu.Unlock()
+	if have == nil || !have.more() {
+		// Nothing was read yet, or all of it was: their playlist reads the
+		// first page, which shows before any page follows it.
+		return nil, false, nil
 	}
-	errs := make([]error, len(pages))
-	var wg sync.WaitGroup
-	next := make(chan int)
-	for range 4 {
-		wg.Go(func() {
-			for i := range next {
-				errs[i] = l.do("GET", fmt.Sprintf("/me/tracks?limit=50&offset=%d", i*50), nil, &pages[i])
-			}
-		})
+	var p savedPage
+	if err := l.do("GET", fmt.Sprintf("/me/tracks?limit=%d&offset=%d", likedPage, have.Read), nil, &p); err != nil {
+		return nil, false, err
 	}
-	for i := 1; i < len(pages); i++ {
-		next <- i
+	got := *have
+	got.Tracks = slices.Clone(have.Tracks)
+	added := len(got.Tracks)
+	for i := range p.Items {
+		got.add(&p.Items[i].Track)
 	}
-	close(next)
-	wg.Wait()
-	if err := errors.Join(errs...); err != nil {
-		return nil, err
+	got.Read += len(p.Items)
+	got.Total = p.Total
+	if len(p.Items) == 0 {
+		// Nothing more, whatever Spotify counts.
+		got.Total = got.Read
 	}
-	got := &likedSongs{Whole: time.Now()}
-	for _, p := range pages {
-		for i := range p.Items {
-			got.add(&p.Items[i].Track)
-		}
+	if name, err := l.mine("liked"); err == nil {
+		l.store(name, &got)
 	}
-	return got, nil
+	l.mu.Lock()
+	l.liked, l.likedAt = &got, time.Now()
+	l.mu.Unlock()
+	return got.Tracks[added:], got.more(), nil
 }
 
 // playlistsFresh is how long the listener's playlists read stay good.
@@ -537,13 +576,14 @@ func (l *Library) likedPlaylist() (*music.Playlist, error) {
 	if err != nil {
 		return nil, err
 	}
-	liked, err := l.likedTracks()
+	liked, err := l.likedList()
 	if err != nil {
 		return nil, err
 	}
-	p := &music.Playlist{ID: likedID, Name: "喜欢的歌曲", Liked: true, Owner: *me, Images: music.Images{{URL: music.LikedCover}}, Tracks: liked}
-	p.TrackCount = len(p.Tracks)
-	p.Snapshot = fmt.Sprint(len(p.Tracks))
+	p := &music.Playlist{
+		ID: likedID, Name: "喜欢的歌曲", Liked: true, Owner: *me, Images: music.Images{{URL: music.LikedCover}},
+		Tracks: liked.Tracks, TrackCount: liked.Total, More: liked.more(), Snapshot: fmt.Sprint(liked.Read),
+	}
 	return p, nil
 }
 
@@ -668,13 +708,32 @@ func (l *Library) Search(query string, kind music.SearchType, limit, offset int)
 	return out, nil
 }
 
-func (l *Library) LikedIDs() ([]string, error) {
-	liked, err := l.likedTracks()
-	ids := make([]string, 0, len(liked))
-	for _, t := range liked {
-		ids = append(ids, t.ID)
+// likesBatch is how many tracks Likes asks about at once: the most the
+// Web API takes.
+const likesBatch = 50
+
+// Likes reports which of the tracks the listener likes. A batch Spotify
+// refuses leaves its tracks out, and err says why.
+func (l *Library) Likes(trackIDs []string) (map[string]bool, error) {
+	likes := make(map[string]bool, len(trackIDs))
+	for ids := trackIDs; len(ids) > 0; {
+		batch := ids[:min(len(ids), likesBatch)]
+		ids = ids[len(batch):]
+		uris := make([]string, len(batch))
+		for i, id := range batch {
+			uris[i] = "spotify:track:" + id
+		}
+		var got []bool
+		if err := l.do("GET", "/me/library/contains?uris="+url.QueryEscape(strings.Join(uris, ",")), nil, &got); err != nil {
+			return likes, err
+		}
+		for i, id := range batch {
+			if i < len(got) {
+				likes[id] = got[i]
+			}
+		}
 	}
-	return ids, err
+	return likes, nil
 }
 
 // keep saves uri in the listener's library, or takes it out.
@@ -703,9 +762,16 @@ func (l *Library) Like(trackID string, like bool) error {
 		l.likedAt = time.Time{}
 		return nil
 	}
-	// Unliked, it leaves what was read, which stays good.
+	// Unliked, it leaves what was read, which stays good: the songs after
+	// it in Spotify's list move up one, and the page after them starts
+	// one earlier when it was among them.
 	got := *l.liked
-	got.Tracks = slices.DeleteFunc(slices.Clone(got.Tracks), func(t music.Track) bool { return t.ID == trackID })
+	tracks := slices.DeleteFunc(slices.Clone(got.Tracks), func(t music.Track) bool { return t.ID == trackID })
+	if len(tracks) < len(got.Tracks) {
+		got.Read--
+	}
+	got.Tracks = tracks
+	got.Total--
 	l.liked = &got
 	l.store(name, &got)
 	return nil

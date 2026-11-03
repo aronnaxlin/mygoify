@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -17,12 +18,23 @@ type countingLib struct {
 	library.Library
 	mu    sync.Mutex
 	calls []string
+	likes [][]string // the songs each call to Likes asked about
 }
 
 func (l *countingLib) called(name string) {
 	l.mu.Lock()
 	l.calls = append(l.calls, name)
 	l.mu.Unlock()
+}
+
+// take returns what was asked since the last take: its calls, and the
+// songs each of them asked about.
+func (l *countingLib) take() (calls []string, likes [][]string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	calls, likes = l.calls, l.likes
+	l.calls, l.likes = nil, nil
+	return calls, likes
 }
 
 func (l *countingLib) Me() (*music.User, error)  { l.called("Me"); return l.Library.Me() }
@@ -51,7 +63,17 @@ func (l *countingLib) Search(q string, kind music.SearchType, limit, offset int)
 	l.called("Search")
 	return l.Library.Search(q, kind, limit, offset)
 }
-func (l *countingLib) LikedIDs() ([]string, error) { l.called("LikedIDs"); return l.Library.LikedIDs() }
+func (l *countingLib) Likes(ids []string) (map[string]bool, error) {
+	l.mu.Lock()
+	l.calls = append(l.calls, "Likes")
+	l.likes = append(l.likes, slices.Clone(ids))
+	l.mu.Unlock()
+	return l.Library.Likes(ids)
+}
+func (l *countingLib) LikedMore() ([]music.Track, bool, error) {
+	l.called("LikedMore")
+	return l.Library.LikedMore()
+}
 func (l *countingLib) Like(id string, like bool) error {
 	l.called("Like")
 	return l.Library.Like(id, like)
@@ -81,10 +103,12 @@ func (l *countingLib) DeletePlaylist(id string) error {
 	return l.Library.DeletePlaylist(id)
 }
 
-// Left alone once it loaded, the window hidden or shown, the app asks
-// Spotify nothing however long the music plays: the developer account's
-// calls are few (DESIGN.md §5.3), and a refresh on a timer would spend
-// them all day in the menu bar.
+// Left alone with the window hidden, the app asks Spotify nothing however
+// long the music plays, even while its view is built: the developer
+// account's calls are few (DESIGN.md §5.3), and a refresh on a timer would
+// spend them all day in the menu bar. Shown, the window asks about the song
+// playing, so that the player bar's heart is right: once for each song
+// whose heart it does not know, and not again for one it does.
 func TestIdleAsksNothing(t *testing.T) {
 	a := newTestApp()
 	a.settings = defaultSettings()
@@ -94,9 +118,25 @@ func TestIdleAsksNothing(t *testing.T) {
 	a.home, _ = f.Home()
 	a.homeAt = time.Now()
 	a.mine, a.saved, _ = f.MyPlaylists()
-	a.liked = map[string]bool{}
 	lib := &countingLib{Library: a.lib}
 	a.lib = lib
+	// The answers come on a goroutine, as with Spotify: run them by hand.
+	answered := make(chan func(), 64)
+	a.inline = func(fn func()) { answered <- fn }
+	drain := func() {
+		for {
+			select {
+			case fn := <-answered:
+				fn()
+			default:
+				return
+			}
+		}
+	}
+	shows := false
+	original := windowShows
+	windowShows = func(*app) bool { return shows }
+	t.Cleanup(func() { windowShows = original })
 	n := &notch{a: a, w0: 200, h0: 32, winW: notchOpenW + 60, winH: 240}
 	a.notch = n
 	a.settings.Notch = true
@@ -104,30 +144,54 @@ func TestIdleAsksNothing(t *testing.T) {
 	a.pl.Cue(tracks)
 	a.pl.Start()
 
-	// Hidden, only the notch is drawn; shown, the window is too.
-	notchView := ui.NewTester(n.view, int(n.winW), int(n.winH))
-	var mainView *ui.Tester
-	for step := range 120 {
-		if step == 60 {
-			mainView = ui.NewTester(a.view, 1200, 800)
-		}
-		for _, tt := range []*ui.Tester{notchView, mainView} {
-			if tt != nil {
+	// The window's view is built either way, as it is when it is shown or
+	// hidden; the notch's always.
+	views := []*ui.Tester{ui.NewTester(n.view, int(n.winW), int(n.winH)), ui.NewTester(a.view, 1200, 800)}
+	play := func(steps int) {
+		for step := range steps {
+			for _, tt := range views {
 				tt.Advance(time.Minute)
 				tt.Frame()
 			}
-		}
-		// A song ends every few minutes.
-		if step%4 == 3 {
-			a.pl.Next()
-			a.syncWindows()
+			// A song ends every few minutes.
+			if step%4 == 3 {
+				a.pl.Next()
+				a.syncWindows()
+			}
+			drain()
 		}
 	}
+
+	play(60)
 	// What the app asks, it asks on a goroutine.
 	time.Sleep(50 * time.Millisecond)
-	lib.mu.Lock()
-	defer lib.mu.Unlock()
-	if len(lib.calls) > 0 {
-		t.Errorf("asked Spotify %v while left alone", lib.calls)
+	drain()
+	if calls, _ := lib.take(); len(calls) > 0 {
+		t.Fatalf("asked Spotify %v with the window hidden", calls)
+	}
+
+	shows = true
+	play(60)
+	time.Sleep(50 * time.Millisecond)
+	drain()
+	calls, likes := lib.take()
+	asked := map[string]int{}
+	for _, batch := range likes {
+		for _, id := range batch {
+			asked[id]++
+		}
+	}
+	for _, call := range calls {
+		if call != "Likes" {
+			t.Errorf("asked the library %s while the listener did nothing", call)
+		}
+	}
+	for i := range tracks {
+		if n := asked[tracks[i].ID]; n != 1 {
+			t.Errorf("asked about %s %d times while it played, want once", tracks[i].Name, n)
+		}
+	}
+	if len(asked) != len(tracks) {
+		t.Errorf("asked about %v, of the songs that played", asked)
 	}
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -21,6 +22,15 @@ var skeletonScenes = []struct {
 	{"playlist", func(a *app) {
 		a.route = route{page: pagePlaylist, id: "7"}
 		a.loadingPl["7"] = true
+	}},
+	{"liked", func(a *app) {
+		var tracks []music.Track
+		for i := range 5 {
+			tracks = append(tracks, music.Track{ID: fmt.Sprint("t", i), Name: "一首喜欢的歌", Duration: 200000})
+		}
+		a.route = route{page: pagePlaylist, id: "liked"}
+		a.playlists["liked"] = &music.Playlist{ID: "liked", Name: "喜欢的歌曲", Liked: true, Tracks: tracks, TrackCount: 120, More: true}
+		a.likedPage = paged{more: true, loading: true}
 	}},
 	{"search", func(a *app) {
 		a.route = route{page: pageSearch, query: "春日影", kind: music.SearchTracks}

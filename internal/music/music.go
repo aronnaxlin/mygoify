@@ -114,16 +114,23 @@ type Playlist struct {
 	// Development Mode, those of playlists the listener neither owns nor
 	// collaborates on. It still plays, as a whole.
 	Hidden bool
+	// Tracks are the playlist's songs, as many as were read: the liked
+	// songs come a page at a time, and More says whether more follow.
 	Tracks []Track
+	More   bool
 }
 
-// URI names the playlist to play it whole, or is "" for the liked songs,
-// which the Web API plays not as a context: as a list of their tracks.
+// URI names what plays the playlist whole: the playlist, or the liked
+// songs as the listener's collection, their owner's, which Spotify plays
+// as a context of its own. It is "" for liked songs of no owner.
 func (p *Playlist) URI() string {
-	if p.Liked {
+	if !p.Liked {
+		return "spotify:playlist:" + p.ID
+	}
+	if p.Owner.ID == "" {
 		return ""
 	}
-	return "spotify:playlist:" + p.ID
+	return "spotify:user:" + p.Owner.ID + ":collection"
 }
 
 func (p *Playlist) URL() string { return "https://open.spotify.com/playlist/" + p.ID }

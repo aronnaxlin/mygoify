@@ -31,6 +31,7 @@ type Fake struct {
 	made      []string // the listener's playlists, newest first
 	saved     []string
 	liked     []string // track IDs, the latest liked first
+	likedRead int      // how many of them their playlist has shown
 	followed  map[string]bool
 	recent    []music.Track
 	nextID    int
@@ -161,14 +162,17 @@ func (f *Fake) Home() (music.Home, error) {
 	return h, nil
 }
 
+// fakeLikedPage is how many liked songs Fake's playlist shows at a time.
+const fakeLikedPage = 50
+
 func (f *Fake) likedPlaylist() music.Playlist {
-	p := music.Playlist{ID: "liked", Name: "喜欢的歌曲", Liked: true, Owner: f.me, Images: fakeImages("liked"), Snapshot: fmt.Sprint(len(f.liked))}
-	for _, id := range f.liked {
+	shown := min(len(f.liked), fakeLikedPage)
+	p := music.Playlist{ID: "liked", Name: "喜欢的歌曲", Liked: true, Owner: f.me, Images: fakeImages("liked"), TrackCount: len(f.liked), More: shown < len(f.liked), Snapshot: fmt.Sprint(shown)}
+	for _, id := range f.liked[:shown] {
 		if tr, ok := f.track(id); ok {
 			p.Tracks = append(p.Tracks, tr)
 		}
 	}
-	p.TrackCount = len(p.Tracks)
 	return p
 }
 
@@ -209,6 +213,7 @@ func (f *Fake) Playlist(id string) (*music.Playlist, error) {
 	defer f.mu.Unlock()
 	if id == "liked" {
 		p := f.likedPlaylist()
+		f.likedRead = min(len(f.liked), fakeLikedPage)
 		return &p, nil
 	}
 	p, ok := f.playlists[id]
@@ -311,11 +316,31 @@ func (f *Fake) Search(query string, kind music.SearchType, limit, offset int) (m
 	return res, nil
 }
 
-func (f *Fake) LikedIDs() ([]string, error) {
+func (f *Fake) LikedMore() ([]music.Track, bool, error) {
 	f.wait()
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return slices.Clone(f.liked), nil
+	from := min(f.likedRead, len(f.liked))
+	to := min(from+fakeLikedPage, len(f.liked))
+	var out []music.Track
+	for _, id := range f.liked[from:to] {
+		if tr, ok := f.track(id); ok {
+			out = append(out, tr)
+		}
+	}
+	f.likedRead = to
+	return out, to < len(f.liked), nil
+}
+
+func (f *Fake) Likes(trackIDs []string) (map[string]bool, error) {
+	f.wait()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	likes := make(map[string]bool, len(trackIDs))
+	for _, id := range trackIDs {
+		likes[id] = slices.Contains(f.liked, id)
+	}
+	return likes, nil
 }
 
 func (f *Fake) Like(trackID string, like bool) error {

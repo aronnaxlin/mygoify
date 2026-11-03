@@ -190,7 +190,23 @@ func (a *app) playlistPage(c *ui.Context) {
 		})
 		return
 	}
+	if pl.Liked {
+		a.trackRows(c, pl.Tracks, true, func(c *ui.Context) { a.playlistHeader(c, pl) }, func(c *ui.Context) { a.likedFoot(c) })
+		return
+	}
 	a.trackRows(c, pl.Tracks, true, func(c *ui.Context) { a.playlistHeader(c, pl) })
+}
+
+// likedFoot ends the liked songs shown, loading the page after them as it
+// comes near, with rows of the skeleton in their place while it loads.
+func (a *app) likedFoot(c *ui.Context) {
+	pg := &a.likedPage
+	switch {
+	case pg.loading:
+		a.trackRowSkeletons(c, a.pageShimmer(c), true, 4)
+	case pg.more || pg.err != "":
+		a.pageFoot(c, pg, a.moreLiked)
+	}
 }
 
 // pageContext names what the page shown plays its tracks within, as
@@ -290,6 +306,7 @@ func (a *app) trackRows(c *ui.Context, tracks []music.Track, covers bool, header
 		}
 		i--
 		tr := &tracks[i]
+		a.wantLike(tr.ID)
 		playing := cur != nil && cur.ID == tr.ID
 		row := ui.ButtonBase(c.Key(tr.ID)).Height(54).PaddingX(12).Gap(14).Radius(10).AlignItems(ui.Center).FocusRing(false).Label(tr.Name).
 			ContextMenu(a.songItems(tr, pid))

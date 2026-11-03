@@ -102,6 +102,8 @@ func (a *app) nowPlayingView(c *ui.Context) {
 
 func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accent ui.Color, w, h float32, pointerIn bool) {
 	pl := a.pl
+	// Its heart shows whether the listener likes it, asked as it opens.
+	a.wantLike(tr.ID)
 	if a.npPane != paneQueue {
 		a.queueAt = -1
 	}

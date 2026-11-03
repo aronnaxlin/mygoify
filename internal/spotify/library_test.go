@@ -64,12 +64,19 @@ func likedServer(t *testing.T, ids *[]string, calls *[]string) *Client {
 		switch r.URL.Path {
 		case "/me":
 			w.Write([]byte(`{"id":"me"}`))
+		case "/me/library":
 		case "/me/tracks":
 			q := r.URL.Query()
 			limit, _ := strconv.Atoi(q.Get("limit"))
 			offset, _ := strconv.Atoi(q.Get("offset"))
 			var items []string
 			for _, id := range (*ids)[min(offset, len(*ids)):min(offset+limit, len(*ids))] {
+				if strings.HasPrefix(id, "local") {
+					// A local file, which the app skips: it still takes a
+					// place in Spotify's list.
+					items = append(items, fmt.Sprintf(`{"track":{"id":%q,"type":"track","name":%q,"is_local":true}}`, id, id))
+					continue
+				}
 				items = append(items, fmt.Sprintf(`{"track":{"id":%q,"type":"track","name":%q}}`, id, id))
 			}
 			next := "null"
@@ -83,42 +90,95 @@ func likedServer(t *testing.T, ids *[]string, calls *[]string) *Client {
 	})
 }
 
-// The liked songs kept from before are read only since then, which takes
-// a call rather than one a page, at each start; when they no longer add
-// up, as when a song was unliked in another app, all are read again,
-// from the page read already.
-func TestLikedSince(t *testing.T) {
+// names says which songs ts are, from the first to the last, or none.
+func names(ts []music.Track) string {
+	if len(ts) == 0 {
+		return "none"
+	}
+	return ts[0].ID + ".." + ts[len(ts)-1].ID
+}
+
+// The liked songs of a large library show a page at a time: their
+// playlist reads the first, and each page after it as the app asks, while
+// songs liked since it was last read come on top of what was read before.
+// Counted fewer than read, as when a song was unliked in another app, they
+// start over from the first page.
+func TestLikedPaged(t *testing.T) {
 	ids := make([]string, 120)
+	for i := range ids {
+		ids[i] = fmt.Sprint("t", i)
+	}
+	// A local file among them: it takes a place in Spotify's list, and
+	// none among what the app shows, which pages on past it.
+	ids[10] = "local"
+	var calls []string
+	c := likedServer(t, &ids, &calls)
+	cache := t.TempDir()
+	open := func() (*Library, *music.Playlist) {
+		t.Helper()
+		calls = nil
+		l := &Library{API: c, Cache: cache}
+		p, err := l.Playlist(likedID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return l, p
+	}
+	l, p := open()
+	if got := names(p.Tracks); len(p.Tracks) != 49 || got != "t0..t49" || p.TrackCount != 120 || !p.More || len(calls) != 2 {
+		t.Fatalf("first page: %s, %d of %d songs, more %v, after %q", got, len(p.Tracks), p.TrackCount, p.More, calls)
+	}
+	next, more, err := l.LikedMore()
+	if err != nil || names(next) != "t50..t99" || !more {
+		t.Fatalf("next page: %s, more %v, %v", names(next), more, err)
+	}
+	// Read again, what was read shows at once: one call reads the top.
+	l, p = open()
+	if got := names(p.Tracks); len(p.Tracks) != 99 || !p.More || len(calls) != 2 {
+		t.Fatalf("read again: %s, %d songs, more %v, after %q", got, len(p.Tracks), p.More, calls)
+	}
+	if next, more, err = l.LikedMore(); err != nil || names(next) != "t100..t119" || more {
+		t.Fatalf("last page: %s, more %v, %v", names(next), more, err)
+	}
+	// A song liked since: it comes first, and what was read stays.
+	ids = append([]string{"new"}, ids...)
+	_, p = open()
+	if got := names(p.Tracks); len(p.Tracks) != 120 || p.Tracks[0].ID != "new" || p.More || len(calls) != 2 {
+		t.Fatalf("one liked since: %s, %d songs, more %v, after %q", got, len(p.Tracks), p.More, calls)
+	}
+	// Two unliked elsewhere: Spotify's list no longer holds what was read
+	// where it was, so the first page comes again.
+	ids = slices.Delete(ids, 60, 62)
+	_, p = open()
+	if got := names(p.Tracks); len(p.Tracks) != 49 || p.TrackCount != 119 || !p.More {
+		t.Fatalf("two unliked elsewhere: %s, %d of %d songs, more %v", got, len(p.Tracks), p.TrackCount, p.More)
+	}
+}
+
+// A song unliked among those read moves the songs after it up one in
+// Spotify's list: the page after them starts one earlier, not past a song.
+func TestLikedUnlikeMovesPages(t *testing.T) {
+	ids := make([]string, 100)
 	for i := range ids {
 		ids[i] = fmt.Sprint("t", i)
 	}
 	var calls []string
 	c := likedServer(t, &ids, &calls)
-	cache := t.TempDir()
-	read := func() []string {
-		t.Helper()
-		calls = nil
-		got, err := (&Library{API: c, Cache: cache}).LikedIDs()
-		if err != nil {
-			t.Fatal(err)
-		}
-		return got
+	l := &Library{API: c}
+	if p, err := l.Playlist(likedID); err != nil || len(p.Tracks) != 50 {
+		t.Fatalf("first page: %d songs, %v", len(p.Tracks), err)
 	}
-	if got := read(); !slices.Equal(got, ids) || len(calls) != 1+3 {
-		t.Fatalf("first: %d songs after %q", len(got), calls)
+	ids = slices.Delete(ids, 4, 5) // t4, unliked here
+	if err := l.Like("t4", false); err != nil {
+		t.Fatal(err)
 	}
-	ids = append([]string{"new"}, ids...)
-	if got := read(); !slices.Equal(got, ids) || len(calls) != 1+1 {
-		t.Fatalf("one liked since: %d songs, %v first, after %q", len(got), got[:1], calls)
-	}
-	ids = append([]string{"newer"}, slices.Delete(ids, 60, 62)...)
-	if got := read(); !slices.Equal(got, ids) || len(calls) != 1+3 {
-		t.Fatalf("two unliked elsewhere: %d songs after %q", len(got), calls)
+	next, more, err := l.LikedMore()
+	if err != nil || names(next) != "t50..t99" || more {
+		t.Fatalf("the page after: %s, more %v, %v", names(next), more, err)
 	}
 }
 
-// The hearts and the liked songs' playlist, asking at once, read the
-// liked songs once.
+// The liked songs' playlist, asked for twice at once, reads its page once.
 func TestLikedReadOnce(t *testing.T) {
 	ids := make([]string, 120)
 	for i := range ids {
@@ -128,7 +188,7 @@ func TestLikedReadOnce(t *testing.T) {
 	c := likedServer(t, &ids, &calls)
 	l := &Library{API: c}
 	var wg sync.WaitGroup
-	wg.Go(func() { l.LikedIDs() })
+	wg.Go(func() { l.Playlist(likedID) })
 	wg.Go(func() { l.Playlist(likedID) })
 	wg.Wait()
 	var reads int
@@ -137,8 +197,42 @@ func TestLikedReadOnce(t *testing.T) {
 			reads++
 		}
 	}
-	if reads != 3 {
-		t.Fatalf("read %d pages of 3: %q", reads, calls)
+	if reads != 1 {
+		t.Fatalf("read %d pages of 1: %q", reads, calls)
+	}
+}
+
+// The hearts ask which of the songs shown the listener likes, in batches of
+// as many as the Web API takes, each answered in its place.
+func TestLikes(t *testing.T) {
+	var requests int
+	c := client(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/me/library/contains" {
+			t.Errorf("asked for %s", r.URL)
+			return
+		}
+		requests++
+		var got []string
+		for _, uri := range strings.Split(r.URL.Query().Get("uris"), ",") {
+			got = append(got, fmt.Sprint(strings.Contains(uri, ":liked")))
+		}
+		w.Write([]byte("[" + strings.Join(got, ",") + "]"))
+	})
+	ids := make([]string, 120)
+	for i := range ids {
+		ids[i] = fmt.Sprintf("%s%d", []string{"t", "liked"}[i%2], i)
+	}
+	likes, err := (&Library{API: c}).Likes(ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests != 3 || len(likes) != len(ids) {
+		t.Fatalf("%d requests for %d songs answered %d", requests, len(ids), len(likes))
+	}
+	for _, id := range ids {
+		if got, want := likes[id], strings.HasPrefix(id, "liked"); got != want {
+			t.Fatalf("%s: liked %v, want %v", id, got, want)
+		}
 	}
 }
 
