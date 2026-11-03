@@ -141,7 +141,7 @@ func (a *app) stage(c *ui.Context, accent ui.Color) {
 
 			// The translation, and the line coming next, along the foot.
 			ui.Column(c).Absolute().Left(0).Right(0).Bottom(24).AlignItems(ui.Center).Gap(8).PassThrough().Children(func() {
-				if cur >= 0 && lines[cur].Translation != "" {
+				if cur >= 0 && lines[cur].Translation != "" && showsTranslation(c) {
 					ui.Text(c.Key("translation"), lines[cur].Translation).FontSize(18).FontWeight(600).TextColor(white.Alpha(0.72)).TextAlign(ui.Center)
 				}
 				if cur+1 < len(lines) {

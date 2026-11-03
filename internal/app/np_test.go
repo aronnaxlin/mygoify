@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
 
+	"mygoify/internal/lyrics"
 	"mygoify/internal/music"
 )
 
@@ -161,6 +163,31 @@ func TestNowPlayingTabsStayPut(t *testing.T) {
 		}
 		if r, _ := tt.Find("歌词"); r.X != first.X || r.Y != first.Y {
 			t.Errorf("on %s the 歌词 tab is at %v,%v, was at %v,%v", tab, r.X, r.Y, first.X, first.Y)
+		}
+	}
+}
+
+// A line's translation shows under it only in a Chinese interface: the
+// sources translate into Chinese, and an English one showed a Chinese line
+// under every line sung.
+func TestTranslationsOnlyInChinese(t *testing.T) {
+	t.Cleanup(func() { mygo.App.SetLocale("zh-Hans") })
+	for _, c := range []struct {
+		locale string
+		shows  bool
+	}{{"zh-Hans", true}, {"zh-Hant", true}, {"en", false}, {"ja", false}} {
+		mygo.App.SetLocale(c.locale)
+		a := newTestApp()
+		a.settings = defaultSettings()
+		a.pl.Cue([]music.Track{{ID: "1", Name: "Hello", Duration: 200000}})
+		a.setLyrics([]lyrics.Line{{At: 0, End: 5 * time.Second, Text: "Hello from the other side", Translation: "来自另一边的问候"}})
+		a.nowPlaying = true
+		tt := ui.NewTester(a.view, 1200, 800)
+		tt.SetLocale(c.locale)
+		tt.Advance(time.Second)
+		tt.Frame()
+		if got := tt.HasText("来自另一边的问候"); got != c.shows {
+			t.Errorf("in %s, the translation shows: %v", c.locale, got)
 		}
 	}
 }

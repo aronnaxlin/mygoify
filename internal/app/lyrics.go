@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/egoist/mygo/ui"
+
 	"mygoify/internal/lyrics"
 	"mygoify/internal/music"
 )
@@ -166,6 +168,12 @@ func (a *app) askLyrics(t music.Track, retry int) {
 }
 
 // setLyrics gives the track playing lines, as loaded, for tests.
+// showsTranslation says whether the lyrics' translations show. The
+// sources that have them translate into Chinese only, so only a Chinese
+// interface shows them: an English or a Japanese one showed a Chinese
+// line under every line sung.
+func showsTranslation(c *ui.Context) bool { return strings.HasPrefix(c.Locale(), "zh") }
+
 func (a *app) setLyrics(lines []lyrics.Line) {
 	if tr := a.pl.Current(); tr != nil {
 		a.lyr = lyricsState{track: tr.ID, lines: lines, loaded: true}
