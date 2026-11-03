@@ -2,7 +2,7 @@
   "name": "MyGoify",
   "identifier": "io.github.aronnaxlin.mygoify",
   "slug": "mygoify",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "out": "build",
   "updates": {
     "publicKey": "J+ud+zDQIxzLYF3k16bTdPFCw8H2i2D0B0x9kUmaUks=",
