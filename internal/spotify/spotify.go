@@ -66,12 +66,13 @@ type Client struct {
 }
 
 // pending keeps the raw answer: callers decode into their own values.
-// The first caller's context bounds the shared request; others may leave
-// without cancelling it.
+// If its caller's context ends or cannot wait out a cooldown, a waiter
+// with a valid context takes over instead of sharing that failure.
 type pending struct {
-	done chan struct{}
-	body []byte
-	err  error
+	done  chan struct{}
+	body  []byte
+	err   error
+	retry bool
 }
 
 // maxRetries is how many times a rate-limited call is tried again.
@@ -107,29 +108,71 @@ func (c *Client) Do(ctx context.Context, method, path string, in, out any) error
 }
 
 func (c *Client) get(ctx context.Context, path string, body []byte) ([]byte, error) {
-	c.mu.Lock()
-	if p := c.pending[path]; p != nil {
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		c.mu.Lock()
+		if p := c.pending[path]; p != nil {
+			c.mu.Unlock()
+			if err := c.waitPending(ctx, p); err != nil {
+				return nil, err
+			}
+			if p.retry {
+				continue
+			}
+			return p.body, p.err
+		}
+		p := &pending{done: make(chan struct{})}
+		if c.pending == nil {
+			c.pending = make(map[string]*pending)
+		}
+		c.pending[path] = p
+		c.mu.Unlock()
+
+		p.body, p.err = c.request(ctx, http.MethodGet, path, body)
+		if err := ctx.Err(); err != nil {
+			p.retry = errors.Is(p.err, err) || errors.Is(p.err, context.Cause(ctx))
+		}
+		var lim *LimitedError
+		if end, ok := ctx.Deadline(); ok && errors.As(p.err, &lim) && lim.Until.After(end) {
+			p.retry = true
+		}
+		c.mu.Lock()
+		delete(c.pending, path)
+		close(p.done)
+		c.mu.Unlock()
+		return p.body, p.err
+	}
+}
+
+// waitPending keeps each waiter's own deadline, including when a 429
+// arrives after it joined a request whose caller can wait longer.
+func (c *Client) waitPending(ctx context.Context, p *pending) error {
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		c.mu.Lock()
+		c.loadHold()
+		until := c.until
+		if end, ok := ctx.Deadline(); ok && until.After(end) {
+			c.mu.Unlock()
+			return &LimitedError{until}
+		}
+		if c.changed == nil {
+			c.changed = make(chan struct{})
+		}
+		changed := c.changed
 		c.mu.Unlock()
 		select {
 		case <-p.done:
-			return p.body, p.err
+			return ctx.Err()
+		case <-changed:
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return ctx.Err()
 		}
 	}
-	p := &pending{done: make(chan struct{})}
-	if c.pending == nil {
-		c.pending = make(map[string]*pending)
-	}
-	c.pending[path] = p
-	c.mu.Unlock()
-
-	p.body, p.err = c.request(ctx, http.MethodGet, path, body)
-	c.mu.Lock()
-	delete(c.pending, path)
-	close(p.done)
-	c.mu.Unlock()
-	return p.body, p.err
 }
 
 func (c *Client) request(ctx context.Context, method, path string, body []byte) ([]byte, error) {

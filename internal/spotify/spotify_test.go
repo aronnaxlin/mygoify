@@ -51,6 +51,22 @@ func (c *observedContext) Done() <-chan struct{} {
 	return c.Context.Done()
 }
 
+// deadlineContext lets a test end a deadline through cancellation,
+// without waiting on the wall clock.
+type deadlineContext struct {
+	context.Context
+	end time.Time
+}
+
+func (c deadlineContext) Deadline() (time.Time, bool) { return c.end, true }
+
+func (c deadlineContext) Err() error {
+	if c.Context.Err() != nil {
+		return context.DeadlineExceeded
+	}
+	return nil
+}
+
 func gate(t *testing.T) (<-chan struct{}, func()) {
 	ch := make(chan struct{})
 	open := sync.OnceFunc(func() { close(ch) })
@@ -128,6 +144,114 @@ func TestRequestSharing(t *testing.T) {
 			c.Do(t.Context(), tc.method, "/me", nil, nil)
 			if calls.Load() != tc.calls+1 {
 				t.Fatal("finished call was kept as a pending request")
+			}
+		})
+	}
+}
+
+// The first caller's cancellation or expired deadline used to fail every
+// caller sharing its GET; a still-valid waiter now takes over the read.
+func TestGETOwnerCancellation(t *testing.T) {
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded, errors.New("view closed")} {
+		t.Run(cause.Error(), func(t *testing.T) {
+			var calls atomic.Int32
+			entered := make(chan struct{}, 1)
+			var release <-chan struct{}
+			c := client(t, func(w http.ResponseWriter, r *http.Request) {
+				if calls.Add(1) == 1 {
+					entered <- struct{}{}
+					select {
+					case <-r.Context().Done():
+					case <-release:
+					}
+					return
+				}
+				w.Write([]byte(`{"id":"me"}`))
+			})
+			release, _ = gate(t)
+			clock := newClock(c)
+			ctx, cancel := context.WithCancelCause(t.Context())
+			defer cancel(nil)
+			var owner context.Context = ctx
+			if cause == context.DeadlineExceeded {
+				owner = deadlineContext{ctx, c.timeNow().Add(time.Second)}
+			}
+			first := startCall(c, owner, "GET", "/me")
+			await(t, entered)
+			waiter := &observedContext{Context: t.Context(), waiting: make(chan struct{})}
+			var me struct{ ID string }
+			second := make(chan error, 1)
+			go func() { second <- c.Do(waiter, "GET", "/me", nil, &me) }()
+			await(t, waiter.waiting)
+			clock.nanos.Add(int64(time.Second))
+			cancel(cause)
+			if err := await(t, first); !errors.Is(err, cause) {
+				t.Fatalf("first caller: %v, want %v", err, cause)
+			}
+			if err := await(t, second); err != nil || me.ID != "me" || calls.Load() != 2 {
+				t.Fatalf("surviving waiter: %+v, %v after %d calls", me, err, calls.Load())
+			}
+		})
+	}
+}
+
+// A shared GET used to give every caller its owner's limit decision;
+// each now compares a newly received cooldown with its own deadline.
+func TestGETCallerDeadlines(t *testing.T) {
+	for _, shorter := range []string{"owner", "waiter"} {
+		t.Run(shorter, func(t *testing.T) {
+			var calls atomic.Int32
+			entered := make(chan struct{}, 1)
+			var release <-chan struct{}
+			c := client(t, func(w http.ResponseWriter, r *http.Request) {
+				if calls.Add(1) == 1 {
+					entered <- struct{}{}
+					<-release
+					w.Header().Set("Retry-After", "10")
+					w.WriteHeader(http.StatusTooManyRequests)
+					return
+				}
+				w.Write([]byte(`{"id":"me"}`))
+			})
+			var open func()
+			release, open = gate(t)
+			clock := newClock(c)
+			tick := make(chan time.Time, 1)
+			waits := make(chan time.Duration, 1)
+			c.after = func(d time.Duration) <-chan time.Time { waits <- d; return tick }
+			start := c.timeNow()
+			ownerWait, waiterWait := time.Minute, 5*time.Second
+			if shorter == "owner" {
+				ownerWait, waiterWait = waiterWait, ownerWait
+			}
+			owner, cancelOwner := context.WithDeadline(t.Context(), start.Add(ownerWait))
+			defer cancelOwner()
+			waiter, cancelWaiter := context.WithDeadline(t.Context(), start.Add(waiterWait))
+			defer cancelWaiter()
+			var first, second struct{ ID string }
+			firstDone, secondDone := make(chan error, 1), make(chan error, 1)
+			go func() { firstDone <- c.Do(owner, "GET", "/me", nil, &first) }()
+			await(t, entered)
+			observed := &observedContext{Context: waiter, waiting: make(chan struct{})}
+			go func() { secondDone <- c.Do(observed, "GET", "/me", nil, &second) }()
+			await(t, observed.waiting)
+			open()
+			limited, remaining, result := secondDone, firstDone, &first
+			if shorter == "owner" {
+				limited, remaining, result = firstDone, secondDone, &second
+			}
+			err := await(t, limited)
+			var lim *LimitedError
+			if !errors.As(err, &lim) || !errors.Is(err, library.ErrLimited) || c.timeNow() != start {
+				t.Fatalf("short deadline: %v at %v", err, c.timeNow())
+			}
+			if d := await(t, waits); d != lim.Until.Sub(start) {
+				t.Fatalf("remaining caller waits %v, want %v", d, lim.Until.Sub(start))
+			}
+			clock.nanos.Store(lim.Until.UnixNano())
+			tick <- c.timeNow()
+			if err := await(t, remaining); err != nil || result.ID != "me" || calls.Load() != 2 {
+				t.Fatalf("long deadline: %+v, %v after %d calls", result, err, calls.Load())
 			}
 		})
 	}
