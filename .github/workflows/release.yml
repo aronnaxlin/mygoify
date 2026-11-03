@@ -47,6 +47,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # One at a time: both upload SHA256SUMS and install.sh to the same
+      # release, and uploaded at once, the second was refused as already
+      # there (v0.0.2's first run).
+      max-parallel: 1
       matrix:
         include:
           - { name: macOS, os: macos-latest, platform: "darwin/arm64" }
