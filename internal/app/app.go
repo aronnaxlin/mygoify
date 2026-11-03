@@ -11,6 +11,7 @@ import (
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
 	"mygoify/internal/secret"
+	"mygoify/internal/soloist"
 )
 
 type pageKind int
@@ -46,6 +47,9 @@ type app struct {
 	// unless the app runs it (connectSpotify).
 	backend playback.Backend
 	svc     service
+	// soloistVer is the build of Soloist the app runs, which expires 90
+	// days after it was built (DESIGN.md §4.2): zero until read.
+	soloistVer soloist.Version
 
 	route   route
 	history []route
@@ -249,6 +253,7 @@ func Run() error {
 		a.pl.Follow()
 		a.setMenu()
 		a.boot()
+		a.readSoloistVersion()
 		// The notch player is macOS's, over its menu bar: elsewhere it would
 		// hang at the top of the screen as a black box.
 		if runtime.GOOS == "darwin" {

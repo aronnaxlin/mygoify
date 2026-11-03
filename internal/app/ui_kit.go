@@ -385,6 +385,12 @@ func relativeTime(t, now time.Time) string {
 	case y1 == y2:
 		return fmt.Sprintf("%d月%d日", m1, d1)
 	default:
-		return fmt.Sprintf("%d年%d月%d日", y1, m1, d1)
+		return dateText(t)
 	}
+}
+
+// dateText says t's day, as the app writes dates.
+func dateText(t time.Time) string {
+	y, m, d := t.Date()
+	return fmt.Sprintf("%d年%d月%d日", y, m, d)
 }
