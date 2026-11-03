@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"mygoify/internal/soloist"
+	"mygoify/locales"
 )
 
 // readSoloistVersion asks Soloist of itself, off the main thread: which
@@ -39,12 +40,12 @@ func (a *app) noteSoloistExpiry(now time.Time) {
 		// Soloist exits with 10 and stays stopped: updating it, alone, is
 		// what is left to do.
 		a.look()
-		a.ob.binErr = "Soloist 已于 " + dateText(v.Expires()) + " 过期，请更新"
+		a.ob.binErr = locales.SoloistExpired(dateText(v.Expires()))
 		a.ob.open = true
 		a.goTo(stepSoloist)
 		a.redraw()
 	case v.Expiring(now):
-		a.toast = "Soloist 将在 " + dateText(v.Expires()) + " 过期，请到设置里更新"
+		a.toast = locales.SoloistExpiringSoon(dateText(v.Expires()))
 	}
 }
 
@@ -59,5 +60,5 @@ func (a *app) soloistAbout() string {
 	if v.Number != "" {
 		about += " " + v.Number
 	}
-	return about + "，到期日 " + dateText(v.Expires()) + "。"
+	return locales.SoloistExpiryNote(about, dateText(v.Expires()))
 }

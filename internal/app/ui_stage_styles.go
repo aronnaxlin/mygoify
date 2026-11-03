@@ -10,6 +10,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/lyrics"
+	"mygoify/locales"
 )
 
 // The stage sets its lyrics in one of the styles of Folia's visualizers
@@ -18,23 +19,26 @@ import (
 // each springing in as it is sung; and 倾诉, which breaks a line into a
 // few large lines, one of them leaning, its characters swelling as they
 // are sung.
-var stageStyles = []struct{ id, label string }{
-	{"", "流光"},
-	{"partita", "云阶"},
-	{"tilt", "倾诉"},
+func stageStyles() []struct{ id, label string } {
+	return []struct{ id, label string }{
+		{"", locales.StageStyleFlow()},
+		{"partita", locales.StageStylePartita()},
+		{"tilt", locales.StageStyleTilt()},
+	}
 }
 
 // stageStyleButton names the stage's style, and opens the menu of the
 // others.
 func (a *app) stageStyleButton(c *ui.Context) {
-	label := stageStyles[0].label
-	for _, s := range stageStyles {
+	styles := stageStyles()
+	label := styles[0].label
+	for _, s := range styles {
 		if s.id == a.settings.StageStyle {
 			label = s.label
 		}
 	}
 	b := ui.ButtonBase(c.Key("stage-style")).Padding(6, 10, 6, 14).Radius(999).Gap(4).AlignItems(ui.Center).
-		FocusRing(false).Label("律动效果").Tooltip("律动效果")
+		FocusRing(false).Label(locales.StageEffect()).Tooltip(locales.StageEffect())
 	bg, fg := ui.Transparent, white.Alpha(0.55)
 	if b.Hovered() {
 		bg, fg = white.Alpha(0.06), white.Alpha(0.8)
@@ -45,14 +49,14 @@ func (a *app) stageStyleButton(c *ui.Context) {
 		ui.Icon(c, iconDown).Size(12, 12).TextColor(fg)
 	})
 	b.Menu(func(m *ui.Menu) {
-		for _, s := range stageStyles {
+		for _, s := range styles {
 			if m.Item(s.label).Checked(a.settings.StageStyle == s.id).Chosen() && a.settings.StageStyle != s.id {
 				a.settings.StageStyle = s.id
 				a.settings.save()
 			}
 		}
 		m.Separator()
-		if m.Item("火花").Checked(a.settings.StageSparks).Chosen() {
+		if m.Item(locales.StageSparks()).Checked(a.settings.StageSparks).Chosen() {
 			a.settings.StageSparks = !a.settings.StageSparks
 			a.settings.save()
 		}

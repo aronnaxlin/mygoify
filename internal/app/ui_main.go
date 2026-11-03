@@ -11,6 +11,7 @@ import (
 
 	"mygoify/internal/music"
 	"mygoify/internal/spotify"
+	"mygoify/locales"
 )
 
 const sidebarWidth = 232
@@ -211,12 +212,12 @@ func (a *app) sidebar(c *ui.Context) {
 		a.searchField(c)
 
 		ui.Scroll(c.Key("nav")).TrackScroll(&a.navScroll).Grow(1).Margin(0, -6).Padding(0, 6).Gap(4).Children(func() {
-			a.navItem(c, iconHome, "首页", route{page: pageHome})
+			a.navItem(c, iconHome, locales.NavHome(), route{page: pageHome})
 			if a.searched.query != "" {
-				a.navItem(c, iconSearch, "搜索结果", a.searched)
+				a.navItem(c, iconSearch, locales.NavSearchResults(), a.searched)
 			}
-			a.myPlaylists(c, "我的歌单", a.mine, true, &a.mineCollapsed)
-			a.myPlaylists(c, "收藏的歌单", a.saved, false, &a.savedCollapsed)
+			a.myPlaylists(c, locales.MyPlaylists(), a.mine, true, &a.mineCollapsed)
+			a.myPlaylists(c, locales.SavedPlaylists(), a.saved, false, &a.savedCollapsed)
 		})
 
 		// What plays, as a card at the foot of the sidebar, over who listens.
@@ -254,7 +255,7 @@ func (a *app) navItem(c *ui.Context, icon *ui.SVG, label string, r route) {
 
 func (a *app) sidebarNowPlaying(c *ui.Context, tr *music.Track) {
 	p := a.pal
-	card := ui.ButtonBase(c.Key("np-card")).Gap(10).Padding(8).Radius(12).AlignItems(ui.Center).FocusRing(false).Label("正在播放")
+	card := ui.ButtonBase(c.Key("np-card")).Gap(10).Padding(8).Radius(12).AlignItems(ui.Center).FocusRing(false).Label(locales.NowPlaying())
 	bg := p.hover
 	if card.Hovered() {
 		bg = p.press
@@ -353,14 +354,14 @@ func (a *app) pageTop(c *ui.Context) {
 	edge.Opacity(edgeShown(edge, a.underTop))
 	if len(a.history) > 0 || len(a.forward) > 0 {
 		ui.Row(c).Absolute().Top(0).Left(20).Height(topBar(c)).AlignItems(ui.Center).Children(func() {
-			back := iconButton(c.Key("back"), iconBack, 18, a.pal.muted, "返回").Disabled(len(a.history) == 0)
+			back := iconButton(c.Key("back"), iconBack, 18, a.pal.muted, locales.Back()).Disabled(len(a.history) == 0)
 			if len(a.history) == 0 {
 				back.Opacity(0.35)
 			}
 			if back.Clicked() {
 				a.back()
 			}
-			if len(a.forward) > 0 && iconButton(c.Key("forward"), iconForward, 18, a.pal.muted, "前进").Clicked() {
+			if len(a.forward) > 0 && iconButton(c.Key("forward"), iconForward, 18, a.pal.muted, locales.Forward()).Clicked() {
 				a.goForward()
 			}
 		})
@@ -395,7 +396,7 @@ func (a *app) centered(c *ui.Context, err string, retry func()) {
 	top, bottom := a.insets(c)
 	ui.Column(c).Grow(1).Padding(top, 0, bottom, 0).Center().Gap(12).Children(func() {
 		ui.Text(c, err).TextColor(a.pal.muted).FontSize(13)
-		if retry != nil && ui.Button(c, "重试").Clicked() {
+		if retry != nil && ui.Button(c, locales.Retry()).Clicked() {
 			retry()
 		}
 	})
@@ -408,7 +409,7 @@ func (a *app) centered(c *ui.Context, err string, retry func()) {
 func failed(err error, msg string) string {
 	var lim *spotify.LimitedError
 	if errors.As(err, &lim) {
-		return "Spotify 限流中，" + lim.Until.Format("15:04") + " 后再试"
+		return locales.SpotifyLimitedUntil(lim.Until.Format("15:04"))
 	}
 	return msg
 }
@@ -423,7 +424,7 @@ func (a *app) loadHome() {
 			if err != nil {
 				// What shows stays, to try once more.
 				if len(a.home.Recent) == 0 && len(a.home.TopTracks) == 0 {
-					a.homeErr = failed(err, "无法连接 Spotify，请检查网络")
+					a.homeErr = failed(err, locales.CannotConnectSpotify())
 				}
 				return
 			}
@@ -461,7 +462,7 @@ func (a *app) loadPlaylist(id string, thenPlay bool) {
 		a.post(func() {
 			delete(a.loadingPl, id)
 			if err != nil {
-				a.plErr[id] = failed(err, "歌单加载失败")
+				a.plErr[id] = failed(err, locales.PlaylistLoadFailed())
 				return
 			}
 			a.playlists[id] = pl

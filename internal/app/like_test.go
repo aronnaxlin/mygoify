@@ -99,7 +99,7 @@ func TestStageFrames(t *testing.T) {
 	if dir == "" {
 		t.Skip()
 	}
-	for _, s := range stageStyles {
+	for _, s := range stageStyles() {
 		name := "stage.png"
 		if s.id != "" {
 			name = "stage-" + s.id + ".png"

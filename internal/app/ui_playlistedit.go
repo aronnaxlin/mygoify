@@ -9,6 +9,7 @@ import (
 
 	"mygoify/internal/library"
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 // The listener's own playlists: making them, renaming them, deleting them,
@@ -103,7 +104,7 @@ func (a *app) submitName() {
 			a.post(func() {
 				if err != nil {
 					a.setPlaylistName(id, old)
-					a.toast = "重命名失败，请稍后再试"
+					a.toast = locales.RenamePlaylistFailed()
 				}
 			})
 		}()
@@ -116,7 +117,7 @@ func (a *app) submitName() {
 		a.post(func() {
 			a.naming.busy = false
 			if err != nil {
-				a.toast = "创建歌单失败，请稍后再试"
+				a.toast = locales.CreatePlaylistFailed()
 				return
 			}
 			a.naming.open = false
@@ -169,11 +170,11 @@ func (a *app) deleteChosen() {
 		a.post(func() {
 			if err != nil {
 				a.mine = slices.Insert(a.mine, min(i, len(a.mine)), pl)
-				a.toast = "删除失败，请稍后再试"
+				a.toast = locales.DeletePlaylistFailed()
 				return
 			}
 			delete(a.playlists, id)
-			a.toast = "已删除歌单"
+			a.toast = locales.PlaylistDeleted()
 		})
 	}()
 }
@@ -195,11 +196,11 @@ func (a *app) addTo(pid string, tr *music.Track) {
 		a.post(func() {
 			switch {
 			case errors.Is(err, library.ErrInPlaylist):
-				a.toast = "歌曲已在歌单中"
+				a.toast = locales.SongAlreadyInPlaylist()
 			case err != nil:
-				a.toast = "添加失败，请稍后再试"
+				a.toast = locales.AddToPlaylistFailed()
 			default:
-				a.toast = "已添加到歌单"
+				a.toast = locales.AddedToPlaylist()
 				a.playlistChanged(pid)
 			}
 		})
@@ -224,7 +225,7 @@ func (a *app) removeFrom(pid string, tr *music.Track) {
 				if pl != nil && a.playlists[pid] == pl {
 					pl.Tracks = before
 				}
-				a.toast = "移除失败，请稍后再试"
+				a.toast = locales.RemoveFromPlaylistFailed()
 				return
 			}
 			// The songs listed are right: only the sidebar's covers may
@@ -244,8 +245,8 @@ func (a *app) playlistItems(m *ui.Menu, tr *music.Track, pid string) {
 		return
 	}
 	m.Separator()
-	m.Submenu("添加到歌单", func(m *ui.Menu) {
-		if m.Item("新建歌单…").Chosen() {
+	m.Submenu(locales.AddToPlaylist(), func(m *ui.Menu) {
+		if m.Item(locales.NewPlaylistEllipsis()).Chosen() {
 			a.newPlaylist(tr)
 		}
 		var to []*music.Playlist
@@ -263,7 +264,7 @@ func (a *app) playlistItems(m *ui.Menu, tr *music.Track, pid string) {
 			}
 		}
 	})
-	if a.editable(pid) != nil && m.Item("从歌单中移除").Chosen() {
+	if a.editable(pid) != nil && m.Item(locales.RemoveFromPlaylist()).Chosen() {
 		a.removeFrom(pid, tr)
 	}
 }
@@ -278,20 +279,20 @@ func (a *app) playlistNameDialog(c *ui.Context) {
 		panel.Width(360).Padding(24).Radius(18).Gap(16).
 			Background(p.bg).Border(1, p.hairline).Shadow(0, 24, 60, -12, ui.RGBA(0, 0, 0, 0.4)).
 			Transition(ui.ElementTransition{Animation: &ui.Snappy, Enter: &ui.Motion{Scale: 0.94}, Exit: &ui.Motion{Scale: 0.96}})
-		title, action := "新建歌单", "创建"
+		title, action := locales.NewPlaylist(), locales.Create()
 		if d.rename != "" {
-			title, action = "重命名歌单", "保存"
+			title, action = locales.RenamePlaylist(), locales.Save()
 		}
 		if d.busy {
-			action = "正在创建…"
+			action = locales.Creating()
 		}
 		ui.Text(c, title).FontSize(17).FontWeight(700)
-		in := ui.TextInput(c.Key("name"), &d.name).Placeholder("歌单名称").Label("歌单名称").FontSize(14).AutoFocus()
+		in := ui.TextInput(c.Key("name"), &d.name).Placeholder(locales.PlaylistName()).Label(locales.PlaylistName()).FontSize(14).AutoFocus()
 		if in.Submitted() {
 			a.submitName()
 		}
 		ui.Row(c).Gap(10).Justify(ui.End).Children(func() {
-			if pillButton(c.Key("cancel"), nil, "取消", p.hover.Over(p.bg), p.text).Clicked() {
+			if pillButton(c.Key("cancel"), nil, locales.Cancel(), p.hover.Over(p.bg), p.text).Clicked() {
 				d.open = false
 			}
 			ok := pillButton(c.Key("ok"), nil, action, p.accent, p.onAccent)
@@ -315,13 +316,13 @@ func (a *app) deletePlaylistDialog(c *ui.Context) {
 		panel.Width(360).Padding(24).Radius(18).Gap(8).
 			Background(p.bg).Border(1, p.hairline).Shadow(0, 24, 60, -12, ui.RGBA(0, 0, 0, 0.4)).
 			Transition(ui.ElementTransition{Animation: &ui.Snappy, Enter: &ui.Motion{Scale: 0.94}, Exit: &ui.Motion{Scale: 0.96}})
-		ui.Text(c, "删除歌单").FontSize(17).FontWeight(700)
-		ui.Text(c, "确定删除歌单“"+d.name+"”吗？删除后无法恢复。").FontSize(13).TextColor(p.muted).LineHeight(1.45)
+		ui.Text(c, locales.DeletePlaylistTitle()).FontSize(17).FontWeight(700)
+		ui.Text(c, locales.DeletePlaylistConfirm(d.name)).FontSize(13).TextColor(p.muted).LineHeight(1.45)
 		ui.Row(c).Gap(10).Justify(ui.End).Margin(8, 0, 0, 0).Children(func() {
-			if pillButton(c.Key("cancel"), nil, "取消", p.hover.Over(p.bg), p.text).Clicked() {
+			if pillButton(c.Key("cancel"), nil, locales.Cancel(), p.hover.Over(p.bg), p.text).Clicked() {
 				d.open = false
 			}
-			if pillButton(c.Key("ok"), nil, "删除", p.danger, white).Clicked() {
+			if pillButton(c.Key("ok"), nil, locales.Delete(), p.danger, white).Clicked() {
 				a.deleteChosen()
 			}
 		})

@@ -7,6 +7,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 // likes are the songs the listener likes, which hearts show filled: the
@@ -98,7 +99,7 @@ func (a *app) toggleLike(tr *music.Track) {
 		a.post(func() {
 			if err != nil {
 				a.setLiked(id, !like)
-				a.toast = "操作失败，请稍后再试"
+				a.toast = locales.ActionFailed()
 				return
 			}
 			// The liked songs' playlist changed: load it anew when shown.
@@ -132,9 +133,9 @@ func (a *app) likeCurrent() {
 	case a.profile == nil:
 		return // asked to sign in
 	case !a.isLiked(tr):
-		a.toast = "已取消喜欢"
+		a.toast = locales.RemovedFromLiked()
 	default:
-		a.toast = "已添加到我喜欢的音乐"
+		a.toast = locales.AddedToLiked()
 	}
 }
 
@@ -151,9 +152,9 @@ func (a *app) setLiked(id string, like bool) {
 // out; unliking lets it give a little.
 func (a *app) likeButton(c *ui.Context, tr *music.Track, size float32, color ui.Color) ui.Element {
 	liked := a.isLiked(tr)
-	icon, label := iconHeart, "喜欢"
+	icon, label := iconHeart, locales.Like()
 	if liked {
-		icon, color, label = iconHeartFill, a.pal.accent, "取消喜欢"
+		icon, color, label = iconHeartFill, a.pal.accent, locales.Unlike()
 	}
 	// The burst goes on a wrapper, which the heart's pop does not scale.
 	wrap := ui.Box(c).Center()

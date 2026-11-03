@@ -25,6 +25,9 @@ type settings struct {
 	NotchGreeted bool `json:"notchGreeted"`
 	// Appearance is light, dark, or system to follow the system.
 	Appearance string `json:"appearance"`
+	// Language is the chosen locale (e.g. "zh-Hans", "zh-Hant", "en", "ja"),
+	// or empty to follow the system.
+	Language string `json:"language,omitempty"`
 	// Smoke makes the progress bars comets trailing smoke as music plays,
 	// for a few percent of a core: the listener turns it on.
 	Smoke bool `json:"smoke"`
@@ -120,6 +123,9 @@ func (s settings) save() error {
 
 // applyAppearance makes the windows light, dark, or follow the system.
 func (s settings) applyAppearance() {
+	if !mygo.App.IsReady() {
+		return
+	}
 	switch s.Appearance {
 	case "light":
 		mygo.Theme.SetSource(mygo.ThemeLight)

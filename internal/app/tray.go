@@ -6,6 +6,8 @@ import (
 	"runtime"
 
 	"github.com/egoist/mygo"
+
+	"mygoify/locales"
 )
 
 // The app's icon in the menu bar on macOS, as the settings choose
@@ -27,10 +29,12 @@ var trayColor []byte
 
 // appIcons are where the app's icon shows on macOS, with their names: the
 // Dock and the menu bar, the Dock alone, or the menu bar alone.
-var appIcons = []struct{ id, label string }{
-	{"dock-and-menubar", "程序坞与菜单栏"},
-	{"dock", "仅程序坞"},
-	{"menubar", "仅菜单栏"},
+func appIcons() []struct{ id, label string } {
+	return []struct{ id, label string }{
+		{"dock-and-menubar", locales.AppIconDockAndMenubar()},
+		{"dock", locales.AppIconDock()},
+		{"menubar", locales.AppIconMenubar()},
+	}
 }
 
 // showsTray tells whether the app's icon shows in the menu bar or the
@@ -114,16 +118,16 @@ func (a *app) trayMenu() *mygo.Menu {
 	}
 	name := mygo.App.Name()
 	return mygo.NewMenu([]*mygo.MenuItem{
-		{Label: "打开" + name, Click: run(a.showMain)},
+		{Label: locales.TrayOpenApp(name), Click: run(a.showMain)},
 		mygo.Separator(),
-		{Label: "播放/暂停", Click: run(func() { a.pl.TogglePlay() })},
-		{Label: "下一首", Click: run(func() { a.pl.Next() })},
-		{Label: "上一首", Click: run(func() { a.pl.Prev() })},
-		{Label: "喜欢/取消喜欢", Click: run(a.likeCurrent)},
+		{Label: locales.PlayPause(), Click: run(func() { a.pl.TogglePlay() })},
+		{Label: locales.NextTrack(), Click: run(func() { a.pl.Next() })},
+		{Label: locales.PrevTrack(), Click: run(func() { a.pl.Prev() })},
+		{Label: locales.MenuLikeOrUnlike(), Click: run(a.likeCurrent)},
 		mygo.Separator(),
-		{Label: "设置…", Click: run(front(a.openSettings))},
-		{Label: "检查更新…", Click: run(front(checkForUpdates))},
+		{Label: locales.SettingsEllipsis(), Click: run(front(a.openSettings))},
+		{Label: locales.MenuCheckForUpdates(), Click: run(front(checkForUpdates))},
 		mygo.Separator(),
-		{Label: "退出" + name, Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
+		{Label: locales.TrayQuitApp(name), Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
 	})
 }

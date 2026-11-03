@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
+
+	"mygoify/locales"
 )
 
 // Skeletons stand in for what is loading: gray blocks in its shape, which
@@ -95,9 +97,9 @@ func boneWidth(i int) float32 { return boneWidths[i%len(boneWidths)] }
 // they show.
 
 func (a *app) homeSkeleton(c *ui.Context, s shimmer) {
-	a.section(c, "最近播放")
+	a.section(c, locales.RecentPlayed())
 	a.playlistCardsSkeleton(c.Key("recent"), s, a.columns(c, 168), 168)
-	a.section(c, "常听的艺人")
+	a.section(c, locales.TopArtists())
 	ui.Grid(c.Key("artists")).Columns(a.columns(c, 150)).GapX(20).GapY(28).Children(func() {
 		for i := range a.columns(c, 150) {
 			ui.Column(c.Key(i)).Gap(10).AlignItems(ui.Center).Children(func() {
@@ -106,7 +108,7 @@ func (a *app) homeSkeleton(c *ui.Context, s shimmer) {
 			})
 		}
 	})
-	a.section(c, "常听的歌曲")
+	a.section(c, locales.TopTracks())
 	a.playlistCardsSkeleton(c.Key("top"), s, a.columns(c, 168), 168)
 }
 

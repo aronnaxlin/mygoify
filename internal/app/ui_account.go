@@ -6,6 +6,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 // boot signs in with the login kept, if any, then loads the home page for
@@ -65,11 +66,11 @@ func (a *app) accountRow(c *ui.Context) {
 	}
 	if a.profile == nil {
 		a.accountOpen = false
-		b.Label("登录").Children(func() {
+		b.Label(locales.Login()).Children(func() {
 			ui.Box(c).Size(26, 26).Radius(13).Background(p.press).Center().Children(func() {
 				ui.Icon(c, iconUser).Size(14, 14).TextColor(p.muted)
 			})
-			ui.Text(c, "登录 Spotify").FontSize(13).FontWeight(500).TextColor(p.muted)
+			ui.Text(c, locales.LoginSpotify()).FontSize(13).FontWeight(500).TextColor(p.muted)
 		})
 		if b.Clicked() {
 			a.openOnboarding()
@@ -95,7 +96,7 @@ func (a *app) accountMenu(c *ui.Context, row ui.Element) {
 	ui.PopoverBase(c.Key("account-menu"), row, &a.accountOpen, func(panel ui.Element) {
 		panel.AttachTo(row, ui.AnchorTopStart, ui.AnchorBottomStart).Margin(0, 0, 6, 0).Padding(5).Gap(1).
 			Radius(12).Background(pop.fill).Border(0.5, pop.edge).Shadow(0, 8, 24, -4, ui.RGBA(0, 0, 0, 0.2)).
-			Role(ui.RoleMenu).FocusGroup(ui.Vertical).Label("账户").TransformOrigin(0.5, 1).
+			Role(ui.RoleMenu).FocusGroup(ui.Vertical).Label(locales.Account()).TransformOrigin(0.5, 1).
 			Transition(ui.ElementTransition{Animation: &ui.Snappy, Enter: &ui.Motion{Scale: 0.96, Y: 4}, Exit: &ui.Motion{Scale: 0.98}})
 		if w := row.Bounds().W; w > 0 {
 			panel.Width(w)
@@ -104,12 +105,12 @@ func (a *app) accountMenu(c *ui.Context, row ui.Element) {
 		if runtime.GOOS == "darwin" {
 			shortcut = "⌘,"
 		}
-		if a.menuItem(c, iconSettings, "设置…", shortcut).AutoFocus().Clicked() {
+		if a.menuItem(c, iconSettings, locales.SettingsEllipsis(), shortcut).AutoFocus().Clicked() {
 			a.accountOpen = false
 			a.openSettings()
 		}
 		ui.Box(c).Height(0.5).Margin(4, 8).Background(pop.edge)
-		if a.menuItem(c, iconSignOut, "退出登录", "").Clicked() {
+		if a.menuItem(c, iconSignOut, locales.SignOut(), "").Clicked() {
 			a.accountOpen = false
 			a.signOut()
 		}
@@ -161,7 +162,7 @@ func (a *app) myPlaylists(c *ui.Context, title string, lists []music.Playlist, m
 			}
 			ui.Icon(c, arrow).Size(12, 12).TextColor(p.faint)
 		})
-		if mine && iconButton(c.Key("new"), iconPlus, 13, p.faint, "新建歌单").Size(26, 26).Radius(6).Clicked() {
+		if mine && iconButton(c.Key("new"), iconPlus, 13, p.faint, locales.NewPlaylist()).Size(26, 26).Radius(6).Clicked() {
 			a.newPlaylist(nil)
 		}
 	})
@@ -184,11 +185,11 @@ func (a *app) myPlaylists(c *ui.Context, title string, lists []music.Playlist, m
 		})
 		if mine && !pl.Liked {
 			b.ContextMenu(func(m *ui.Menu) {
-				if m.Item("重命名…").Chosen() {
+				if m.Item(locales.RenamePlaylistEllipsis()).Chosen() {
 					a.startRename(pl)
 				}
 				m.Separator()
-				if m.Item("删除歌单…").Chosen() {
+				if m.Item(locales.DeletePlaylistEllipsis()).Chosen() {
 					a.confirmDelete(pl)
 				}
 			})

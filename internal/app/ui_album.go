@@ -1,12 +1,12 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 // albumData is what the app has of an album.
@@ -31,7 +31,7 @@ func (a *app) loadAlbum(id string) {
 		a.post(func() {
 			d.loading = false
 			if err != nil {
-				d.err = failed(err, "专辑加载失败")
+				d.err = failed(err, locales.AlbumLoadFailed())
 				return
 			}
 			d.album = al
@@ -61,7 +61,7 @@ func (a *app) albumHeader(c *ui.Context, al *music.AlbumProfile) {
 			a.coverFill(c, al.Images, 600, 14)
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
-			ui.Text(c, "专辑").FontSize(12).FontWeight(600).TextColor(p.muted)
+			ui.Text(c, locales.Album()).FontSize(12).FontWeight(600).TextColor(p.muted)
 			ui.Text(c, al.Name).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
 			ui.RichText(c).FontSize(13).TextColor(p.muted).Children(func() {
 				for i, ar := range al.Artists {
@@ -70,7 +70,7 @@ func (a *app) albumHeader(c *ui.Context, al *music.AlbumProfile) {
 					}
 					a.link(c.Key(i), ar.Name, p.muted, p.text, route{page: pageArtist, id: ar.ID})
 				}
-				meta := fmt.Sprintf(" · %d 首", len(al.Songs))
+				meta := locales.TrackCountDot(len(al.Songs))
 				if al.Released != "" {
 					meta = " · " + al.Released + meta
 				}
@@ -80,7 +80,7 @@ func (a *app) albumHeader(c *ui.Context, al *music.AlbumProfile) {
 				ui.Text(c, al.Label).FontSize(12.5).TextColor(p.muted).SingleLine().Margin(2, 0, 0, 0)
 			}
 			ui.Row(c).Gap(10).Wrap().Margin(10, 0, 0, 0).Children(func() {
-				if pillButton(c.Key("play"), iconPlay, "播放", p.accent, p.onAccent).Clicked() {
+				if pillButton(c.Key("play"), iconPlay, locales.Play(), p.accent, p.onAccent).Clicked() {
 					if a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}

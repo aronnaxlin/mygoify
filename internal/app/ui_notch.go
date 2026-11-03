@@ -9,6 +9,7 @@ import (
 
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
+	"mygoify/locales"
 )
 
 // notch is the quick player around the camera housing at the top of the
@@ -52,7 +53,7 @@ func newNotch(a *app) *notch {
 	n.winW, n.winH = notchOpenW+60, 240
 	n.place()
 	n.win = mygo.NewWindow(mygo.WindowOptions{
-		Title:         mygo.App.Name() + "迷你播放器",
+		Title:         locales.MiniPlayerTitle(mygo.App.Name()),
 		Panel:         true,
 		Hidden:        true,
 		Frameless:     true,
@@ -434,7 +435,7 @@ func (n *notch) expanded(c *ui.Context, tr *music.Track, open, left float32) {
 	col.Translate(0, (1-open)*-10)
 	col.Children(func() {
 		ui.Row(c).Gap(14).AlignItems(ui.Center).Children(func() {
-			cov := ui.ButtonBase(c.Key("cover")).Size(60, 60).Radius(12).FocusRing(false).Label("打开正在播放")
+			cov := ui.ButtonBase(c.Key("cover")).Size(60, 60).Radius(12).FocusRing(false).Label(locales.OpenNowPlaying())
 			lift := ui.Pose{}
 			if cov.Hovered() {
 				lift.Scale = 1.05
@@ -453,7 +454,7 @@ func (n *notch) expanded(c *ui.Context, tr *music.Track, open, left float32) {
 			ui.Column(c).Grow(1).MinWidth(0).Gap(4).Children(func() {
 				ui.Text(c, tr.Name).FontSize(15).FontWeight(700).SingleLine()
 				if pl.Loading() {
-					ui.Text(c, "正在缓冲…").FontSize(12.5).TextColor(white.Alpha(0.55)).SingleLine()
+					ui.Text(c, locales.Buffering()).FontSize(12.5).TextColor(white.Alpha(0.55)).SingleLine()
 				} else {
 					a.artistLinks(c, tr, white.Alpha(0.55), white).FontSize(12.5).SingleLine()
 				}
@@ -482,16 +483,16 @@ func (n *notch) helloRow(c *ui.Context, shown, left float32) {
 		Opacity(max(0, shown*1.4-0.4))
 	row.Translate(0, (1-shown)*-8)
 	row.Children(func() {
-		title, hint := "刘海里也能控制播放", "指针停在这里，即可暂停、切歌"
+		title, hint := locales.NotchHelloTitle(), locales.NotchHelloHint()
 		if !n.real {
-			title, hint = "屏幕顶部也能控制播放", "指针移到顶部中央，即可暂停、切歌"
+			title, hint = locales.TopHelloTitle(), locales.TopHelloHint()
 		}
 		ui.Column(c).Grow(1).MinWidth(0).Gap(2).Children(func() {
 			ui.Text(c, title).FontSize(13.5).FontWeight(700).SingleLine()
 			ui.Text(c, hint).FontSize(11.5).TextColor(white.Alpha(0.55)).SingleLine()
 		})
-		b := ui.ButtonBase(c.Key("keep")).Padding(6, 14).Radius(999).Background(a.pal.accent).FocusRing(false).Label("开启刘海播放器")
-		b.Children(func() { ui.Text(c, "开启").FontSize(12.5).FontWeight(600).TextColor(a.pal.onAccent) })
+		b := ui.ButtonBase(c.Key("keep")).Padding(6, 14).Radius(999).Background(a.pal.accent).FocusRing(false).Label(locales.EnableNotchPlayer())
+		b.Children(func() { ui.Text(c, locales.Enable()).FontSize(12.5).FontWeight(600).TextColor(a.pal.onAccent) })
 		if b.Clicked() {
 			n.keep()
 		}
@@ -511,10 +512,10 @@ func (n *notch) idle(c *ui.Context, open, left float32) {
 		})
 		ui.Column(c).Grow(1).Gap(2).Children(func() {
 			ui.Text(c, mygo.App.Name()).FontSize(14).FontWeight(700)
-			ui.Text(c, "未在播放").FontSize(12).TextColor(white.Alpha(0.5))
+			ui.Text(c, locales.NotPlaying()).FontSize(12).TextColor(white.Alpha(0.5))
 		})
 		b := ui.ButtonBase(c.Key("open")).Padding(6, 14).Radius(999).Background(white.Alpha(0.14)).FocusRing(false)
-		b.Children(func() { ui.Text(c, "打开").FontSize(12.5).FontWeight(600) })
+		b.Children(func() { ui.Text(c, locales.Open()).FontSize(12.5).FontWeight(600) })
 		if b.Clicked() {
 			a.showMain()
 		}

@@ -4,6 +4,10 @@
   "slug": "mygoify",
   "version": "0.0.2",
   "out": "build",
+  "i18n": {
+    "dir": "locales",
+    "source": "zh-Hans"
+  },
   "updates": {
     "publicKey": "J+ud+zDQIxzLYF3k16bTdPFCw8H2i2D0B0x9kUmaUks=",
     "github": "aronnaxlin/mygoify"

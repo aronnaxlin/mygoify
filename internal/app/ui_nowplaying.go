@@ -9,6 +9,7 @@ import (
 
 	"mygoify/internal/lyrics"
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 var white = ui.RGB(255, 255, 255)
@@ -115,7 +116,7 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 		// showing only while the pointer is in the window, as the pane tabs do.
 		ui.Row(c).Height(topBar(c)).Justify(ui.Center).AlignItems(ui.Center).DragWindow().Children(func() {
 			reveal(ui.Box(c.Key("close-reveal")), pointerIn).Children(func() {
-				if iconButton(c.Key("close"), iconDown, 22, white.Alpha(0.7), "关闭").Clicked() {
+				if iconButton(c.Key("close"), iconDown, 22, white.Alpha(0.7), locales.Close()).Clicked() {
 					a.nowPlaying = false
 				}
 			})
@@ -167,7 +168,7 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 					ui.Spacer(c)
 					status := "-" + clock(pl.Duration()-pl.Position())
 					if pl.Loading() {
-						status = "正在缓冲…"
+						status = locales.Buffering()
 					}
 					ui.Text(c, status).FontSize(11).FontFeatures("tnum").TextColor(white.Alpha(0.5))
 				})
@@ -264,7 +265,12 @@ type npTab struct {
 // npTabs returns the tabs of Now Playing, in order, for what plays: ⌘1
 // chooses the first, ⌘2 the second, and on.
 func (a *app) npTabs() []npTab {
-	return []npTab{{paneLyrics, "歌词"}, {paneStage, "律动"}, {paneQueue, "待播清单"}, {paneWall, "选歌"}}
+	return []npTab{
+		{paneLyrics, locales.TabLyrics()},
+		{paneStage, locales.TabStage()},
+		{paneQueue, locales.TabQueue()},
+		{paneWall, locales.TabWall()},
+	}
 }
 
 func (a *app) paneTabs(c *ui.Context) {
@@ -341,7 +347,7 @@ func (a *app) lyricsPane(c *ui.Context, tr *music.Track, h float32) {
 				lyricsSkeleton(c, npShimmer(c))
 				return
 			}
-			ui.Text(c, "暂无歌词").FontSize(24).FontWeight(700).TextColor(white.Alpha(0.4))
+			ui.Text(c, locales.NoLyrics()).FontSize(24).FontWeight(700).TextColor(white.Alpha(0.4))
 		})
 		return
 	}

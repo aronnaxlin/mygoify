@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+
+	"mygoify/locales"
 )
 
 // searchField is the search field atop the sidebar, which searches as
@@ -21,7 +23,7 @@ func (a *app) searchField(c *ui.Context) {
 		ui.Icon(c, iconSearch).Size(14, 14).TextColor(p.muted)
 		cb := ui.ComboboxBase(c.Key("search"), &a.query)
 		in := cb.Input.Bind(&a.searchBox).Grow(1).MinWidth(0).
-			Placeholder("搜索歌曲、歌手、专辑").FontSize(13).Label("搜索")
+			Placeholder(locales.SearchPlaceholder()).FontSize(13).Label(locales.Search())
 		q := strings.TrimSpace(a.query)
 		// Empty, it lists the searches before, if any.
 		if q != "" || len(a.settings.SearchHistory) == 0 {
@@ -39,10 +41,10 @@ func (a *app) searchField(c *ui.Context) {
 				}
 				return row
 			}
-			panel.Label("搜索历史")
+			panel.Label(locales.SearchHistory())
 			ui.Row(c).Padding(2, 4, 2, 10).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, "搜索历史").FontSize(12).TextColor(p.muted).Grow(1)
-				iconButton(c.Key("clear"), iconTrash, 14, p.muted, "清空搜索历史").KeepFocus().OnClick(a.clearSearchHistory)
+				ui.Text(c, locales.SearchHistory()).FontSize(12).TextColor(p.muted).Grow(1)
+				iconButton(c.Key("clear"), iconTrash, 14, p.muted, locales.ClearSearchHistory()).KeepFocus().OnClick(a.clearSearchHistory)
 			})
 			for _, h := range a.settings.SearchHistory {
 				option("history:"+h, h).Children(func() {

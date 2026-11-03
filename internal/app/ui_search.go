@@ -6,6 +6,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 // searchLimit is how many results load at a time: as many as Spotify
@@ -13,14 +14,19 @@ import (
 const searchLimit = 10
 
 // searchKinds are the kinds of search, as their tabs show them.
-var searchKinds = []struct {
+func searchKinds() []struct {
 	kind  music.SearchType
 	label string
-}{
-	{music.SearchTracks, "单曲"},
-	{music.SearchArtists, "歌手"},
-	{music.SearchAlbums, "专辑"},
-	{music.SearchPlaylists, "歌单"},
+} {
+	return []struct {
+		kind  music.SearchType
+		label string
+	}{
+		{music.SearchTracks, locales.SearchTracks()},
+		{music.SearchArtists, locales.SearchArtists()},
+		{music.SearchAlbums, locales.SearchAlbums()},
+		{music.SearchPlaylists, locales.SearchPlaylists()},
+	}
 }
 
 // searchData is what a search found, as far as its pages have loaded.
@@ -73,7 +79,7 @@ func (a *app) moreResults(r route, d *searchData) {
 		a.post(func() {
 			d.page.loading = false
 			if err != nil {
-				d.page.err = failed(err, "搜索失败，请稍后再试")
+				d.page.err = failed(err, locales.SearchFailed())
 				return
 			}
 			d.res.Append(res)
@@ -149,7 +155,7 @@ func (a *app) searchPage(c *ui.Context) {
 
 func (a *app) searchEmpty(c *ui.Context, d *searchData) {
 	if d.page.loaded && d.res.Len() == 0 {
-		a.empty(c, "没有找到相关结果")
+		a.empty(c, locales.NoResultsFound())
 	}
 }
 
@@ -157,20 +163,21 @@ func (a *app) searchEmpty(c *ui.Context, d *searchData) {
 // for instead. Spotify says not how many it found.
 func (a *app) searchHeader(c *ui.Context) {
 	r := a.route
+	kinds := searchKinds()
 	at := 0
-	for i, k := range searchKinds {
+	for i, k := range kinds {
 		if k.kind == r.kind {
 			at = i
 		}
 	}
-	a.heading(c, "“"+r.query+"”", "搜索")
+	a.heading(c, "“"+r.query+"”", locales.Search())
 	ui.Row(c).Margin(0, 0, 18, 0).Children(func() {
-		labels := make([]string, len(searchKinds))
-		for i, k := range searchKinds {
+		labels := make([]string, len(kinds))
+		for i, k := range kinds {
 			labels[i] = k.label
 		}
 		if segmented(c.Key("kind"), &at, labels...) {
-			r.kind = searchKinds[at].kind
+			r.kind = kinds[at].kind
 			a.show(r)
 		}
 	})

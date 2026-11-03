@@ -1,11 +1,15 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
+
+	"mygoify/locales"
 )
 
 // openSettings shows the settings window, opening it the first time.
@@ -16,7 +20,7 @@ func (a *app) openSettings() {
 		return
 	}
 	a.settingsWin = mygo.NewWindow(mygo.WindowOptions{
-		Title:           "设置",
+		Title:           locales.Settings(),
 		Width:           560,
 		Height:          720,
 		MinWidth:        480,
@@ -45,6 +49,43 @@ func (a *app) changed() {
 		a.notch.setEnabled(a.settings.Notch)
 	}
 	a.redraw()
+}
+
+func (a *app) changeLanguage() {
+	tag := a.settings.Language
+	if mygo.App.IsReady() {
+		mygo.App.SetLocale(tag)
+	}
+	if tag != "" {
+		_ = os.Setenv("MYGO_LOCALE", tag)
+	} else {
+		_ = os.Unsetenv("MYGO_LOCALE")
+	}
+	saveLocaleFile(tag)
+	a.setMenu()
+	if a.tray != nil {
+		a.tray.SetMenu(a.trayMenu())
+	}
+	if a.settingsWin != nil {
+		a.settingsWin.SetTitle(locales.Settings())
+	}
+	a.redraw()
+}
+
+func saveLocaleFile(tag string) {
+	dir, err := mygo.App.Path(mygo.PathUserData)
+	if err != nil {
+		return
+	}
+	path := filepath.Join(dir, "locale")
+	if tag == "" {
+		_ = os.Remove(path)
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+	_ = os.WriteFile(path, []byte(tag+"\n"), 0o644)
 }
 
 func (a *app) settingsView(c *ui.Context) {
@@ -76,18 +117,19 @@ func (a *app) settingsView(c *ui.Context) {
 		// Only on macOS: elsewhere the icon is always in the notification
 		// area.
 		if runtime.GOOS == "darwin" {
-			group("通用", "", func() {
-				row("应用图标", func() {
-					labels := make([]string, len(appIcons))
-					chosen := appIcons[0].label
-					for i, ic := range appIcons {
+			group(locales.General(), "", func() {
+				row(locales.AppIcon(), func() {
+					icons := appIcons()
+					labels := make([]string, len(icons))
+					chosen := icons[0].label
+					for i, ic := range icons {
 						labels[i] = ic.label
 						if ic.id == s.AppIcon {
 							chosen = ic.label
 						}
 					}
-					if ui.Select(c.Key("app-icon"), &chosen, labels).Label("应用图标").Width(150).Changed() {
-						for _, ic := range appIcons {
+					if ui.Select(c.Key("app-icon"), &chosen, labels).Label(locales.AppIcon()).Width(150).Changed() {
+						for _, ic := range icons {
 							if ic.label == chosen {
 								s.AppIcon = ic.id
 							}
@@ -105,24 +147,25 @@ func (a *app) settingsView(c *ui.Context) {
 		// apps but not on the web, and Soloist played at 160 kbps until it
 		// was (2026-11-02).
 		device := s.Spotify.withEnv().DeviceName
-		group("播放", "音质在手机或电脑上的 Spotify 官方 App 里选：点设备图标，选中 "+device+"，改成无损。只需一次，Soloist 更新后可能要再选；网页版不行。", func() {
-			row("音质", func() {
-				ui.Text(c, "在官方 App 里选").FontSize(12.5).TextColor(p.muted)
+		group(locales.Playback(), locales.PlaybackQualityNote(device), func() {
+			row(locales.Quality(), func() {
+				ui.Text(c, locales.SelectInOfficialApp()).FontSize(12.5).TextColor(p.muted)
 			})
-			mode := quitModes[0]
-			for _, m := range quitModes {
+			modes := quitModes()
+			mode := modes[0]
+			for _, m := range modes {
 				if m.id == s.Quit {
 					mode = m
 				}
 			}
-			row("退出 App 时", func() {
-				labels := make([]string, len(quitModes))
-				for i, m := range quitModes {
+			row(locales.WhenQuittingApp(), func() {
+				labels := make([]string, len(modes))
+				for i, m := range modes {
 					labels[i] = m.label
 				}
 				chosen := mode.label
-				if ui.Select(c.Key("quit"), &chosen, labels).Label("退出 App 时").Width(170).Changed() {
-					for _, m := range quitModes {
+				if ui.Select(c.Key("quit"), &chosen, labels).Label(locales.WhenQuittingApp()).Width(170).Changed() {
+					for _, m := range modes {
 						if m.label == chosen {
 							s.Quit = m.id
 						}
@@ -130,39 +173,39 @@ func (a *app) settingsView(c *ui.Context) {
 					a.changed()
 				}
 			})
-			row("单击歌曲即播放", func() {
-				if ui.Switch(c.Key("click-plays"), &s.ClickPlays).Label("单击歌曲即播放").Changed() {
+			row(locales.ClickPlaysSong(), func() {
+				if ui.Switch(c.Key("click-plays"), &s.ClickPlays).Label(locales.ClickPlaysSong()).Changed() {
 					a.changed()
 				}
 			})
 			if a.canHide() {
-				row("关闭窗口时退出", func() {
-					if ui.Switch(c.Key("close-quits"), &s.CloseQuits).Label("关闭窗口时退出").Changed() {
+				row(locales.CloseWindowQuits(), func() {
+					if ui.Switch(c.Key("close-quits"), &s.CloseQuits).Label(locales.CloseWindowQuits()).Changed() {
 						a.changed()
 					}
 				})
 			}
-			row("登录时启动 Soloist", func() {
-				if ui.Switch(c.Key("soloist-at-login"), &s.Spotify.SoloistAtLogin).Label("登录时启动 Soloist").Changed() {
+			row(locales.StartSoloistAtLogin(), func() {
+				if ui.Switch(c.Key("soloist-at-login"), &s.Spotify.SoloistAtLogin).Label(locales.StartSoloistAtLogin()).Changed() {
 					a.changed()
 					a.changeAtLogin()
 				}
 			})
 		})
 
-		group("歌词", "网易云和 QQ 音乐是非公开接口，可能失效。", func() {
-			row("歌词服务器", func() {
-				if ui.TextInput(c.Key("lyrics-server"), &s.LyricsServer).Placeholder("https://lrclib.net").Label("歌词服务器").FontSize(13).Width(200).Changed() {
+		group(locales.Lyrics(), locales.LyricsSourcesNote(), func() {
+			row(locales.LyricsServer(), func() {
+				if ui.TextInput(c.Key("lyrics-server"), &s.LyricsServer).Placeholder("https://lrclib.net").Label(locales.LyricsServer()).FontSize(13).Width(200).Changed() {
 					a.changed()
 				}
 			})
-			row("网易云音乐", func() {
-				if ui.Switch(c.Key("lyrics-netease"), &s.LyricsNetEase).Label("网易云音乐").Changed() {
+			row(locales.NeteaseCloudMusic(), func() {
+				if ui.Switch(c.Key("lyrics-netease"), &s.LyricsNetEase).Label(locales.NeteaseCloudMusic()).Changed() {
 					a.lyricsSourceChanged()
 				}
 			})
-			row("QQ 音乐", func() {
-				if ui.Switch(c.Key("lyrics-qq"), &s.LyricsQQ).Label("QQ 音乐").Changed() {
+			row(locales.QqMusic(), func() {
+				if ui.Switch(c.Key("lyrics-qq"), &s.LyricsQQ).Label(locales.QqMusic()).Changed() {
 					a.lyricsSourceChanged()
 				}
 			})
@@ -170,27 +213,27 @@ func (a *app) settingsView(c *ui.Context) {
 
 		// Only on macOS, the one with a notch player.
 		if a.notch != nil {
-			group("刘海播放器", "", func() {
-				row("刘海播放器", func() {
-					if ui.Switch(c.Key("notch"), &s.Notch).Label("刘海播放器").Changed() {
+			group(locales.NotchPlayer(), "", func() {
+				row(locales.NotchPlayer(), func() {
+					if ui.Switch(c.Key("notch"), &s.Notch).Label(locales.NotchPlayer()).Changed() {
 						a.changed()
 					}
 				})
-				row("播放时显示实时活动", func() {
-					if ui.Switch(c.Key("activity"), &s.NotchActivity).Label("播放时显示实时活动").Disabled(!s.Notch).Changed() {
+				row(locales.ShowActivityWhilePlaying(), func() {
+					if ui.Switch(c.Key("activity"), &s.NotchActivity).Label(locales.ShowActivityWhilePlaying()).Disabled(!s.Notch).Changed() {
 						a.changed()
 					}
 				})
-				row("无刘海的屏幕上常驻", func() {
-					if ui.Switch(c.Key("virtual"), &s.NotchVirtual).Label("无刘海的屏幕上常驻").Disabled(!s.Notch).Changed() {
+				row(locales.PersistentOnNotchlessScreens(), func() {
+					if ui.Switch(c.Key("virtual"), &s.NotchVirtual).Label(locales.PersistentOnNotchlessScreens()).Disabled(!s.Notch).Changed() {
 						a.changed()
 					}
 				})
 			})
 		}
 
-		group("外观", "", func() {
-			row("外观", func() {
+		group(locales.Appearance(), "", func() {
+			row(locales.Appearance(), func() {
 				modes := []string{"system", "light", "dark"}
 				i := 0
 				for k, m := range modes {
@@ -198,21 +241,47 @@ func (a *app) settingsView(c *ui.Context) {
 						i = k
 					}
 				}
-				if segmented(c.Key("appearance"), &i, "跟随系统", "浅色", "深色") {
+				if segmented(c.Key("appearance"), &i, locales.FollowSystem(), locales.Light(), locales.Dark()) {
 					s.Appearance = modes[i]
 					a.changed()
 				}
 			})
+			row(locales.Language(), func() {
+				options := []struct{ id, label string }{
+					{"", locales.FollowSystem()},
+					{"zh-Hans", "简体中文"},
+					{"zh-Hant", "繁體中文"},
+					{"en", "English"},
+					{"ja", "日本語"},
+				}
+				labels := make([]string, len(options))
+				chosen := options[0].label
+				for k, opt := range options {
+					labels[k] = opt.label
+					if opt.id == s.Language {
+						chosen = opt.label
+					}
+				}
+				if ui.Select(c.Key("language"), &chosen, labels).Label(locales.SelectLanguage()).Width(150).Changed() {
+					for _, opt := range options {
+						if opt.label == chosen {
+							s.Language = opt.id
+						}
+					}
+					a.changed()
+					a.changeLanguage()
+				}
+			})
 		})
 
-		group("实验性功能", "会多耗一些电。", func() {
-			row("进度条烟雾", func() {
-				if ui.Switch(c.Key("smoke"), &s.Smoke).Label("进度条烟雾").Changed() {
+		group(locales.ExperimentalFeatures(), locales.ExperimentalNote(), func() {
+			row(locales.ProgressBarSmoke(), func() {
+				if ui.Switch(c.Key("smoke"), &s.Smoke).Label(locales.ProgressBarSmoke()).Changed() {
 					a.changed()
 				}
 			})
-			row("烟雾背景", func() {
-				if ui.Switch(c.Key("fog"), &s.Fog).Label("烟雾背景").Changed() {
+			row(locales.FogBackdrop(), func() {
+				if ui.Switch(c.Key("fog"), &s.Fog).Label(locales.FogBackdrop()).Changed() {
 					a.changed()
 				}
 			})
@@ -220,23 +289,23 @@ func (a *app) settingsView(c *ui.Context) {
 
 		// What Soloist is, and what its version has left: renaming it takes
 		// the next start of the app, for the service file carries the name.
-		note := a.soloistAbout() + "设备名改名后，重启 App 生效。"
-		group("账号", note, func() {
-			row("连接 Spotify", func() {
-				if ui.Button(c.Key("onboarding"), "设置…").Clicked() {
+		note := a.soloistAbout() + locales.DeviceNameNote()
+		group(locales.Account(), note, func() {
+			row(locales.ConnectSpotify(), func() {
+				if ui.Button(c.Key("onboarding"), locales.SettingsEllipsis()).Clicked() {
 					a.showMain()
 					a.openOnboarding()
 					a.win.Invalidate()
 				}
 			})
-			row("设备名", func() {
-				if ui.TextInput(c.Key("device-name"), &s.Spotify.DeviceName).Placeholder("MyGoify").Label("填写设备名").FontSize(13).Width(200).Changed() {
+			row(locales.DeviceName(), func() {
+				if ui.TextInput(c.Key("device-name"), &s.Spotify.DeviceName).Placeholder("MyGoify").Label(locales.FillDeviceName()).FontSize(13).Width(200).Changed() {
 					a.keepSettings()
 				}
 			})
 			if a.profile == nil {
-				row("未登录", func() {
-					if ui.PrimaryButton(c.Key("login"), "登录").Clicked() {
+				row(locales.NotSignedIn(), func() {
+					if ui.PrimaryButton(c.Key("login"), locales.Login()).Clicked() {
 						a.showMain()
 						a.openOnboarding()
 						a.win.Invalidate()
@@ -249,9 +318,9 @@ func (a *app) settingsView(c *ui.Context) {
 				a.avatar(c, prof.Images, 36, p.press)
 				ui.Column(c).Grow(1).Gap(2).Children(func() {
 					ui.Text(c, prof.Name).FontSize(13.5).FontWeight(600)
-					ui.Text(c, "已登录 Spotify").FontSize(12).TextColor(p.muted)
+					ui.Text(c, locales.SignedInSpotify()).FontSize(12).TextColor(p.muted)
 				})
-				if ui.Button(c.Key("logout"), "退出登录").Clicked() {
+				if ui.Button(c.Key("logout"), locales.SignOut()).Clicked() {
 					a.signOut()
 				}
 			})
@@ -260,23 +329,23 @@ func (a *app) settingsView(c *ui.Context) {
 		if a.updates {
 			var checked string
 			if t := lastUpdateCheck(); !t.IsZero() {
-				checked = "上次检查：" + relativeTime(t, time.Now())
+				checked = locales.LastChecked(relativeTime(t, time.Now()))
 			}
-			group("更新", checked, func() {
-				row("自动检查更新", func() {
+			group(locales.Updates(), checked, func() {
+				row(locales.AutomaticallyCheckForUpdates(), func() {
 					on := updateChecks()
-					if ui.Switch(c.Key("update-checks"), &on).Label("自动检查更新").Changed() {
+					if ui.Switch(c.Key("update-checks"), &on).Label(locales.AutomaticallyCheckForUpdates()).Changed() {
 						setUpdateChecks(on)
 					}
 				})
-				row("自动下载并安装", func() {
+				row(locales.AutomaticallyDownloadAndInstall(), func() {
 					on := updateDownloads()
-					if ui.Switch(c.Key("update-downloads"), &on).Label("自动下载并安装").Disabled(!updateChecks()).Changed() {
+					if ui.Switch(c.Key("update-downloads"), &on).Label(locales.AutomaticallyDownloadAndInstall()).Disabled(!updateChecks()).Changed() {
 						setUpdateDownloads(on)
 					}
 				})
-				row("当前版本 "+mygo.App.Version(), func() {
-					if ui.Button(c.Key("check-updates"), "检查更新").Clicked() {
+				row(locales.CurrentVersion(mygo.App.Version()), func() {
+					if ui.Button(c.Key("check-updates"), locales.CheckForUpdates()).Clicked() {
 						checkForUpdates()
 					}
 				})
