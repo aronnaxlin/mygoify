@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
+	"mygoify/locales"
 )
 
 const pagePad = 40
@@ -47,19 +47,19 @@ func (a *app) homePage(c *ui.Context) {
 		defer a.endMark(c)
 		hello := greeting(now)
 		if a.profile != nil {
-			hello += "，" + a.profile.Name
+			hello = locales.GreetingNamed(hello, a.profile.Name)
 		}
-		a.heading(c, hello, fmt.Sprintf("%d月%d日 %s", now.Month(), now.Day(), weekday(now)))
+		a.heading(c, hello, locales.DateWithWeekday(now))
 		if loading {
 			a.homeSkeleton(c, a.pageShimmer(c))
 			return
 		}
 		if len(h.Recent) > 0 {
-			a.section(c, "最近播放")
+			a.section(c, locales.RecentPlayed())
 			a.trackCards(c.Key("recent"), h.Recent)
 		}
 		if len(h.TopArtists) > 0 {
-			a.section(c, "常听的艺人")
+			a.section(c, locales.TopArtists())
 			ui.Grid(c.Key("artists")).Columns(a.columns(c, 150)).GapX(20).GapY(28).Children(func() {
 				for i := range h.TopArtists[:min(len(h.TopArtists), a.columns(c, 150))] {
 					a.artistCard(c.Key(h.TopArtists[i].ID), &h.TopArtists[i])
@@ -67,11 +67,11 @@ func (a *app) homePage(c *ui.Context) {
 			})
 		}
 		if len(h.TopTracks) > 0 {
-			a.section(c, "常听的歌曲")
+			a.section(c, locales.TopTracks())
 			a.trackCards(c.Key("top"), h.TopTracks)
 		}
 		if lists := append(append([]music.Playlist(nil), a.mine...), a.saved...); len(lists) > 0 {
-			a.section(c, "我的歌单")
+			a.section(c, locales.MyPlaylists())
 			ui.Grid(c.Key("playlists")).Columns(a.columns(c, 168)).GapX(20).GapY(28).Children(func() {
 				for i := range lists {
 					a.playlistCard(c.Key(lists[i].ID), &lists[i])
@@ -96,13 +96,22 @@ func (a *app) trackCards(c *ui.Context, tracks []music.Track) {
 }
 
 func weekday(t time.Time) string {
-	return [...]string{"星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"}[t.Weekday()]
+	return locales.Weekday(t)
+}
+
+// playlistName returns the playlist's title, using the localized Liked Songs
+// title when pl.Liked is true.
+func playlistName(pl *music.Playlist) string {
+	if pl.Liked {
+		return locales.LikedSongs()
+	}
+	return pl.Name
 }
 
 // playlistCard is a square cover with the playlist's name below: it lifts
 // under the pointer, where a play button shows on it.
 func (a *app) playlistCard(c *ui.Context, pl *music.Playlist) {
-	if a.coverCard(c, pl.Name, pl.Images, pl.Owner.Name, func() { a.loadPlaylist(pl.ID, true) }) {
+	if a.coverCard(c, playlistName(pl), pl.Images, pl.Owner.Name, func() { a.loadPlaylist(pl.ID, true) }) {
 		a.open(route{page: pagePlaylist, id: pl.ID})
 	}
 }
@@ -155,7 +164,7 @@ func (a *app) coverFill(c *ui.Context, cover music.Images, px int, radius float3
 // opening it.
 func (a *app) coverPlayButton(c *ui.Context, shown bool, play func()) {
 	b := ui.ButtonBase(c.Key("play")).Absolute().Bottom(10).Right(10).Size(38, 38).Radius(999).Center().
-		Background(a.pal.accent).TextColor(a.pal.onAccent).Label("播放").FocusRing(false).
+		Background(a.pal.accent).TextColor(a.pal.onAccent).Label(locales.Play()).FocusRing(false).
 		Shadow(0, 4, 12, 0, ui.RGBA(0, 0, 0, 0.3))
 	pose := ui.Pose{Fade: 1, Scale: 0.8, Y: 6}
 	if shown || b.Hovered() {
@@ -186,7 +195,7 @@ func (a *app) playlistPage(c *ui.Context) {
 	if pl.Hidden {
 		// Spotify lists none of its tracks: it plays as a whole.
 		a.trackRows(c, nil, true, func(c *ui.Context) { a.playlistHeader(c, pl) }, func(c *ui.Context) {
-			ui.Text(c, "Spotify 不提供这个歌单的曲目列表，可以直接播放整个歌单。").FontSize(13).TextColor(a.pal.muted).Margin(8, 12)
+			ui.Text(c, locales.PlaylistTracksNotProvided()).FontSize(13).TextColor(a.pal.muted).Margin(8, 12)
 		})
 		return
 	}
@@ -230,38 +239,38 @@ func (a *app) playlistHeader(c *ui.Context, pl *music.Playlist) {
 			a.coverFill(c, pl.Images, 600, 14)
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
-			ui.Text(c, "歌单").FontSize(12).FontWeight(600).TextColor(p.muted)
-			ui.Text(c, pl.Name).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
+			ui.Text(c, locales.Playlist()).FontSize(12).FontWeight(600).TextColor(p.muted)
+			ui.Text(c, playlistName(pl)).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
 			var meta []string
 			if pl.Owner.Name != "" {
 				meta = append(meta, pl.Owner.Name)
 			}
-			meta = append(meta, fmt.Sprintf("%d 首", pl.TrackCount))
+			meta = append(meta, locales.TrackCount(pl.TrackCount))
 			ui.Text(c, strings.Join(meta, " · ")).FontSize(13).TextColor(p.muted)
 			if d := strings.TrimSpace(pl.Description); d != "" {
 				ui.Text(c, strings.ReplaceAll(d, "\n", " ")).FontSize(12.5).TextColor(p.muted).MaxLines(2).LineHeight(1.45).Margin(2, 0, 0, 0)
 			}
 			ui.Row(c).Gap(10).Wrap().Margin(10, 0, 0, 0).Children(func() {
-				if pillButton(c.Key("play"), iconPlay, "播放", p.accent, p.onAccent).Clicked() {
+				if pillButton(c.Key("play"), iconPlay, locales.Play(), p.accent, p.onAccent).Clicked() {
 					if a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}
 					a.pl.PlayQueue(pl.URI(), pl.Tracks, firstPlayable(pl.Tracks))
 				}
-				if pillButton(c.Key("shuffle"), iconShuffle, "随机播放", p.hover.Over(p.bg), p.text).Clicked() {
+				if pillButton(c.Key("shuffle"), iconShuffle, locales.Shuffle(), p.hover.Over(p.bg), p.text).Clicked() {
 					if !a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}
 					a.pl.PlayQueue(pl.URI(), pl.Tracks, randomPlayable(pl.Tracks))
 				}
 				if mine := a.editable(pl.ID); mine != nil {
-					more := iconButton(c.Key("more"), iconMore, 18, p.muted, "更多")
+					more := iconButton(c.Key("more"), iconMore, 18, p.muted, locales.More())
 					more.Menu(func(m *ui.Menu) {
-						if m.Item("重命名…").Chosen() {
+						if m.Item(locales.RenamePlaylistEllipsis()).Chosen() {
 							a.startRename(mine)
 						}
 						m.Separator()
-						if m.Item("删除歌单…").Chosen() {
+						if m.Item(locales.DeletePlaylistEllipsis()).Chosen() {
 							a.confirmDelete(mine)
 						}
 					})
@@ -340,7 +349,7 @@ func (a *app) trackRows(c *ui.Context, tracks []music.Track, covers bool, header
 				ui.Text(c, tr.Name).FontSize(14).FontWeight(500).SingleLine()
 				ui.Row(c).Gap(6).AlignItems(ui.Center).Children(func() {
 					if tr.Explicit {
-						ui.Text(c, "E").FontSize(9).FontWeight(800).TextColor(p.muted).Padding(0, 4).Radius(3).Background(p.hover).Label("含有不适宜内容")
+						ui.Text(c, "E").FontSize(9).FontWeight(800).TextColor(p.muted).Padding(0, 4).Radius(3).Background(p.hover).Label(locales.ExplicitContent())
 					}
 					a.artistLinks(c, tr, p.muted, p.text).FontSize(12.5).SingleLine().Shrink(1).MinWidth(0)
 				})

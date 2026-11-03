@@ -269,6 +269,9 @@ func (e *entity) track() music.Track {
 	return t
 }
 
+// ErrNotLoggedIn is the error message reported when Soloist is not logged in.
+const ErrNotLoggedIn = "soloist: not logged in"
+
 // handle takes in what Soloist sent, and reports the state it leaves.
 func (b *Backend) handle(data []byte) {
 	var ev event
@@ -290,7 +293,7 @@ func (b *Backend) handle(data []byte) {
 		b.err = ev.Message
 	case "auth_state":
 		if ev.LoggedIn != nil && !*ev.LoggedIn {
-			b.err = "Soloist 未登录"
+			b.err = ErrNotLoggedIn
 		} else if ev.LoggedIn != nil {
 			if b.volume != nil {
 				v := *b.volume

@@ -7,15 +7,18 @@ import (
 	"time"
 
 	"mygoify/internal/soloist"
+	"mygoify/locales"
 )
 
 // quitModes are what quitting the app does with the music (DESIGN.md
 // §4.2), with their names: stop it and Soloist, pause it and leave
 // Soloist running, or play on.
-var quitModes = []struct{ id, label string }{
-	{"stop", "停止并关闭 Soloist"},
-	{"pause", "暂停"},
-	{"play", "继续播放"},
+func quitModes() []struct{ id, label string } {
+	return []struct{ id, label string }{
+		{"stop", locales.QuitStop()},
+		{"pause", locales.QuitPause()},
+		{"play", locales.QuitPlay()},
+	}
 }
 
 // pauser is a backend that can pause as the app quits: Soloist's.

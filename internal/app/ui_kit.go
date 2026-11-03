@@ -8,6 +8,7 @@ import (
 
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
+	"mygoify/locales"
 )
 
 // palette holds the app's colors, for the light and the dark appearance.
@@ -72,7 +73,7 @@ func iconButton(c *ui.Context, icon *ui.SVG, size float32, color ui.Color, label
 // playButton is the icon button that plays and pauses, its icon turning
 // from one into the other.
 func playButton(c *ui.Context, playing bool, size float32, color ui.Color) ui.Element {
-	b := roundButton(c, size, color, "播放/暂停")
+	b := roundButton(c, size, color, locales.PlayPause())
 	b.Children(func() { playPause(c, b, playing, size) })
 	return b
 }
@@ -210,15 +211,15 @@ func clock(d time.Duration) string {
 func greeting(now time.Time) string {
 	switch h := now.Hour(); {
 	case h < 5:
-		return "夜深了"
+		return locales.GreetingLateNight()
 	case h < 11:
-		return "早上好"
+		return locales.GreetingMorning()
 	case h < 13:
-		return "中午好"
+		return locales.GreetingNoon()
 	case h < 18:
-		return "下午好"
+		return locales.GreetingAfternoon()
 	default:
-		return "晚上好"
+		return locales.GreetingEvening()
 	}
 }
 
@@ -335,10 +336,10 @@ func (a *app) pageFoot(c *ui.Context, pg *paged, next func()) {
 	foot.Children(func() {
 		switch {
 		case pg.loading:
-			ui.Text(c, "正在加载…").FontSize(12.5).TextColor(a.pal.muted)
+			ui.Text(c, locales.Loading()).FontSize(12.5).TextColor(a.pal.muted)
 		case pg.err != "":
 			ui.Text(c, pg.err).FontSize(12.5).TextColor(a.pal.muted)
-			if ui.Button(c.Key("retry"), "重试").Clicked() {
+			if ui.Button(c.Key("retry"), locales.Retry()).Clicked() {
 				next()
 			}
 		}
@@ -375,15 +376,15 @@ func relativeTime(t, now time.Time) string {
 	y2, m2, d2 := now.Date()
 	switch {
 	case d < time.Minute:
-		return "刚刚"
+		return locales.JustNow()
 	case d < time.Hour:
-		return fmt.Sprintf("%d分钟前", int(d/time.Minute))
+		return locales.MinutesAgo(int(d / time.Minute))
 	case y1 == y2 && m1 == m2 && d1 == d2:
 		return t.Format("15:04")
 	case now.AddDate(0, 0, -1).Format("20060102") == t.Format("20060102"):
-		return "昨天 " + t.Format("15:04")
+		return locales.YesterdayTime(t.Format("15:04"))
 	case y1 == y2:
-		return fmt.Sprintf("%d月%d日", m1, d1)
+		return locales.DateMonthDay(t)
 	default:
 		return dateText(t)
 	}
@@ -391,6 +392,5 @@ func relativeTime(t, now time.Time) string {
 
 // dateText says t's day, as the app writes dates.
 func dateText(t time.Time) string {
-	y, m, d := t.Date()
-	return fmt.Sprintf("%d年%d月%d日", y, m, d)
+	return locales.DateYearMonthDay(t)
 }

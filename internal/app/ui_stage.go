@@ -7,6 +7,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/lyrics"
+	"mygoify/locales"
 )
 
 // The stage shows lyrics as Folia's classic visualizer does: one line at a
@@ -103,7 +104,7 @@ func (a *app) stage(c *ui.Context, accent ui.Color) {
 					stageSkeleton(c, npShimmer(c), f, w)
 					return
 				}
-				ui.Text(c, "暂无歌词").FontSize(28).FontWeight(800).TextColor(white.Alpha(0.4))
+				ui.Text(c, locales.NoLyrics()).FontSize(28).FontWeight(800).TextColor(white.Alpha(0.4))
 			})
 		})
 		return

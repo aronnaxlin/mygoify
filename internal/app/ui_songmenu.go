@@ -6,6 +6,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 // copyText puts text on the clipboard; tests replace it.
@@ -13,7 +14,7 @@ var copyText = func(text string) error { return mygo.Clipboard.Write(transfer.Te
 
 // songMenu is three dots that open the menu of tr.
 func (a *app) songMenu(c *ui.Context, tr *music.Track, size float32, color ui.Color) ui.Element {
-	b := iconButton(c, iconMore, size, color, "更多")
+	b := iconButton(c, iconMore, size, color, locales.More())
 	b.Menu(a.songItems(tr, ""))
 	return b
 }
@@ -25,28 +26,28 @@ func (a *app) songMenu(c *ui.Context, tr *music.Track, size float32, color ui.Co
 // pid, the playlist it is listed in, if set.
 func (a *app) songItems(tr *music.Track, pid string) func(m *ui.Menu) {
 	return func(m *ui.Menu) {
-		if m.Item("加入队列").Chosen() {
+		if m.Item(locales.AddToQueue()).Chosen() {
 			a.addToQueue(tr)
 		}
 		m.Separator()
 		if a.profile != nil {
-			label := "喜欢"
+			label := locales.Like()
 			if a.isLiked(tr) {
-				label = "取消喜欢"
+				label = locales.Unlike()
 			}
 			if m.Item(label).Chosen() {
 				a.toggleLike(tr)
 			}
 			m.Separator()
 		}
-		if m.Item("复制歌名").Chosen() {
+		if m.Item(locales.CopySongTitle()).Chosen() {
 			copyText(tr.Name)
 		}
-		if m.Item("复制歌名和歌手").Chosen() {
+		if m.Item(locales.CopyTitleAndArtist()).Chosen() {
 			copyText(tr.Name + " - " + tr.ArtistNames())
 		}
 		m.Separator()
-		if m.Item("复制链接").Chosen() {
+		if m.Item(locales.CopyLink()).Chosen() {
 			copyText(tr.URL())
 		}
 		// Its artists' and album's pages, those Spotify has.
@@ -58,11 +59,11 @@ func (a *app) songItems(tr *music.Track, pid string) func(m *ui.Menu) {
 			m.Separator()
 		}
 		for _, ar := range tr.Artists {
-			if ar.ID != "" && m.Item("查看歌手："+ar.Name).Chosen() {
+			if ar.ID != "" && m.Item(locales.ViewArtist(ar.Name)).Chosen() {
 				a.openArtist(ar.ID)
 			}
 		}
-		if tr.Album.ID != "" && m.Item("查看专辑："+tr.Album.Name).Chosen() {
+		if tr.Album.ID != "" && m.Item(locales.ViewAlbum(tr.Album.Name)).Chosen() {
 			a.openPage(route{page: pageAlbum, id: tr.Album.ID})
 		}
 		a.playlistItems(m, tr, pid)
@@ -73,9 +74,9 @@ func (a *app) songItems(tr *music.Track, pid string) func(m *ui.Menu) {
 func (a *app) addToQueue(tr *music.Track) {
 	a.pl.AddToQueue(*tr, func(err error) {
 		if err != nil {
-			a.toast = "加入队列失败，请稍后再试"
+			a.toast = locales.AddToQueueFailed()
 		} else {
-			a.toast = "已加入队列"
+			a.toast = locales.AddedToQueue()
 		}
 	})
 }

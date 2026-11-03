@@ -1,10 +1,20 @@
 package app
 
 import (
+	"os"
+
 	"mygoify/internal/library"
 	"mygoify/internal/music"
 	"mygoify/internal/playback"
 )
+
+func init() {
+	// Tests look elements up by their Chinese labels: fix the language
+	// to Simplified Chinese so tests pass regardless of host system locale.
+	if os.Getenv("MYGO_LOCALE") == "" {
+		_ = os.Setenv("MYGO_LOCALE", "zh-Hans")
+	}
+}
 
 func newTestApp() *app {
 	a := &app{

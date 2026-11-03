@@ -6,6 +6,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 // artistLinks shows a track's artists as its credits read, each a link to
@@ -102,7 +103,7 @@ func (a *app) loadArtist(id string) {
 		a.post(func() {
 			d.loading = false
 			if err != nil {
-				d.err = failed(err, "歌手加载失败")
+				d.err = failed(err, locales.ArtistLoadFailed())
 				return
 			}
 			d.profile = ar
@@ -123,7 +124,7 @@ func (a *app) loadAlbums(id string) {
 		a.post(func() {
 			d.albumsPage.loading = false
 			if err != nil {
-				d.albumsPage.err = failed(err, "专辑加载失败")
+				d.albumsPage.err = failed(err, locales.AlbumLoadFailed())
 				return
 			}
 			d.albums = append(d.albums, albums...)
@@ -153,11 +154,11 @@ func (a *app) toggleFollow(id string) {
 			switch {
 			case err != nil:
 				ar.Followed = !follow
-				a.toast = "操作失败，请稍后再试"
+				a.toast = locales.ActionFailed()
 			case follow:
-				a.toast = "已关注"
+				a.toast = locales.Following()
 			default:
-				a.toast = "已取消关注"
+				a.toast = locales.Unfollowed()
 			}
 		})
 	}()
@@ -185,7 +186,7 @@ func (a *app) artistPage(c *ui.Context) {
 			a.albumGrid(c, d.albums)
 			a.pageFoot(c, &d.albumsPage, func() { a.loadAlbums(id) })
 			if d.albumsPage.loaded && len(d.albums) == 0 {
-				a.empty(c, "暂无专辑")
+				a.empty(c, locales.NoAlbums())
 			}
 		})
 		return
@@ -220,27 +221,27 @@ func (a *app) artistHeader(c *ui.Context, d *artistData) {
 			a.coverFill(c, ar.Images, 600, photo/2)
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
-			ui.Text(c, "歌手").FontSize(12).FontWeight(600).TextColor(p.muted)
+			ui.Text(c, locales.Artist()).FontSize(12).FontWeight(600).TextColor(p.muted)
 			ui.Text(c, ar.Name).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
 			if len(ar.Genres) > 0 {
 				ui.Text(c, strings.Join(ar.Genres, " · ")).FontSize(13).TextColor(p.muted)
 			}
 			ui.Row(c).Gap(10).Wrap().Margin(10, 0, 0, 0).Children(func() {
-				if pillButton(c.Key("play"), iconPlay, "播放", p.accent, p.onAccent).Clicked() {
+				if pillButton(c.Key("play"), iconPlay, locales.Play(), p.accent, p.onAccent).Clicked() {
 					if a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}
 					a.pl.PlayQueue("", songs, firstPlayable(songs))
 				}
-				if pillButton(c.Key("shuffle"), iconShuffle, "随机播放", p.hover.Over(p.bg), p.text).Clicked() {
+				if pillButton(c.Key("shuffle"), iconShuffle, locales.Shuffle(), p.hover.Over(p.bg), p.text).Clicked() {
 					if !a.pl.Shuffle() {
 						a.pl.ToggleShuffle()
 					}
 					a.pl.PlayQueue("", songs, randomPlayable(songs))
 				}
-				icon, label := iconPlus, "关注"
+				icon, label := iconPlus, locales.Follow()
 				if ar.Followed {
-					icon, label = iconCheck, "已关注"
+					icon, label = iconCheck, locales.Following()
 				}
 				if pillButton(c.Key("follow"), icon, label, p.hover.Over(p.bg), p.text).Clicked() {
 					a.toggleFollow(ar.ID)
@@ -248,16 +249,18 @@ func (a *app) artistHeader(c *ui.Context, d *artistData) {
 			})
 		})
 	})
+	tabTitle := locales.PopularSongs()
+	if a.artistTab == artistAlbums {
+		tabTitle = locales.Albums()
+	}
 	ui.Row(c).AlignItems(ui.Center).Margin(34, 0, 14, 0).Children(func() {
-		ui.Text(c, artistTabTitles[a.artistTab]).FontSize(19).FontWeight(700).LetterSpacing(-0.3)
+		ui.Text(c, tabTitle).FontSize(19).FontWeight(700).LetterSpacing(-0.3)
 		ui.Spacer(c)
-		if segmented(c.Key("tab"), &a.artistTab, "热门", "专辑") {
+		if segmented(c.Key("tab"), &a.artistTab, locales.Popular(), locales.Albums()) {
 			a.loadArtist(ar.ID)
 		}
 	})
 }
-
-var artistTabTitles = [...]string{"热门歌曲", "专辑"}
 
 func (a *app) artistHeaderSkeleton(c *ui.Context, s shimmer) {
 	ui.Row(c).Gap(28).AlignItems(ui.End).Padding(0, 0, 8, 0).Children(func() {
@@ -276,5 +279,5 @@ func (a *app) artistHeaderSkeleton(c *ui.Context, s shimmer) {
 			})
 		})
 	})
-	a.section(c, "歌曲")
+	a.section(c, locales.Songs())
 }

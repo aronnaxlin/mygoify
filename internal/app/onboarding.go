@@ -17,6 +17,7 @@ import (
 	"mygoify/internal/playback"
 	"mygoify/internal/secret"
 	"mygoify/internal/soloist"
+	"mygoify/locales"
 )
 
 // Onboarding (DESIGN.md §4.2): five steps, each of which can be done again
@@ -26,7 +27,7 @@ var (
 	openURL = func(u string) error { return mygo.Shell.OpenExternal(u) }
 	// chooseSoloist asks for Soloist's executable, or returns "".
 	chooseSoloist = func() string {
-		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Title: "选择 Soloist", ButtonLabel: "选择"})
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Title: locales.ChooseSoloist(), ButtonLabel: locales.Choose()})
 		if err != nil || len(paths) == 0 {
 			return ""
 		}
@@ -35,6 +36,13 @@ var (
 	// spotifyLogin has the listener log in in the browser, and keeps the
 	// login in keep.
 	spotifyLogin = func(ctx context.Context, cfg auth.Config, keep secret.Store) error {
+		cfg.Messages = auth.Messages{
+			SuccessTitle: locales.LoginSuccessTitle(),
+			SuccessBody:  locales.LoginSuccessBody(),
+			FailureTitle: locales.LoginFailureTitle(),
+			FailureBody:  locales.LoginFailureBody(),
+			Mismatch:     locales.LoginMismatch(),
+		}
 		sess := auth.NewSession(cfg, secret.Entry{Store: keep, Name: secret.SpotifyLogin})
 		return sess.Login(ctx, openURL)
 	}
@@ -299,12 +307,12 @@ func (a *app) saveApp() {
 		redirect = defaultRedirect
 	}
 	if id == "" || strings.ContainsAny(id, " \t\n") {
-		ob.appErr = "Client ID 不对，请从应用页面复制"
+		ob.appErr = locales.ErrClientID()
 		return
 	}
 	// The login is to the Redirect URI as the listener's own app has it.
 	if u, err := url.Parse(redirect); err != nil || u.Scheme != "http" || u.Hostname() != "127.0.0.1" || u.Port() == "" {
-		ob.appErr = "回调地址要写成 http://127.0.0.1:端口/路径"
+		ob.appErr = locales.ErrRedirectURI()
 		return
 	}
 	ob.appErr = ""
@@ -345,9 +353,9 @@ func (a *app) startLogin() {
 			}
 			ob.loginWaiting, ob.stopLogin = false, nil
 			if err != nil {
-				ob.loginErr = "登录失败，请再试一次"
+				ob.loginErr = locales.ErrLoginFailed()
 				if errors.Is(err, auth.ErrDenied) {
-					ob.loginErr = "你拒绝了授权"
+					ob.loginErr = locales.ErrLoginDenied()
 				}
 				return
 			}
@@ -393,7 +401,7 @@ func (a *app) pickSoloist() {
 		return
 	}
 	if !isExecutable(path) {
-		ob.binErr = "这不是可以运行的文件"
+		ob.binErr = locales.ErrNotExecutable()
 		return
 	}
 	a.useSoloist(path)
@@ -455,11 +463,11 @@ func (a *app) install(get func(ctx context.Context, progress func(done, total in
 			case err == nil:
 				a.useSoloist(bin)
 			case errors.Is(err, errNotSoloist):
-				ob.binErr = "解压出来的文件运行不了，请再试，或自己选择"
+				ob.binErr = locales.ErrUnpackFailed()
 			case errors.Is(err, errNoSoloist):
-				ob.binErr = "压缩包里没有 Soloist"
+				ob.binErr = locales.ErrNoSoloistInArchive()
 			default:
-				ob.binErr = "没能下载或解压，请再试一次"
+				ob.binErr = locales.ErrDownloadOrExtract()
 			}
 		})
 	}()

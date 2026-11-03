@@ -1,0 +1,1 @@
+"NSAudioCaptureUsageDescription" = "MyGoifyはSoloistが再生している音声をメモリ内で解析し、ビジュアライザや背景を音楽に合わせて動かします。音声の保存や外部送信は行いません。";

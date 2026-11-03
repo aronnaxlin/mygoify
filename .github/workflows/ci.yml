@@ -34,8 +34,9 @@ jobs:
             echo "$unformatted"
             exit 1
           fi
+      - run: go tool mygo i18n check
       - run: go vet ./...
-      - run: go test ./internal/...
+      - run: go test ./internal/... ./locales/...
 
   build:
     name: Build

@@ -9,6 +9,7 @@ import (
 	"github.com/egoist/mygo/ui/shader"
 
 	"mygoify/internal/music"
+	"mygoify/locales"
 )
 
 // The cover of Now Playing is a thing to touch. It tilts toward the
@@ -95,7 +96,7 @@ func (a *app) npCover(c *ui.Context, tr *music.Track, art *artwork, size float32
 		cs.flung = dir
 		cs.off = ui.Point{X: -float32(dir) * far}
 	}
-	wrap := ui.Box(c.Key(coverKey{tr.ID, cs.gen})).Size(size, size).AlignSelf(ui.Start).Label("专辑封面")
+	wrap := ui.Box(c.Key(coverKey{tr.ID, cs.gen})).Size(size, size).AlignSelf(ui.Start).Label(locales.AlbumCover())
 	entering := cs.enter != 0
 	if entering {
 		// A new cover's first frame: it shows where it comes in from.

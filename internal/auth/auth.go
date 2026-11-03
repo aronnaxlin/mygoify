@@ -37,11 +37,21 @@ var (
 	tokenURL     = "https://accounts.spotify.com/api/token"
 )
 
+// Messages customize what the browser page shows after the login callback.
+type Messages struct {
+	SuccessTitle string
+	SuccessBody  string
+	FailureTitle string
+	FailureBody  string
+	Mismatch     string
+}
+
 // Config is the app registered with Spotify: its client ID, and the
 // loopback address its dashboard lists to send the listener back to.
 type Config struct {
 	ClientID    string
 	RedirectURI string
+	Messages    Messages
 }
 
 type Token struct {
@@ -97,11 +107,24 @@ func Login(ctx context.Context, cfg Config, open func(url string) error) (*Token
 		}
 		q := r.URL.Query()
 		var a answer
+		msgs := cfg.Messages
+		mismatch := msgs.Mismatch
+		if mismatch == "" {
+			mismatch = "MyGoify: login request mismatch, please return to MyGoify to log in again."
+		}
+		failTitle, failBody := msgs.FailureTitle, msgs.FailureBody
+		if failTitle == "" {
+			failTitle, failBody = "Login not completed", "Please return to MyGoify and try again."
+		}
+		okTitle, okBody := msgs.SuccessTitle, msgs.SuccessBody
+		if okTitle == "" {
+			okTitle, okBody = "Logged in", "You can close this tab and return to MyGoify."
+		}
 		switch {
 		case q.Get("state") != state:
 			// Not the login asked for: a page of another, or of someone
 			// else's making.
-			http.Error(w, "MyGoify：登录请求不匹配，请回到 MyGoify 重新登录。", http.StatusBadRequest)
+			http.Error(w, mismatch, http.StatusBadRequest)
 			return
 		case q.Get("error") == "access_denied":
 			a.err = ErrDenied
@@ -112,9 +135,9 @@ func Login(ctx context.Context, cfg Config, open func(url string) error) (*Token
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if a.err != nil {
-			fmt.Fprint(w, page("登录未完成", "请回到 MyGoify 再试一次。"))
+			fmt.Fprint(w, page(failTitle, failBody))
 		} else {
-			fmt.Fprint(w, page("已登录", "可以关闭这个页面，回到 MyGoify。"))
+			fmt.Fprint(w, page(okTitle, okBody))
 		}
 		select {
 		case answers <- a:

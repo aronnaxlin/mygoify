@@ -12,6 +12,7 @@ import (
 	"mygoify/internal/playback"
 	"mygoify/internal/secret"
 	"mygoify/internal/soloist"
+	"mygoify/locales"
 )
 
 type pageKind int
@@ -218,6 +219,9 @@ func Run() error {
 	a.useUpdater()
 	mygo.App.WhenReady(func() {
 		a.settings = loadSettings()
+		if a.settings.Language != "" {
+			mygo.App.SetLocale(a.settings.Language)
+		}
 		a.settings.applyAppearance()
 		a.npPane = a.lyricsPaneChosen()
 		// Before the window: on Windows it lays out its content as it is
@@ -289,6 +293,16 @@ func Run() error {
 		}
 	})
 	// Once the windows have gone, so that quitting shows at once.
+	mygo.App.OnLocaleChanged(func(string) {
+		a.setMenu()
+		if a.tray != nil {
+			a.tray.SetMenu(a.trayMenu())
+		}
+		if a.settingsWin != nil {
+			a.settingsWin.SetTitle(locales.Settings())
+		}
+		a.redraw()
+	})
 	mygo.App.OnQuit(a.leaveSoloist)
 	mygo.App.OnWindowAllClosed(func() {})
 	mygo.App.OnActivate(func(bool) { a.showMain() })

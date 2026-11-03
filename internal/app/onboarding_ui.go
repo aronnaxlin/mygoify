@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/egoist/mygo/ui"
+
+	"mygoify/locales"
 )
 
 // onboardingDialog walks the listener through connecting Spotify: each
@@ -23,8 +25,8 @@ func (a *app) onboardingDialog(c *ui.Context) {
 		panel.Width(460).Padding(26, 26, 22, 26).Radius(22).Gap(4).
 			Background(p.bg).Border(1, p.hairline).Shadow(0, 24, 60, -12, ui.RGBA(0, 0, 0, 0.4)).
 			Transition(ui.ElementTransition{Animation: &ui.Snappy, Enter: &ui.Motion{Scale: 0.94}, Exit: &ui.Motion{Scale: 0.96}})
-		ui.Text(c, "连接 Spotify").FontSize(20).FontWeight(700)
-		ui.Text(c, "分五步，每一步都可以单独重做").FontSize(13).TextColor(p.muted).Margin(0, 0, 10, 0)
+		ui.Text(c, locales.OnboardingTitle()).FontSize(20).FontWeight(700)
+		ui.Text(c, locales.OnboardingSubtitle()).FontSize(13).TextColor(p.muted).Margin(0, 0, 10, 0)
 		// In a window as short as the app allows, the steps scroll.
 		_, h := c.Size()
 		ui.Scroll(c).MaxHeight(max(h-230, 200)).Children(func() {
@@ -66,11 +68,11 @@ func (a *app) onboardStep(c *ui.Context, i int, title, summary string, body func
 					t.TextColor(p.muted)
 				}
 				if !open && done {
-					b := ui.ButtonBase(c.Key("redo")).Label("修改" + title).Height(24).PaddingX(8).Radius(6).Center()
+					b := ui.ButtonBase(c.Key("redo")).Label(locales.ModifyStep(title)).Height(24).PaddingX(8).Radius(6).Center()
 					if b.Hovered() {
 						b.Background(p.hover)
 					}
-					b.Children(func() { ui.Text(c, "修改").FontSize(12.5).TextColor(p.muted) })
+					b.Children(func() { ui.Text(c, locales.Modify()).FontSize(12.5).TextColor(p.muted) })
 					if b.Clicked() {
 						a.redo(i)
 					}
@@ -126,21 +128,21 @@ func (a *app) stepApp(c *ui.Context) {
 	if len(id) > 8 {
 		id = id[:8] + "…"
 	}
-	a.onboardStep(c, stepApp, "创建应用", "Client ID "+id, func() {
-		a.note(c, "每个人用自己的应用，不和别人共用额度。在 Spotify for Developers 新建一个应用，勾选 Web API，Redirect URI 填下面的回调地址，再把 Client ID 贴到这里。")
+	a.onboardStep(c, stepApp, locales.StepAppTitle(), "Client ID "+id, func() {
+		a.note(c, locales.StepAppNote())
 		row := ui.Row(c).Margin(4, 0, 2, 0)
 		row.Children(func() {
-			if a.action(c, "dashboard", "打开开发者后台", false).Clicked() {
+			if a.action(c, "dashboard", locales.OpenDeveloperDashboard(), false).Clicked() {
 				openURL(developerDashboardURL)
 			}
 		})
 		a.fieldLabel(c, "Client ID")
-		in := ui.TextInput(c.Key("client-id"), &ob.clientID).Placeholder("32 位字符").Label("填写 Client ID").FontSize(13)
-		a.fieldLabel(c, "回调地址")
-		redirect := ui.TextInput(c.Key("redirect"), &ob.redirect).Label("填写回调地址").FontSize(13)
+		in := ui.TextInput(c.Key("client-id"), &ob.clientID).Placeholder(locales.ClientIDPlaceholder()).Label(locales.FillClientID()).FontSize(13)
+		a.fieldLabel(c, locales.RedirectURI())
+		redirect := ui.TextInput(c.Key("redirect"), &ob.redirect).Label(locales.FillRedirectURI()).FontSize(13)
 		a.problem(c, ob.appErr)
 		ui.Row(c).Justify(ui.End).Margin(8, 0, 0, 0).Children(func() {
-			save := off(a.action(c, "save-app", "保存", true), strings.TrimSpace(ob.clientID) == "")
+			save := off(a.action(c, "save-app", locales.Save(), true), strings.TrimSpace(ob.clientID) == "")
 			if save.Clicked() || in.Submitted() || redirect.Submitted() {
 				a.saveApp()
 			}
@@ -151,17 +153,17 @@ func (a *app) stepApp(c *ui.Context) {
 func (a *app) stepLogin(c *ui.Context) {
 	p := a.pal
 	ob := &a.ob
-	summary := "已登录"
+	summary := locales.LoggedIn()
 	if a.live && a.profile != nil {
-		summary = "已登录为 " + a.profile.Name
+		summary = locales.LoggedInAs(a.profile.Name)
 	}
-	a.onboardStep(c, stepLogin, "登录 Spotify", summary, func() {
-		a.note(c, "在浏览器里登录，并允许 MyGoify 访问你的曲库。需要 Spotify Premium。")
+	a.onboardStep(c, stepLogin, locales.StepLoginTitle(), summary, func() {
+		a.note(c, locales.StepLoginNote())
 		if ob.loginWaiting {
 			ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(6, 0, 0, 0).Children(func() {
 				ui.Spinner(c).FontSize(16)
-				ui.Text(c, "请在浏览器中完成登录").FontSize(13).TextColor(p.muted).Grow(1)
-				if a.action(c, "cancel-login", "取消", false).Clicked() {
+				ui.Text(c, locales.CompleteLoginInBrowser()).FontSize(13).TextColor(p.muted).Grow(1)
+				if a.action(c, "cancel-login", locales.Cancel(), false).Clicked() {
 					a.cancelLogin()
 				}
 			})
@@ -169,7 +171,7 @@ func (a *app) stepLogin(c *ui.Context) {
 		}
 		a.problem(c, ob.loginErr)
 		ui.Row(c).Margin(6, 0, 0, 0).Children(func() {
-			login := off(pillButton(c.Key("log-in"), iconUser, "在浏览器中登录", p.accent, p.onAccent).Height(32), !ob.have.app)
+			login := off(pillButton(c.Key("log-in"), iconUser, locales.LoginInBrowser(), p.accent, p.onAccent).Height(32), !ob.have.app)
 			if login.Clicked() {
 				a.startLogin()
 			}
@@ -181,8 +183,8 @@ func (a *app) stepSoloist(c *ui.Context) {
 	p := a.pal
 	ob := &a.ob
 	dl := &ob.dl
-	a.onboardStep(c, stepSoloist, "Soloist", a.settings.Spotify.withEnv().SoloistBin, func() {
-		a.note(c, "Soloist 是 Spotify 官方的播放器，MyGoify 通过它播放。可以直接下载，也可以自己下载后选择。")
+	a.onboardStep(c, stepSoloist, locales.StepSoloistTitle(), a.settings.Spotify.withEnv().SoloistBin, func() {
+		a.note(c, locales.StepSoloistNote())
 		a.problem(c, ob.binErr)
 		file := soloistArchive()
 		switch {
@@ -190,22 +192,22 @@ func (a *app) stepSoloist(c *ui.Context) {
 			a.downloadProgress(c)
 			return
 		case dl.confirm:
-			a.note(c, "将从 Spotify 官方（soloist-builds.spotifycdn.com）下载 "+file+"，解压后保存在这台电脑上。")
+			a.note(c, locales.DownloadSoloistConfirm(file))
 			ui.Row(c).Gap(10).Justify(ui.End).Margin(6, 0, 0, 0).Children(func() {
-				if a.action(c, "download-no", "取消", false).Clicked() {
+				if a.action(c, "download-no", locales.Cancel(), false).Clicked() {
 					dl.confirm = false
 				}
-				if a.action(c, "download-yes", "下载", true).Clicked() {
+				if a.action(c, "download-yes", locales.Download(), true).Clicked() {
 					a.startDownload()
 				}
 			})
 			return
 		}
 		ui.Row(c).Gap(10).Wrap().Margin(6, 0, 0, 0).Children(func() {
-			if file != "" && a.action(c, "download", "下载 Soloist", true).Clicked() {
+			if file != "" && a.action(c, "download", locales.DownloadSoloist(), true).Clicked() {
 				a.askDownload()
 			}
-			if a.action(c, "choose", "选择已下载的文件…", false).Clicked() {
+			if a.action(c, "choose", locales.ChooseDownloadedFile(), false).Clicked() {
 				a.pickSoloist()
 			}
 		})
@@ -222,9 +224,9 @@ func (a *app) stepSoloist(c *ui.Context) {
 				}
 			}
 			if file != "" {
-				link("browser", "用浏览器下载", soloistCDN+file)
+				link("browser", locales.DownloadInBrowser(), soloistCDN+file)
 			}
-			link("official", "官方下载页", soloistDownloadsURL)
+			link("official", locales.OfficialDownloadPage(), soloistDownloadsURL)
 		})
 	})
 }
@@ -234,7 +236,7 @@ func (a *app) stepSoloist(c *ui.Context) {
 func (a *app) downloadProgress(c *ui.Context) {
 	p := a.pal
 	dl := &a.ob.dl
-	frac, label := float32(0), "正在准备…"
+	frac, label := float32(0), locales.PreparingDownload()
 	if dl.total > 0 {
 		frac = min(float32(dl.done)/float32(dl.total), 1)
 		label = fmt.Sprintf("%.1f / %.1f MB", float64(dl.done)/1e6, float64(dl.total)/1e6)
@@ -251,7 +253,7 @@ func (a *app) downloadProgress(c *ui.Context) {
 			})
 			ui.Text(c, label).FontSize(12).TextColor(p.muted)
 		})
-		if a.action(c, "cancel-download", "取消", false).Clicked() {
+		if a.action(c, "cancel-download", locales.Cancel(), false).Clicked() {
 			a.cancelDownload()
 		}
 	})
@@ -260,37 +262,37 @@ func (a *app) downloadProgress(c *ui.Context) {
 func (a *app) stepKey(c *ui.Context) {
 	p := a.pal
 	ob := &a.ob
-	summary := "已保存"
+	summary := locales.KeySaved()
 	switch ob.keyState {
 	case keyValid:
-		summary = "key 有效，已保存"
+		summary = locales.KeyValidSaved()
 	case keyUnverified:
-		summary = "已保存，配对后才能确认"
+		summary = locales.KeyUnverifiedSaved()
 	}
-	a.onboardStep(c, stepKey, "API key", summary, func() {
-		a.note(c, "在开发者后台的 Soloist 页面登录并接受条款，生成 API key，贴到这里。key 只保存在这台电脑上，不会显示出来。")
+	a.onboardStep(c, stepKey, locales.StepKeyTitle(), summary, func() {
+		a.note(c, locales.StepKeyNote())
 		ui.Row(c).Margin(4, 0, 0, 0).Children(func() {
-			if a.action(c, "key-page", "打开 API key 页面", false).Clicked() {
+			if a.action(c, "key-page", locales.OpenKeyPage(), false).Clicked() {
 				openURL(soloistKeyURL)
 			}
 		})
-		in := ui.TextInput(c.Key("api-key"), &ob.key).Password().Placeholder("API key").Label("填写 API key").FontSize(13).Margin(4, 0, 0, 0)
+		in := ui.TextInput(c.Key("api-key"), &ob.key).Password().Placeholder("API key").Label(locales.FillAPIKey()).FontSize(13).Margin(4, 0, 0, 0)
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(6, 0, 0, 0).Children(func() {
 			switch ob.keyState {
 			case keyChecking:
 				ui.Spinner(c).FontSize(16)
-				ui.Text(c, "验证中，最多要 30 秒…").FontSize(13).TextColor(p.muted).Grow(1)
-				if a.action(c, "cancel-key", "取消", false).Clicked() {
+				ui.Text(c, locales.VerifyingMaxWait()).FontSize(13).TextColor(p.muted).Grow(1)
+				if a.action(c, "cancel-key", locales.Cancel(), false).Clicked() {
 					a.cancelKey()
 				}
 			case keyInvalid:
-				ui.Text(c, "key 无效，Spotify 拒绝了它").FontSize(13).TextColor(p.danger)
+				ui.Text(c, locales.KeyInvalid()).FontSize(13).TextColor(p.danger)
 			case keyFailed:
-				ui.Text(c, "Soloist 没能启动或登录，可以再试一次").FontSize(13).TextColor(p.danger)
+				ui.Text(c, locales.KeyFailed()).FontSize(13).TextColor(p.danger)
 			case keyValid:
-				ui.Text(c, "key 有效").FontSize(13).TextColor(p.muted)
+				ui.Text(c, locales.KeyValid()).FontSize(13).TextColor(p.muted)
 			case keyUnverified:
-				ui.Text(c, "已保存，配对后才能确认").FontSize(13).TextColor(p.muted)
+				ui.Text(c, locales.KeyUnverifiedSaved()).FontSize(13).TextColor(p.muted)
 			}
 			if ob.keyState != keyChecking {
 				ui.Box(c).Grow(1)
@@ -299,7 +301,7 @@ func (a *app) stepKey(c *ui.Context) {
 				return
 			}
 			wait := strings.TrimSpace(ob.key) == "" || !ob.have.bin
-			verify := off(a.action(c, "verify", "验证", true), wait)
+			verify := off(a.action(c, "verify", locales.Verify(), true), wait)
 			if verify.Clicked() || in.Submitted() {
 				a.submitKey()
 			}
@@ -310,20 +312,20 @@ func (a *app) stepKey(c *ui.Context) {
 func (a *app) stepPair(c *ui.Context) {
 	p := a.pal
 	ob := &a.ob
-	a.onboardStep(c, stepPair, "配对", "Soloist 已登录", func() {
+	a.onboardStep(c, stepPair, locales.StepPairTitle(), locales.SoloistLoggedIn(), func() {
 		if !ob.have.bin || !ob.have.key {
-			a.note(c, "先完成前面的步骤。")
+			a.note(c, locales.CompletePriorSteps())
 			return
 		}
-		a.note(c, "在同一局域网的手机上打开 Spotify，选中设备“"+a.settings.Spotify.withEnv().DeviceName+"”，随便播放一首歌。")
+		a.note(c, locales.PairInstructions(a.settings.Spotify.withEnv().DeviceName))
 		ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(6, 0, 0, 0).Children(func() {
 			ui.Spinner(c).FontSize(16)
-			ui.Text(c, "等待 Soloist 登录…").FontSize(13).TextColor(p.muted).Grow(1)
-			if a.action(c, "redo-key", "重填 key", false).Clicked() {
+			ui.Text(c, locales.WaitingForSoloistLogin()).FontSize(13).TextColor(p.muted).Grow(1)
+			if a.action(c, "redo-key", locales.RedoKey(), false).Clicked() {
 				a.redo(stepKey)
 			}
 		})
-		ui.Text(c, "等不到的话，key 可能填错了。").FontSize(12).TextColor(p.faint)
+		ui.Text(c, locales.PairKeyMayBeWrong()).FontSize(12).TextColor(p.faint)
 	})
 }
 
@@ -334,28 +336,28 @@ func (a *app) onboardingFoot(c *ui.Context) {
 	note := ""
 	switch {
 	case a.restartNeeded():
-		note = "重新启动后，用你的 Spotify 播放"
+		note = locales.PlayWithYourSpotifyAfterRestart()
 	case !a.live:
-		note = "连上之前，看到的是示例音乐"
+		note = locales.SampleMusicBeforeConnected()
 	}
 	ui.Row(c).Gap(10).AlignItems(ui.Center).Margin(12, 0, 0, 0).Children(func() {
 		ui.Text(c, note).FontSize(12).TextColor(p.faint).Grow(1).Shrink(1)
 		switch {
 		case a.restartNeeded():
-			if a.action(c, "later", "稍后", false).Clicked() {
+			if a.action(c, "later", locales.Later(), false).Clicked() {
 				a.closeOnboarding()
 			}
-			if a.action(c, "restart", "重新启动", true).Clicked() {
+			if a.action(c, "restart", locales.Restart(), true).Clicked() {
 				// The app comes back at once: Soloist plays on.
 				a.relaunching = true
 				relaunch()
 			}
 		case a.complete():
-			if a.action(c, "done", "完成", true).Clicked() {
+			if a.action(c, "done", locales.Done(), true).Clicked() {
 				a.closeOnboarding()
 			}
 		default:
-			if a.action(c, "dismiss", "稍后再说", false).Clicked() {
+			if a.action(c, "dismiss", locales.Dismiss(), false).Clicked() {
 				a.dismiss()
 			}
 		}
