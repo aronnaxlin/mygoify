@@ -2,7 +2,7 @@
 
 ## Project
 
-MyGoify is a third-party Spotify desktop client, forked from [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) (remote `upstream`). Read [docs/DESIGN.md](docs/DESIGN.md) and [ROADMAP.md](ROADMAP.md) before changing architecture. Version 1 covers music only: no podcasts. Never implement PlayPlay, audio download or export, or anything that works around Spotify's restrictions.
+MyGoify is a third-party Spotify desktop client, forked from [mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) (remote `upstream`). Read `DESIGN.md` and `ROADMAP.md` before changing architecture: they live in the private repo `aronnaxlin/mygoify-docs`, cloned beside this one at `~/Developer/mygoify-docs`, and the `DESIGN.md §…` of code comments means its `DESIGN.md`. Update them there, not here. Version 1 covers music only: no podcasts. Never implement PlayPlay, audio download or export, or anything that works around Spotify's restrictions.
 
 The app (`internal/app`) asks `library.Library` for music and plays through `playback.Player`, whose `Backend` does the playing. Both have fakes (`library.Fake`, `playback.Fake`), which the app runs on until Spotify answers (M2, M3). `go tool mygo dev` with no setup shows made-up music.
 

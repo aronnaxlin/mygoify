@@ -1,28 +1,32 @@
 # Releasing
 
-1. Commit pending work, bring main up to date with origin, and run `go test ./internal/...`. Others push to main too, so a release cut from a stale main leaves out their work:
+Versions have three parts: v1.0.0, then v1.0.1, v1.0.2… for fixes, and v1.1.0 for new features.
+
+1. Bring main up to date and run the tests:
 
    ```bash
    git pull --rebase origin main
+   go test ./internal/...
    ```
 
-2. Bump `version` in `mygo.json`, and add a `## 0.1.8` section at the top of `CHANGELOG.md` saying, in Chinese, what changed for people using the app since the last release (`git log v0.1.7..HEAD`, after the pull). Commit both in a commit titled just the version, e.g. `0.1.8`. MyGo's updater shows that section in the app's update window, and the release page takes it as its notes; `mygo build` fails without one.
-3. Push main first, and tag only once that push has gone through. Pushing both at once still pushes the tag when main is rejected, and the tag starts a release build of a commit that isn't on main:
+2. Bump `version` in `mygo.json`, and add a section for it at the top of `CHANGELOG.md`, in English and then in Chinese, saying what changed for people using the app. Commit both in a commit titled just the version, e.g. `1.0.1`. The app's update window and the release page show that section; `mygo build` fails without one.
+
+3. Push main first, and tag only once that push has gone through:
 
    ```bash
    git push origin main
-   git tag v0.1.8
-   git push origin v0.1.8
+   git tag v1.0.1
+   git push origin v1.0.1
    ```
 
-   If main is rejected, pull again, add what came in to the changelog, amend the version commit, test, and push main again before tagging. If a tag went up on the wrong commit anyway, cancel its run, then delete the tag and the draft it made before tagging again:
+   If a tag went up on the wrong commit, or its run failed, delete the tag and its draft before tagging again:
 
    ```bash
-   git push origin :refs/tags/v0.1.8
-   gh release delete v0.1.8 --yes
+   git push origin :refs/tags/v1.0.1
+   gh release delete v1.0.1 --yes
    ```
 
-4. `.github/workflows/release.yml` builds macOS, Windows and Linux and uploads them to a draft release. Wait for every job to pass:
+4. `.github/workflows/release.yml` builds Apple Silicon macOS and Linux (amd64, arm64), one after the other, and uploads them, their delta updates and the signed update manifests to a draft release. The manifests are signed with the repository secret `MYGO_UPDATER_PRIVATE_KEY`, whose public key is `updates.publicKey` in `mygo.json`. Wait for every job to pass:
 
    ```bash
    gh run watch "$(gh run list --workflow release.yml -L1 --json databaseId -q '.[0].databaseId')" --exit-status
@@ -30,23 +34,16 @@
 
    If a job fails, don't publish; fix it first.
 
-5. Publish the draft and mark it latest:
+5. Publish the draft and mark it latest. Installed apps update to the latest release, so only publish what should reach them:
 
    ```bash
-   gh release edit v0.1.8 --draft=false --latest
+   gh release edit v1.0.1 --draft=false --latest
    ```
 
-6. Check the update feed shows the new version:
+6. Check that the update feed shows the new version:
 
    ```bash
-   curl -sL https://github.com/egoist/mygo-cloudmusic/releases/latest/download/update-darwin-arm64.json
+   curl -sL https://github.com/aronnaxlin/mygoify/releases/latest/download/update-linux-amd64.json
    ```
 
-## The speech recognition libraries
-
-Podcast captions run sherpa-onnx, whose libraries the app downloads with the model from the `sherpa-onnx-<version>` release, not from the app's own. They only change with sherpa-onnx's version, in `scripts/sherpa`. Then pack them again, signing the macOS ones with the app's Developer ID (the app's hardened runtime loads no others), commit the `internal/speech/natives.go` it writes, and upload them as a prerelease, which never becomes the latest that updates look for:
-
-```bash
-go run ./scripts/sherpa -sign "Developer ID Application: xinyu zeng (GJE9R5VE87)"
-gh release create sherpa-onnx-2.0.1 --prerelease --latest=false build/sherpa/*
-```
+The macOS app is signed ad hoc and not notarized: there is no Developer ID. README.md says how macOS lets it in.
