@@ -265,7 +265,8 @@ func Run() error {
 		// From the menu bar alone, the Dock icon shows while the window
 		// does.
 		a.syncDock()
-		a.win.OnShow(a.syncDock)
+		// Shown again, it draws: what it shows may be asked about then.
+		a.win.OnShow(func() { a.syncDock(); a.redraw() })
 		a.win.OnHide(a.syncDock)
 		// Shown or switched to the morning after, it shows the new day's.
 		a.win.OnFocus(a.freshenHome)

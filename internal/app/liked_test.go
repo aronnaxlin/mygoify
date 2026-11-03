@@ -10,6 +10,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/internal/playback"
 )
 
 // likedTracks are n songs, t0 to t(n-1), as the app shows them.
@@ -225,5 +226,47 @@ func TestLikeWhileLikesAreAsked(t *testing.T) {
 	tt.Frame()
 	if !a.isLiked(&tr) {
 		t.Error("a frame unliked the song")
+	}
+}
+
+// playBackend plays as the fake does, but notes what it was asked to play.
+type playBackend struct {
+	*playback.Fake
+	played chan playback.Request
+}
+
+func (b *playBackend) Play(req playback.Request) error {
+	b.played <- req
+	return b.Fake.Play(req)
+}
+
+// Playing the liked songs plays the listener's collection, from the song
+// clicked: what plays on comes from Spotify's own list of those songs, not
+// from the page loaded, which is only the first of them.
+func TestLikedSongsPlayAsTheCollection(t *testing.T) {
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.settings.ClickPlays = true
+	a.profile = &music.User{ID: "me", Name: "小明"}
+	tracks := likedTracks(3)
+	a.playlists["liked"] = &music.Playlist{
+		ID: "liked", Name: "喜欢的歌曲", Liked: true, Owner: music.User{ID: "me", Name: "小明"},
+		Tracks: tracks, TrackCount: 2000, More: true,
+	}
+	a.route = route{page: pagePlaylist, id: "liked"}
+	played := make(chan playback.Request, 2)
+	a.pl = playback.New(func(func()) {}, &playBackend{Fake: playback.NewFake(), played: played})
+	tt := ui.NewTester(a.view, 1200, 800)
+	tt.Frame()
+	if err := tt.Click(tracks[2].Name); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case req := <-played:
+		if req.Context != "spotify:user:me:collection" || req.Start != 2 || len(req.Tracks) != len(tracks) {
+			t.Fatalf("played %+v", req)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("nothing played")
 	}
 }

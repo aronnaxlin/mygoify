@@ -36,8 +36,19 @@ func headerArt(c *ui.Context) float32 {
 	return 212
 }
 
+// windowShows reports whether the main window shows. Shown, what it shows
+// is asked about, as the song playing is; hidden, with the notch alone, the
+// app asks nothing (DESIGN.md §4.2). A test sets it.
+var windowShows = func(a *app) bool { return a.win == nil || a.win.IsVisible() }
+
 func (a *app) view(c *ui.Context) {
-	// The hearts ask about what the frame shows, once it is built.
+	// The hearts ask about what the frame shows, once it is built: its
+	// rows, and the song playing, which the player bar's heart shows.
+	if windowShows(a) {
+		if tr := a.pl.Current(); tr != nil {
+			a.wantLike(tr.ID)
+		}
+	}
 	defer a.askLikes()
 	t := *c.Theme()
 	a.pal = paletteFor(&t)
