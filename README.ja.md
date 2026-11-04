@@ -13,7 +13,7 @@ MyGoify は、Go 言語と [MyGo](https://github.com/egoist/mygo) で構築さ�
 
 ユーザーインターフェースと再生エンジンを完全に分離したアーキテクチャを採用しており、再生処理は Spotify 公式のヘッドレスプレイヤー **Soloist** がユーザーサービスとしてバックグラウンドで担います。この設計により、公式クライアント（約 900 MB）と比較して極めて低いメモリ消費量を実現しています。Linux 環境における実測値では、再生中・ウィンドウ表示時の UI プロセスが約 110 MB、常駐する Soloist サービスが約 60 MB（PSS）です。UI ウィンドウを閉じても、バックグラウンドで音楽を途切れることなく再生し続けることができます。
 
-本プロジェクトは [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) からフォークして開発されています。洗練された UI デザインとアーキテクチャの基礎を築かれた egoist 氏に心より感謝申し上げます。
+**インターフェースは egoist 氏の作品です。** デザイン、再生中画面、歌詞ステージ、各種ビジュアルエフェクトは、MyGoify のフォーク元である [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic) によるものです。MyGoify はそれを Spotify に対応させました：Soloist による再生、Web API によるライブラリの読み込み、Spotify 向けの歌詞ソース、4 つの表示言語、そして Linux 対応です。egoist 氏に心より感謝申し上げます。
 
 > **免責事項**：本プロジェクトは独立したオープンソースプロジェクトであり、Spotify AB との提携、承認、または公式な関係はありません。Spotify は Spotify AB の登録商標です。
 

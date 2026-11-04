@@ -13,7 +13,7 @@ MyGoify 是一套以 Go 與 [MyGo](https://github.com/egoist/mygo) 開發的原�
 
 本應用程式將介面呈現與播放引擎徹底分離：音訊播放交由 Spotify 官方無周邊播放器 **Soloist** 負責，並作為獨立的使用者層級背景服務運作。這種架構大幅降低了記憶體消耗——在 Linux 上開啟視窗時，介面程序實測約 110 MB，背景常駐的 Soloist 服務約 60 MB（PSS，播放中）（相較之下，官方桌面客戶端約 900 MB）。關閉介面視窗後，音樂仍會在背景持續順暢播放。
 
-本專案 Fork 自 [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)。由衷感謝 egoist 所打造的優異 UI 設計與架構基礎。
+**介面是 egoist 的作品。** 介面設計、現正播放頁、歌詞舞台與各種視覺效果，都來自 MyGoify 所 Fork 的 [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic)。MyGoify 做的是將它適配到 Spotify：以 Soloist 播放、透過 Web API 讀取你的音樂庫、改用適合 Spotify 的歌詞來源，並加入四種介面語言與 Linux 支援。由衷感謝 egoist。
 
 > **免責聲明**：本專案為獨立開源專案，與 Spotify AB 無任何官方關聯。Spotify 為 Spotify AB 之註冊商標。
 

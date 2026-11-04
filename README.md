@@ -13,7 +13,7 @@ MyGoify is a native, lightweight third-party Spotify desktop client built with G
 
 The application architecture separates the user interface from the audio engine: playback is handled by Spotify's official headless player, **Soloist**, which runs as a lightweight user service. This architecture keeps memory usage significantly lower than the official client — about 110 MB for the UI process and 60 MB for Soloist (PSS, measured on Linux with the window open while playing), compared to ~900 MB for the official desktop client. Closing the window keeps the music playing smoothly in the background.
 
-This project was forked from [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic). We extend our sincere gratitude to egoist for the original UI design and architecture.
+**The interface is egoist's work.** The design, the Now Playing view, the lyrics stage and the visual effects all come from [egoist/mygo-cloudmusic](https://github.com/egoist/mygo-cloudmusic), which MyGoify is forked from. MyGoify adapts it to Spotify: playback through Soloist, your library through the Web API, Spotify-friendly lyrics sources, four interface languages and Linux support. Many thanks to egoist.
 
 > **Disclaimer**: MyGoify is an independent open-source project and is not affiliated with, endorsed by, or associated with Spotify AB. Spotify is a registered trademark of Spotify AB.
 
