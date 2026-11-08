@@ -65,7 +65,7 @@ func TestSongMenuOnRightClick(t *testing.T) {
 	if err := tt.RightClick("宝船"); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := tt.Menu(), []string{"加入队列", "-", "复制歌名", "复制歌名和歌手", "-", "复制链接"}; !slices.Equal(got, want) {
+	if got, want := tt.Menu(), []string{"加入队列", "开始电台", "-", "复制歌名", "复制歌名和歌手", "-", "复制链接"}; !slices.Equal(got, want) {
 		t.Fatalf("the menu shows %q, want %q", got, want)
 	}
 	if err := tt.ChooseMenuItem("复制链接"); err != nil {

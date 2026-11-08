@@ -227,7 +227,9 @@ func Run() error {
 		// Before the window: on Windows it lays out its content as it is
 		// made, and the view asks the player what plays.
 		a.art = newArtCache(a.post)
-		a.backend = playback.NewFake()
+		fake := playback.NewFake()
+		fake.Station = fakeStation(a.lib)
+		a.backend = fake
 		if lib, b, svc := connectSpotify(a.settings.Spotify, secrets()); lib != nil {
 			a.lib, a.backend, a.svc, a.live = lib, b, svc, true
 			useLyricSources()

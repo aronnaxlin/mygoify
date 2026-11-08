@@ -70,6 +70,16 @@ type Track struct {
 
 func (t *Track) URI() string { return "spotify:track:" + t.ID }
 
+// StationURI names Spotify's radio of what uri names, a track, an artist,
+// an album or a playlist: songs like it, without end. Only Soloist plays
+// one, over its WebSocket; the Web API refuses it (DESIGN.md §5.4).
+func StationURI(uri string) string {
+	return "spotify:station:" + strings.TrimPrefix(uri, "spotify:")
+}
+
+// IsStation reports whether uri names a radio of Spotify's.
+func IsStation(uri string) bool { return strings.HasPrefix(uri, "spotify:station:") }
+
 // URL is the track's page on Spotify's website.
 func (t *Track) URL() string { return "https://open.spotify.com/track/" + t.ID }
 

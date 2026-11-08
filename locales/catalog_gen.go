@@ -1290,6 +1290,26 @@ func (msgs Messages) Follow() string {
 	return Catalog.Format(msgs.locale, "follow", nil)
 }
 
+// Radio says "电台"
+// in the language the app shows.
+func Radio() string { return In(i18n.Locale()).Radio() }
+
+// Radio says "电台"
+// in the language of msgs.
+func (msgs Messages) Radio() string {
+	return Catalog.Format(msgs.locale, "radio", nil)
+}
+
+// RadioOf says "{name} 电台"
+// in the language the app shows.
+func RadioOf(name string) string { return In(i18n.Locale()).RadioOf(name) }
+
+// RadioOf says "{name} 电台"
+// in the language of msgs.
+func (msgs Messages) RadioOf(name string) string {
+	return Catalog.Format(msgs.locale, "radioOf", map[string]any{"name": name})
+}
+
 // Following says "已关注"
 // in the language the app shows.
 func Following() string { return In(i18n.Locale()).Following() }
@@ -1468,6 +1488,16 @@ func AddToQueue() string { return In(i18n.Locale()).AddToQueue() }
 // in the language of msgs.
 func (msgs Messages) AddToQueue() string {
 	return Catalog.Format(msgs.locale, "addToQueue", nil)
+}
+
+// StartRadio says "开始电台"
+// in the language the app shows.
+func StartRadio() string { return In(i18n.Locale()).StartRadio() }
+
+// StartRadio says "开始电台"
+// in the language of msgs.
+func (msgs Messages) StartRadio() string {
+	return Catalog.Format(msgs.locale, "startRadio", nil)
 }
 
 // AddedToQueue says "已加入队列"

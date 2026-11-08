@@ -20,7 +20,8 @@ func (a *app) songMenu(c *ui.Context, tr *music.Track, size float32, color ui.Co
 }
 
 // songItems builds the menu of what can be done with tr, behind its dots
-// or a right click on its row: queueing it, copying its title, its title
+// or a right click on its row: queueing it, playing its radio, copying its
+// title, its title
 // with its artists, or the link to its page, opening its artists' or
 // album's, and, signed in, adding it to a playlist or taking it out of
 // pid, the playlist it is listed in, if set.
@@ -28,6 +29,9 @@ func (a *app) songItems(tr *music.Track, pid string) func(m *ui.Menu) {
 	return func(m *ui.Menu) {
 		if m.Item(locales.AddToQueue()).Chosen() {
 			a.addToQueue(tr)
+		}
+		if m.Item(locales.StartRadio()).Chosen() {
+			a.startRadio(tr.URI(), tr)
 		}
 		m.Separator()
 		if a.profile != nil {
