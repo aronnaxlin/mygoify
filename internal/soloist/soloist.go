@@ -732,6 +732,9 @@ const maxURIs = 100
 // as the track alone with those after it queued, they would change what
 // the listener's other devices show playing, and leave the queue full.
 func (b *Backend) Play(req playback.Request) error {
+	if music.IsStation(req.Context) {
+		return b.playStation(req)
+	}
 	if req.Context != "" && b.fromStart(req) {
 		return b.command("play", "uri", req.Context)
 	}
@@ -757,6 +760,78 @@ func (b *Backend) Play(req playback.Request) error {
 	return b.playOnDevice(body)
 }
 
+// stationWait is how long playStation waits for Soloist to start a radio,
+// and then the song it starts from.
+var stationWait = 8 * time.Second
+
+// playStation starts a radio of Spotify's, which only the WebSocket can
+// (DESIGN.md §5.4). A song's radio starts with another song: the one it is
+// of, req's track, is queued and skipped to once Soloist starts the radio,
+// as Spotify's own apps start it, muted meanwhile. Sent at once, the skip
+// came before the radio and moved on to its second song. With songs the
+// listener queued, queueing it would put it after them, and skipping to it
+// would skip them: the radio starts as Soloist starts it.
+func (b *Backend) playStation(req playback.Request) error {
+	var seed string
+	if req.Start >= 0 && req.Start < len(req.Tracks) && req.Context == music.StationURI(req.Tracks[req.Start].URI()) {
+		seed = req.Tracks[req.Start].URI()
+	}
+	b.mu.Lock()
+	before, vol := b.ctxURI, b.volume
+	var was string
+	if b.item != nil {
+		was = b.item.URI
+	}
+	b.mu.Unlock()
+	if err := b.command("play", "uri", req.Context); err != nil || seed == "" {
+		return err
+	}
+	if vol != nil {
+		b.send(context.Background(), map[string]any{"command": "set_volume", "volume": 0})
+		defer b.send(context.Background(), map[string]any{"command": "set_volume", "volume": *vol})
+	}
+	started := b.waitFor(stationWait, func() bool {
+		return b.ctxURI == req.Context && b.item != nil && (before != req.Context || b.item.URI != was)
+	})
+	b.mu.Lock()
+	first, queued := "", false
+	if b.item != nil {
+		first = b.item.URI
+	}
+	for _, e := range b.upcoming {
+		queued = queued || e.Source == "queue"
+	}
+	b.mu.Unlock()
+	if !started || first == seed || queued {
+		return nil
+	}
+	if err := b.command("add_to_queue", "uri", seed); err != nil {
+		return err
+	}
+	if err := b.command("skip_next"); err != nil {
+		return err
+	}
+	b.waitFor(stationWait, func() bool { return b.item != nil && b.item.URI == seed })
+	return nil
+}
+
+// waitFor waits up to d for ok, called with b.mu held, and reports whether
+// it came.
+func (b *Backend) waitFor(d time.Duration, ok func() bool) bool {
+	for deadline := time.Now().Add(d); ; {
+		b.mu.Lock()
+		done := ok()
+		b.mu.Unlock()
+		if done {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 // fromStart reports whether req plays its context as Soloist plays it
 // from the start: from its first track the listener can play, not
 // shuffled, as Soloist would pick another.
@@ -779,7 +854,7 @@ func (b *Backend) fromStart(req playback.Request) bool {
 }
 
 // Jump plays the track at i of the queue: within the context it plays,
-// through the Web API, else skipping to it.
+// through the Web API, else, or within a radio, skipping to it.
 func (b *Backend) Jump(i int) error {
 	b.mu.Lock()
 	st := b.state()
@@ -794,7 +869,8 @@ func (b *Backend) Jump(i int) error {
 	if i < 0 || i >= len(st.Queue) || i == st.At {
 		return nil
 	}
-	if source == "context" && ctxURI != "" {
+	// The Web API refuses a radio: within one, skip.
+	if source == "context" && ctxURI != "" && !music.IsStation(ctxURI) {
 		return b.playOnDevice(map[string]any{"context_uri": ctxURI, "offset": map[string]any{"uri": st.Queue[i].URI()}})
 	}
 	step, n := "skip_next", i-st.At

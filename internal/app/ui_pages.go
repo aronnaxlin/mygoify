@@ -58,6 +58,10 @@ func (a *app) homePage(c *ui.Context) {
 			a.section(c, locales.RecentPlayed())
 			a.trackCards(c.Key("recent"), h.Recent)
 		}
+		if len(h.TopArtists) > 0 || len(h.TopTracks) > 0 {
+			a.section(c, locales.Radio())
+			a.radioCards(c.Key("radio"), h)
+		}
 		if len(h.TopArtists) > 0 {
 			a.section(c, locales.TopArtists())
 			ui.Grid(c.Key("artists")).Columns(a.columns(c, 150)).GapX(20).GapY(28).Children(func() {

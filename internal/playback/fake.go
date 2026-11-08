@@ -20,6 +20,11 @@ type Fake struct {
 	queued int           // how many of the tracks after the one playing were queued
 	timer  *time.Timer
 	volume float64
+
+	// Station, if set, makes up the songs of a radio of Spotify's
+	// (music.StationURI), which play after the tracks it was asked to
+	// start from.
+	Station func(uri string) []music.Track
 }
 
 func NewFake() *Fake { return &Fake{st: State{At: -1}} }
@@ -89,6 +94,11 @@ func (f *Fake) ended() {
 var errNothing = errors.New("playback: nothing to play")
 
 func (f *Fake) Play(req Request) error {
+	if music.IsStation(req.Context) && f.Station != nil {
+		// A radio goes on with songs like the one it started from.
+		req.Tracks = append(slices.Clone(req.Tracks), f.Station(req.Context)...)
+		req.Start = max(req.Start, 0)
+	}
 	if len(req.Tracks) == 0 {
 		// A context alone: Fake knows no albums or playlists of its own.
 		return errNothing

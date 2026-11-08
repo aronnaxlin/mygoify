@@ -239,6 +239,9 @@ func (a *app) artistHeader(c *ui.Context, d *artistData) {
 					}
 					a.pl.PlayQueue("", songs, randomPlayable(songs))
 				}
+				if pillButton(c.Key("radio"), iconRadio, locales.Radio(), p.hover.Over(p.bg), p.text).Clicked() {
+					a.startRadio(ar.URI(), nil)
+				}
 				icon, label := iconPlus, locales.Follow()
 				if ar.Followed {
 					icon, label = iconCheck, locales.Following()
