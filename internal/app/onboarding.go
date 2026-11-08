@@ -136,10 +136,10 @@ type download struct {
 
 // vault is the store of the listener's secrets.
 func (a *app) vault() secret.Store {
-	if a.keep != nil {
-		return a.keep
+	if a.keep == nil {
+		a.keep = secrets(a.settings.Spotify.SecretsInFiles)
 	}
-	return secrets()
+	return a.keep
 }
 
 // soloistService is Soloist's service as cfg and key set it up.
