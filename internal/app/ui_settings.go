@@ -299,7 +299,7 @@ func (a *app) settingsView(c *ui.Context) {
 				}
 			})
 			row(locales.DeviceName(), func() {
-				if ui.TextInput(c.Key("device-name"), &s.Spotify.DeviceName).Placeholder("MyGoify").Label(locales.FillDeviceName()).FontSize(13).Width(200).Changed() {
+				if ui.TextInput(c.Key("device-name"), &s.Spotify.DeviceName).Placeholder(defaultDeviceName()).Label(locales.FillDeviceName()).FontSize(13).Width(200).Changed() {
 					a.keepSettings()
 				}
 			})

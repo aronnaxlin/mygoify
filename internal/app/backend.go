@@ -31,8 +31,8 @@ type spotifySettings struct {
 	// SoloistBin is Soloist's executable; without it, the app plays
 	// through a Soloist started by hand.
 	SoloistBin string `json:"soloistBin,omitempty"`
-	// DeviceName is how Spotify Connect lists Soloist, "MyGoify" unless
-	// the listener names it.
+	// DeviceName is how Spotify Connect lists Soloist, "MyGoify" and the
+	// computer's name unless the listener names it (defaultDeviceName).
 	DeviceName string `json:"deviceName,omitempty"`
 	// SoloistAtLogin starts Soloist as the listener logs in, so that
 	// Spotify Connect lists the computer with the app closed.
@@ -60,7 +60,7 @@ func (s spotifySettings) withEnv() spotifySettings {
 		}
 	}
 	if s.DeviceName == "" {
-		s.DeviceName = "MyGoify"
+		s.DeviceName = defaultDeviceName()
 	}
 	return s
 }
