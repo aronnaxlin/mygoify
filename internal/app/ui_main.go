@@ -429,6 +429,7 @@ func (a *app) loadHome() {
 				return
 			}
 			a.home, a.homeAt = home, at
+			a.seeHomeMixes(home.Mixes, at)
 		})
 	}()
 }

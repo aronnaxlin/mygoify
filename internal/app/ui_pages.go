@@ -58,6 +58,10 @@ func (a *app) homePage(c *ui.Context) {
 			a.section(c, locales.RecentPlayed())
 			a.trackCards(c.Key("recent"), h.Recent)
 		}
+		if len(a.mixes.list) > 0 {
+			a.section(c, locales.MadeForYou())
+			a.mixCards(c.Key("mixes"))
+		}
 		if len(h.TopArtists) > 0 || len(h.TopTracks) > 0 {
 			a.section(c, locales.Radio())
 			a.radioCards(c.Key("radio"), h)

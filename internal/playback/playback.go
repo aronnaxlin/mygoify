@@ -49,6 +49,10 @@ type State struct {
 	Shuffle  bool
 	Repeat   RepeatMode
 	Err      string
+	// Context is what plays, as an album, a playlist or a radio, if the
+	// backend says; ContextName is its name, as the backend says it.
+	Context     string
+	ContextName string
 }
 
 // Backend plays. Its methods may block, and are called one at a time, off
@@ -246,7 +250,7 @@ func (p *Player) PlayQueue(context string, tracks []music.Track, start int) {
 	if len(tracks) == 0 {
 		start = -1
 	}
-	p.st = State{Queue: tracks, At: start, Playing: true, Loading: true, Since: time.Now(), Shuffle: p.st.Shuffle, Repeat: p.st.Repeat}
+	p.st = State{Queue: tracks, At: start, Playing: true, Loading: true, Since: time.Now(), Shuffle: p.st.Shuffle, Repeat: p.st.Repeat, Context: context}
 	p.expect, p.expectAt = "", time.Now()
 	if start >= 0 {
 		p.expect = tracks[start].ID
@@ -287,6 +291,10 @@ func (p *Player) Current() *music.Track {
 	}
 	return &p.st.Queue[p.st.At]
 }
+
+// Context returns what plays, as an album, a playlist or a radio, and its
+// name, as far as the backend said.
+func (p *Player) Context() (uri, name string) { return p.st.Context, p.st.ContextName }
 
 // Queue returns the tracks queued, in the order they play.
 func (p *Player) Queue() []music.Track { return p.st.Queue }

@@ -113,6 +113,7 @@ func (f *Fake) Play(req Request) error {
 		f.shuffle()
 	}
 	f.st.Playing, f.st.Loading, f.st.Err = true, false, ""
+	f.st.Context, f.st.ContextName = req.Context, ""
 	f.at(0)
 	f.emit()
 	return nil

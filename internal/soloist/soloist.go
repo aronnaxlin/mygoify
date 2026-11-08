@@ -57,6 +57,7 @@ type Backend struct {
 	status   string // idle, playing, paused or buffering
 	item     *entity
 	ctxURI   string
+	ctxName  string // as Soloist last named the context, after it started
 	position position
 	options  options
 	previous []queueEntry // the most recent first, as Soloist lists them
@@ -316,8 +317,16 @@ func (b *Backend) handle(data []byte) {
 			b.item = ev.Item
 		}
 	}
-	if ev.Context != nil {
-		b.ctxURI = ev.Context.URI
+	if c := ev.Context; c != nil {
+		// Soloist names a context once it plays it: the event that it
+		// changed comes without a name.
+		if c.URI != b.ctxURI {
+			b.ctxName = ""
+		}
+		if n := c.Decorations.Identity.Name; n != "" {
+			b.ctxName = n
+		}
+		b.ctxURI = c.URI
 	}
 	if ev.Position != nil {
 		b.position = *ev.Position
@@ -477,7 +486,9 @@ func (b *Backend) state() playback.State {
 		Since:    time.UnixMilli(b.position.TimestampMs),
 		Shuffle:  b.options.Shuffle,
 		Err:      b.err,
+		Context:  b.ctxURI,
 	}
+	st.ContextName = b.ctxName
 	switch b.options.Repeat {
 	case "context":
 		st.Repeat = playback.RepeatAll

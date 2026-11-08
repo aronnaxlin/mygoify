@@ -159,7 +159,27 @@ func (f *Fake) Home() (music.Home, error) {
 			h.TopTracks = append(h.TopTracks, a.Songs[0])
 		}
 	}
+	for _, m := range fakeMixes {
+		h.Mixes = append(h.Mixes, "spotify:playlist:"+m.id)
+	}
 	return h, nil
+}
+
+// fakeMixes are the playlists Spotify made for the made-up listener.
+var fakeMixes = []struct{ id, name string }{
+	{"37i9dQZEVXcFakeWeekly00", "Discover Weekly"},
+	{"37i9dQZF1E3FakeDaily001", "Daily Mix 1"},
+	{"37i9dQZF1EPFakeDaylist0", "daylist"},
+}
+
+func (f *Fake) Mix(id string) (*music.Playlist, error) {
+	f.wait()
+	for _, m := range fakeMixes {
+		if m.id == id {
+			return &music.Playlist{ID: id, Name: m.name, Images: fakeImages(id), Hidden: true}, nil
+		}
+	}
+	return nil, errors.New("fake: no such mix")
 }
 
 // fakeLikedPage is how many liked songs Fake's playlist shows at a time.

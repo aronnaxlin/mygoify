@@ -74,6 +74,7 @@ type app struct {
 	homeErr     string
 	homeLoading bool
 	homeAt      time.Time // when what the home page shows was asked for
+	mixes       mixes     // the playlists Spotify made for the listener, as seen
 
 	playlists map[string]*music.Playlist
 	loadingPl map[string]bool

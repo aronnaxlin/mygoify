@@ -33,6 +33,9 @@ type Library interface {
 	ArtistAlbums(id string, limit, offset int) ([]music.AlbumProfile, bool, error)
 	// Search returns limit of what matches query, of a kind, from offset.
 	Search(query string, kind music.SearchType, limit, offset int) (music.SearchResult, error)
+	// Mix names a playlist Spotify made for the listener (music.IsMix),
+	// by its ID, and finds its cover: Hidden, without its tracks.
+	Mix(id string) (*music.Playlist, error)
 
 	// LikedMore reads the page of the liked songs after those their
 	// playlist returned, and reports whether more follow.
