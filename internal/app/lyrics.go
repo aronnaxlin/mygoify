@@ -103,9 +103,14 @@ func (a *app) currentLyrics() ([]lyrics.Line, bool) {
 	return a.lyr.lines, a.lyr.loaded
 }
 
-// playbackChanged hears that what plays, or how, changed: a new track's
-// lyrics load, and the next one's, to be at hand as it plays.
+// playbackChanged hears that what plays, or how, changed: a mix of
+// Spotify's is kept, and a new track's lyrics load, and the next one's, to
+// be at hand as it plays.
 func (a *app) playbackChanged() {
+	// A mix of Spotify's for the listener, played from anywhere.
+	if uri, name := a.pl.Context(); music.IsMix(uri) {
+		a.seeMix(uri, name, time.Now())
+	}
 	tr := a.pl.Current()
 	if tr == nil || tr.ID == a.lyr.track {
 		return

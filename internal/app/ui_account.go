@@ -40,11 +40,13 @@ func (a *app) signedIn(prof *music.User) {
 	a.plErr = map[string]string{}
 	a.artists, a.albums = map[string]*artistData{}, map[string]*albumData{}
 	a.searches = map[route]*searchData{}
+	a.mixes = mixes{}
 	if prof == nil {
 		a.homeLoading = false
 		return
 	}
 	a.load(a.route)
+	a.loadMixes(prof.ID)
 	a.loadHome()
 	a.loadMine(prof.ID)
 }

@@ -239,7 +239,10 @@ func (l *Library) home() (music.Home, error) {
 	var h music.Home
 	var recent struct {
 		Items []struct {
-			Track track `json:"track"`
+			Track   track `json:"track"`
+			Context *struct {
+				URI string `json:"uri"`
+			} `json:"context"`
 		} `json:"items"`
 	}
 	err := l.do("GET", "/me/player/recently-played?limit=30", nil, &recent)
@@ -248,6 +251,12 @@ func (l *Library) home() (music.Home, error) {
 		if t := it.Track; t.playable() && !seen[t.ID] {
 			seen[t.ID] = true
 			h.Recent = append(h.Recent, t.music(nil))
+		}
+		// What they played from: the only way the Web API names the
+		// playlists Spotify made for the listener.
+		if c := it.Context; c != nil && music.IsMix(c.URI) && !seen[c.URI] {
+			seen[c.URI] = true
+			h.Mixes = append(h.Mixes, c.URI)
 		}
 	}
 	var top page[track]
@@ -269,7 +278,7 @@ func (l *Library) home() (music.Home, error) {
 		err = e
 	}
 	// What loaded shows: one part failing leaves the others.
-	if len(h.Recent)+len(h.TopTracks)+len(h.TopArtists) > 0 {
+	if len(h.Recent)+len(h.TopTracks)+len(h.TopArtists)+len(h.Mixes) > 0 {
 		err = nil
 	}
 	return h, err

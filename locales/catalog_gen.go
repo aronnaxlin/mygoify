@@ -1290,6 +1290,16 @@ func (msgs Messages) Follow() string {
 	return Catalog.Format(msgs.locale, "follow", nil)
 }
 
+// MadeForYou says "为你推荐"
+// in the language the app shows.
+func MadeForYou() string { return In(i18n.Locale()).MadeForYou() }
+
+// MadeForYou says "为你推荐"
+// in the language of msgs.
+func (msgs Messages) MadeForYou() string {
+	return Catalog.Format(msgs.locale, "madeForYou", nil)
+}
+
 // Radio says "电台"
 // in the language the app shows.
 func Radio() string { return In(i18n.Locale()).Radio() }

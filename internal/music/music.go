@@ -80,6 +80,16 @@ func StationURI(uri string) string {
 // IsStation reports whether uri names a radio of Spotify's.
 func IsStation(uri string) bool { return strings.HasPrefix(uri, "spotify:station:") }
 
+// IsMix reports whether uri names a playlist Spotify made for the
+// listener: Discover Weekly, a Daily Mix, the daylist, an artist's radio.
+// In Development Mode the Web API reads none of them, but Soloist plays
+// them (DESIGN.md §5.4). Spotify's editorial playlists, 37i9dQZF1D…, are
+// everyone's, not the listener's.
+func IsMix(uri string) bool {
+	id, ok := strings.CutPrefix(uri, "spotify:playlist:37i9")
+	return ok && id != "" && !strings.HasPrefix(id, "dQZF1D")
+}
+
 // URL is the track's page on Spotify's website.
 func (t *Track) URL() string { return "https://open.spotify.com/track/" + t.ID }
 
@@ -229,4 +239,8 @@ type Home struct {
 	Recent     []Track
 	TopTracks  []Track
 	TopArtists []ArtistProfile
+	// Mixes are the playlists Spotify made for the listener (IsMix) that
+	// they played lately, the latest first, by URI: the Web API names no
+	// others, and reads none of them.
+	Mixes []string
 }
