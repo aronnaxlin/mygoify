@@ -35,10 +35,11 @@ type searchData struct {
 	page paged
 }
 
-// search searches for q, of the kind last searched for.
+// search searches for q, of the kind last searched for, or opens what q
+// names, a link to Spotify.
 func (a *app) search(q string) {
 	q = strings.TrimSpace(q)
-	if q == "" {
+	if q == "" || a.openLink(q) {
 		return
 	}
 	a.searchFor(route{page: pageSearch, query: q, kind: a.searched.kind})
