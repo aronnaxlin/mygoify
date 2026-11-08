@@ -28,21 +28,34 @@ type Store interface {
 	Delete(name string) error
 }
 
-// Default is the store the app keeps its secrets in: the system's
-// keychain, which takes over the secrets kept in files in dir, or those
-// files where there is none. MYGOIFY_SECRETS=files keeps them in files
-// anyway, for development: macOS asks the listener to let each new build
-// read the keychain, and the app is built anew at each change.
-func Default(dir string) Store {
-	if os.Getenv("MYGOIFY_SECRETS") == "files" {
-		return Files(dir)
-	}
+// Default is the store the app keeps its secrets in, as Open keeps them;
+// MYGOIFY_SECRETS=files keeps them in files, for development: macOS asks
+// the listener to let each new build read the keychain, and the app is
+// built anew at each change.
+func Default(dir string) Store { return Open(dir, os.Getenv("MYGOIFY_SECRETS") == "files") }
+
+// Open is the store the app keeps its secrets in: the system's keychain,
+// unless inFiles, or the system has none, in files in dir. Some would
+// rather the files: macOS asks each new build of an app it doesn't know
+// the developer of, as MyGoify, to be let read the keychain, with their
+// password. Either takes over the secrets the other kept, as the app asks
+// for them, so that switching signs no one out.
+func Open(dir string, inFiles bool) Store {
 	s, err := system()
 	if err != nil {
 		log.Printf("secret: no keychain, keeping secrets in files: %v", err)
 		return Files(dir)
 	}
-	return moving{s, Files(dir)}
+	return open(s, Files(dir), inFiles)
+}
+
+// open keeps secrets in files, if inFiles, else in sys, the other taking
+// over what the one kept.
+func open(sys Store, files Files, inFiles bool) Store {
+	if inFiles {
+		return moving{files, sys}
+	}
+	return moving{sys, files}
 }
 
 // moving keeps secrets in to, and moves there those from keeps as they

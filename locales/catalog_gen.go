@@ -2162,6 +2162,46 @@ func (msgs Messages) DeviceNameNote() string {
 	return Catalog.Format(msgs.locale, "deviceNameNote", nil)
 }
 
+// SecretsKeptIn says "登录信息存放在"
+// in the language the app shows.
+func SecretsKeptIn() string { return In(i18n.Locale()).SecretsKeptIn() }
+
+// SecretsKeptIn says "登录信息存放在"
+// in the language of msgs.
+func (msgs Messages) SecretsKeptIn() string {
+	return Catalog.Format(msgs.locale, "secretsKeptIn", nil)
+}
+
+// SystemKeychain says "系统钥匙串"
+// in the language the app shows.
+func SystemKeychain() string { return In(i18n.Locale()).SystemKeychain() }
+
+// SystemKeychain says "系统钥匙串"
+// in the language of msgs.
+func (msgs Messages) SystemKeychain() string {
+	return Catalog.Format(msgs.locale, "systemKeychain", nil)
+}
+
+// LocalFiles says "本地文件"
+// in the language the app shows.
+func LocalFiles() string { return In(i18n.Locale()).LocalFiles() }
+
+// LocalFiles says "本地文件"
+// in the language of msgs.
+func (msgs Messages) LocalFiles() string {
+	return Catalog.Format(msgs.locale, "localFiles", nil)
+}
+
+// SecretsNote says "登录信息存放在本地文件时，Spotify 登录和 Soloist 的 key …"
+// in the language the app shows.
+func SecretsNote() string { return In(i18n.Locale()).SecretsNote() }
+
+// SecretsNote says "登录信息存放在本地文件时，Spotify 登录和 Soloist 的 key …"
+// in the language of msgs.
+func (msgs Messages) SecretsNote() string {
+	return Catalog.Format(msgs.locale, "secretsNote", nil)
+}
+
 // SoloistExpired says "Soloist 已于 {date} 过期，请更新"
 // in the language the app shows.
 func SoloistExpired(date string) string { return In(i18n.Locale()).SoloistExpired(date) }

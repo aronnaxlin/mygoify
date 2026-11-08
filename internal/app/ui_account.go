@@ -81,7 +81,7 @@ func (a *app) accountRow(c *ui.Context) {
 	}
 	prof := a.profile
 	b.Label(prof.Name).Expanded(a.accountOpen).Children(func() {
-		a.avatar(c, prof.Images, 26, p.press)
+		a.avatar(c, prof.Images, 26, p.press, prof.Name)
 		ui.Text(c, prof.Name).FontSize(13).FontWeight(600).SingleLine().Grow(1).Shrink(1).MinWidth(0)
 		ui.Icon(c, iconUpDown).Size(13, 13).TextColor(p.faint)
 	})

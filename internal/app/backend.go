@@ -37,6 +37,11 @@ type spotifySettings struct {
 	// SoloistAtLogin starts Soloist as the listener logs in, so that
 	// Spotify Connect lists the computer with the app closed.
 	SoloistAtLogin bool `json:"soloistAtLogin,omitempty"`
+	// SecretsInFiles keeps the secrets in files only the listener can
+	// read, rather than in the system's keychain, which on macOS asks for
+	// their password as each new version first reads it. It takes effect
+	// as the app starts.
+	SecretsInFiles bool `json:"secretsInFiles,omitempty"`
 }
 
 // withEnv fills in what s leaves empty from the environment.
@@ -67,8 +72,14 @@ func dataDir() string {
 	return filepath.Join(home, ".local/share/mygoify")
 }
 
-// secrets is the store of the listener's secrets.
-func secrets() secret.Store { return secret.Default(dataDir()) }
+// secrets is the store of the listener's secrets: in files, if inFiles,
+// as development keeps them anyway (secret.Default), else the keychain.
+func secrets(inFiles bool) secret.Store {
+	if inFiles {
+		return secret.Open(dataDir(), true)
+	}
+	return secret.Default(dataDir())
+}
 
 // connectSpotify returns the library and the backend of Spotify, as cfg
 // and the secrets kept set them up, or nils with no login, and Soloist's

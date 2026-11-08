@@ -59,7 +59,7 @@ type app struct {
 	profile     *music.User
 	mine, saved []music.Playlist // the listener's playlists: made, and saved
 	ob          onboardState
-	keep        secret.Store    // the listener's secrets; secrets() unless a test sets it
+	keep        secret.Store    // the listener's secrets, as the app started, or as a test sets them
 	live        bool            // the library and the player are Spotify's, not the fake ones
 	accountOpen bool            // the dropdown of the account row shows
 	naming      nameDialog      // the name of a playlist asked for
@@ -231,7 +231,9 @@ func Run() error {
 		fake := playback.NewFake()
 		fake.Station = fakeStation(a.lib)
 		a.backend = fake
-		if lib, b, svc := connectSpotify(a.settings.Spotify, secrets()); lib != nil {
+		// The store chosen as the app starts, for as long as it runs.
+		a.keep = secrets(a.settings.Spotify.SecretsInFiles)
+		if lib, b, svc := connectSpotify(a.settings.Spotify, a.keep); lib != nil {
 			a.lib, a.backend, a.svc, a.live = lib, b, svc, true
 			useLyricSources()
 		}

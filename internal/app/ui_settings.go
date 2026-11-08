@@ -289,7 +289,7 @@ func (a *app) settingsView(c *ui.Context) {
 
 		// What Soloist is, and what its version has left: renaming it takes
 		// the next start of the app, for the service file carries the name.
-		note := a.soloistAbout() + locales.DeviceNameNote()
+		note := a.soloistAbout() + locales.DeviceNameNote() + locales.SecretsNote()
 		group(locales.Account(), note, func() {
 			row(locales.ConnectSpotify(), func() {
 				if ui.Button(c.Key("onboarding"), locales.SettingsEllipsis()).Clicked() {
@@ -300,6 +300,17 @@ func (a *app) settingsView(c *ui.Context) {
 			})
 			row(locales.DeviceName(), func() {
 				if ui.TextInput(c.Key("device-name"), &s.Spotify.DeviceName).Placeholder("MyGoify").Label(locales.FillDeviceName()).FontSize(13).Width(200).Changed() {
+					a.keepSettings()
+				}
+			})
+			row(locales.SecretsKeptIn(), func() {
+				labels := []string{locales.SystemKeychain(), locales.LocalFiles()}
+				chosen := labels[0]
+				if s.Spotify.SecretsInFiles {
+					chosen = labels[1]
+				}
+				if ui.Select(c.Key("secrets"), &chosen, labels).Label(locales.SecretsKeptIn()).Width(170).Changed() {
+					s.Spotify.SecretsInFiles = chosen == labels[1]
 					a.keepSettings()
 				}
 			})
@@ -315,7 +326,7 @@ func (a *app) settingsView(c *ui.Context) {
 			}
 			prof := a.profile
 			ui.Row(c).Padding(12, 16).Gap(12).AlignItems(ui.Center).Children(func() {
-				a.avatar(c, prof.Images, 36, p.press)
+				a.avatar(c, prof.Images, 36, p.press, prof.Name)
 				ui.Column(c).Grow(1).Gap(2).Children(func() {
 					ui.Text(c, prof.Name).FontSize(13.5).FontWeight(600)
 					ui.Text(c, locales.SignedInSpotify()).FontSize(12).TextColor(p.muted)

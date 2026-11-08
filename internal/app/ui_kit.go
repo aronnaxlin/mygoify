@@ -2,7 +2,10 @@ package app
 
 import (
 	"fmt"
+	"hash/fnv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/egoist/mygo/ui"
 
@@ -357,15 +360,33 @@ func b2f(b bool) float32 {
 	return 0
 }
 
-// avatar shows a round picture of someone, from url, size across.
-func (a *app) avatar(c *ui.Context, im music.Images, size float32, empty ui.Color) {
-	bmp := bitmap(a.art.get(im.URL(int(size*3)), false))
+// avatar shows a round picture of someone, size across, empty until it
+// loads. Of someone Spotify has no picture of, it shows the initial of
+// their name, on a color of their own, as Spotify's apps do: the account
+// showed as a gray circle.
+func (a *app) avatar(c *ui.Context, im music.Images, size float32, empty ui.Color, name string) {
 	box := ui.Box(c).Size(size, size).Radius(size / 2).Shrink(0)
+	if r, _ := utf8.DecodeRuneInString(name); len(im) == 0 && name != "" {
+		h := fnv.New32a()
+		h.Write([]byte(name))
+		box.Background(avatarColors[h.Sum32()%uint32(len(avatarColors))]).AlignItems(ui.Center).Justify(ui.Center)
+		box.Children(func() {
+			ui.Text(c, strings.ToUpper(string(r))).FontSize(size * 0.46).FontWeight(700).TextColor(ui.RGB(255, 255, 255))
+		})
+		return
+	}
+	bmp := bitmap(a.art.get(im.URL(int(size*3)), false))
 	in := artIn(box, bmp)
 	if in < 1 {
 		box.Background(empty)
 	}
 	box.Children(func() { artImage(c, bmp, size/2, in) })
+}
+
+// avatarColors are what an avatar without a picture is filled with.
+var avatarColors = []ui.Color{
+	ui.RGB(232, 17, 91), ui.RGB(39, 133, 106), ui.RGB(80, 55, 155),
+	ui.RGB(225, 51, 0), ui.RGB(30, 110, 160), ui.RGB(175, 40, 150),
 }
 
 // relativeTime says when t was: in minutes or hours while recent, then by
