@@ -1,5 +1,25 @@
 # Changelog / 更新日志
 
+## 1.1.0
+
+Recommendations: Spotify's radios, and the playlists Spotify makes for you.
+
+- Radio: start a song's radio from its menu, which begins with that song, or an artist's radio from their page. The home page has a Radio row made from the artists and songs you listen to most. Radios play through Soloist, even while Spotify is limiting the app's requests.
+- Made for you: the home page shows the playlists Spotify made for you, such as Discover Weekly, Daily Mixes, the daylist and artist radios, with their own names and covers. They show up as you play them anywhere, or when you paste one's link into the search field. Spotify's developer API doesn't list them, so MyGoify finds them this way.
+- Links: paste a Spotify link to an album, artist or playlist into the search field to open it.
+- Sign-in storage: Settings › Account can keep your sign-in in local files only your account can read, instead of the system keychain. On macOS, new versions then no longer ask for your password. Switching keeps you signed in.
+- Device name: Soloist now shows in Spotify Connect as "MyGoify (your computer's name)", so two computers running MyGoify can be told apart. Renaming keeps the pairing.
+- An account without a profile picture shows its initial, as Spotify's apps do, rather than a gray circle.
+
+推荐：Spotify 的电台，以及 Spotify 为你生成的歌单。
+
+- 电台：在歌曲菜单里选"开始电台"，从这首歌开始播；在艺人页点"电台"，播这位艺人的电台。首页新增"电台"一栏，用你最常听的艺人和歌曲当种子。电台经 Soloist 播放，Spotify 限流时也能开。
+- 为你推荐：首页显示 Spotify 为你生成的歌单，如 Discover Weekly、Daily Mix、daylist、艺人电台，带官方的名字和封面。在任何设备上播放过的，或者把分享链接贴进搜索框的，都会出现在这里。Spotify 的开发者接口不提供这些歌单，所以 MyGoify 用这种方式找到它们。
+- 链接：把专辑、艺人或歌单的 Spotify 链接贴进搜索框，可以直接打开。
+- 登录信息存放位置："设置 › 账户"里可以选择把登录信息存在只有你的账号能读的本地文件里，不用系统钥匙串；这样在 macOS 上新版本不再要求输入密码。切换后不用重新登录。
+- 设备名：Soloist 在 Spotify Connect 里显示为"MyGoify (你的电脑名)"，两台电脑都运行 MyGoify 时能分清。改名后不用重新配对。
+- 没有头像的账号显示名字首字母，和 Spotify 官方客户端一样，不再是灰色圆圈。
+
 ## 1.0.1
 
 - Lyrics show their translations only when the interface is in Chinese: the translations are Chinese, and showed under every line in English or Japanese too.
