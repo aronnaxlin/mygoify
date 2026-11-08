@@ -1300,6 +1300,16 @@ func (msgs Messages) MadeForYou() string {
 	return Catalog.Format(msgs.locale, "madeForYou", nil)
 }
 
+// MixKept says "已加到“为你推荐”"
+// in the language the app shows.
+func MixKept() string { return In(i18n.Locale()).MixKept() }
+
+// MixKept says "已加到“为你推荐”"
+// in the language of msgs.
+func (msgs Messages) MixKept() string {
+	return Catalog.Format(msgs.locale, "mixKept", nil)
+}
+
 // Radio says "电台"
 // in the language the app shows.
 func Radio() string { return In(i18n.Locale()).Radio() }
