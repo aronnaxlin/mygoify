@@ -16,6 +16,9 @@ import (
 // the levels of the music its smoke follows.
 type scrubState struct {
 	v float64
+	// thin draws it as Omarchy's sliders are: a hairline, its knob always
+	// showing (the mini player).
+	thin bool
 	// held is set while the pointer pressed on the bar is down, wherever
 	// it has gone since: Pressed is false off the bar, which is thin.
 	held   bool
@@ -65,9 +68,12 @@ func (a *app) scrubber(c *ui.Context, st *scrubState, track, fill ui.Color, heig
 	if hot {
 		thick = 6
 	}
+	if st.thin {
+		thick = 2
+	}
 	thick = s.AnimateTo("thick", thick, ui.Snappy)
 	knob := float32(0)
-	if hot {
+	if hot || st.thin {
 		knob = 1
 	}
 	knob = s.AnimateTo("knob", knob, ui.Snappy)

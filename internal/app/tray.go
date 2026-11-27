@@ -80,7 +80,8 @@ func (a *app) changeAppIcon() {
 // applyTray adds or removes the icon in the menu bar or notification area,
 // as the settings say.
 func (a *app) applyTray() {
-	switch show := showsTray(a.settings); {
+	// The agent's icon, or Omarchy's bar's, opens the mini player.
+	switch show := showsTray(a.settings) && !a.agent; {
 	case show && a.tray == nil:
 		icon, template := trayColor, false
 		if runtime.GOOS == "darwin" {

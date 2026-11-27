@@ -858,6 +858,46 @@ func (msgs Messages) TabQueue() string {
 	return Catalog.Format(msgs.locale, "tabQueue", nil)
 }
 
+// OpenMyGoify says "打开 MyGoify"
+// in the language the app shows.
+func OpenMyGoify() string { return In(i18n.Locale()).OpenMyGoify() }
+
+// OpenMyGoify says "打开 MyGoify"
+// in the language of msgs.
+func (msgs Messages) OpenMyGoify() string {
+	return Catalog.Format(msgs.locale, "openMyGoify", nil)
+}
+
+// UpNext says "接下来播放"
+// in the language the app shows.
+func UpNext() string { return In(i18n.Locale()).UpNext() }
+
+// UpNext says "接下来播放"
+// in the language of msgs.
+func (msgs Messages) UpNext() string {
+	return Catalog.Format(msgs.locale, "upNext", nil)
+}
+
+// NothingUpNext says "后面没有歌了"
+// in the language the app shows.
+func NothingUpNext() string { return In(i18n.Locale()).NothingUpNext() }
+
+// NothingUpNext says "后面没有歌了"
+// in the language of msgs.
+func (msgs Messages) NothingUpNext() string {
+	return Catalog.Format(msgs.locale, "nothingUpNext", nil)
+}
+
+// MiniPlayer says "迷你播放器"
+// in the language the app shows.
+func MiniPlayer() string { return In(i18n.Locale()).MiniPlayer() }
+
+// MiniPlayer says "迷你播放器"
+// in the language of msgs.
+func (msgs Messages) MiniPlayer() string {
+	return Catalog.Format(msgs.locale, "miniPlayer", nil)
+}
+
 // TabWall says "选歌"
 // in the language the app shows.
 func TabWall() string { return In(i18n.Locale()).TabWall() }

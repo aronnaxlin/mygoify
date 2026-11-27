@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"mygoify/internal/agent"
+	"mygoify/internal/omarchy"
 )
 
 // RunAgent runs the agent: what plays, on the session bus, while the
@@ -16,6 +17,15 @@ import (
 func RunAgent() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// On Omarchy its icon is in Omarchy's bar, where a click opens the mini
+	// player (DESIGN.md §4.3).
+	if exe, err := os.Executable(); err == nil && omarchy.Detect() {
+		go func() {
+			if err := omarchy.KeepWidget(exe); err != nil {
+				log.Print(err)
+			}
+		}()
+	}
 	return agent.Run(ctx, agent.Config{SoloistDir: soloistDataDir(), Raise: func() { openApp() }})
 }
 
