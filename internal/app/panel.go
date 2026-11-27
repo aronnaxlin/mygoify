@@ -482,6 +482,13 @@ func (a *app) miniQueue(c *ui.Context) {
 				ui.Text(c, tr.Name).FontWeight(600).SingleLine()
 				a.artistLinks(c, tr, p.muted, p.text).FontSize(11).SingleLine()
 			})
+			if hovered {
+				// Neither Soloist nor the Web API moves what is queued: a
+				// song played next is queued, before the rest of what plays.
+				if a.miniButton(c.Key("next"), iconPlayNext, p.muted, locales.PlayNext()) {
+					a.addToQueue(tr)
+				}
+			}
 			if hovered || a.isLiked(tr) {
 				a.miniHeart(c, tr)
 			}

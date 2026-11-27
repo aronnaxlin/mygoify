@@ -3,10 +3,12 @@ package app
 import (
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/music"
+	"mygoify/internal/playback"
 )
 
 // miniApp is the mini player playing the first of three songs of an
@@ -74,6 +76,39 @@ func TestMiniOpensAlbumFromItsName(t *testing.T) {
 	tt.ClickAt(r.X+4, r.Y+r.H/2)
 	if !slices.Equal(*opened, []string{"spotify:album:8"}) || !*closed {
 		t.Errorf("opened %q, closed %v", *opened, *closed)
+	}
+}
+
+// A song up next, its play-next button clicked as the pointer is over it,
+// is queued to play after this one, and doesn't play at once.
+func TestMiniPlaysNext(t *testing.T) {
+	t.Setenv("MYGOIFY_OMARCHY", "0")
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.mini = true
+	b := &queueBackend{Fake: playback.NewFake()}
+	posted := make(chan func(), 8)
+	a.pl = playback.New(func(f func()) { posted <- f }, b)
+	a.pl.Cue([]music.Track{{ID: "1", Name: "春日影", Duration: 200000}, {ID: "2", Name: "迷星叫", Duration: 200000}, {ID: "3", Name: "碧天伴走", Duration: 200000}})
+	tt := ui.NewTester(a.miniView, miniWidth, miniHeight)
+	tt.Frame()
+	r, ok := tt.Find("碧天伴走")
+	if !ok {
+		t.Fatal("no song up next")
+	}
+	tt.Move(r.X+r.W/2, r.Y+r.H/2)
+	tt.Frame()
+	if err := tt.Click("下一首播放"); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case f := <-posted:
+		f()
+	case <-time.After(2 * time.Second):
+		t.Fatal("the backend was never asked")
+	}
+	if !slices.Equal(b.queued, []string{"3"}) || a.pl.Current().ID != "1" {
+		t.Errorf("queued %v, playing %s", b.queued, a.pl.Current().ID)
 	}
 }
 

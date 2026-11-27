@@ -938,6 +938,16 @@ func (msgs Messages) ThisAlbumSaved() string {
 	return Catalog.Format(msgs.locale, "thisAlbumSaved", nil)
 }
 
+// PlayNext says "下一首播放"
+// in the language the app shows.
+func PlayNext() string { return In(i18n.Locale()).PlayNext() }
+
+// PlayNext says "下一首播放"
+// in the language of msgs.
+func (msgs Messages) PlayNext() string {
+	return Catalog.Format(msgs.locale, "playNext", nil)
+}
+
 // TabWall says "选歌"
 // in the language the app shows.
 func TabWall() string { return In(i18n.Locale()).TabWall() }
