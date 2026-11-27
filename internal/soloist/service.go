@@ -38,6 +38,12 @@ type Service struct {
 	// on Linux.
 	Logs string
 
+	// Agent, if set, is the app's executable, which runs as MyGoify's
+	// agent beside Soloist on Linux, started and stopped with it: what
+	// plays, on the session bus, while the window is closed (DESIGN.md
+	// §4.3).
+	Agent string
+
 	// run runs a command of launchctl or systemctl, exec.Command's
 	// unless a test swaps it.
 	run func(name string, args ...string) error
@@ -46,6 +52,7 @@ type Service struct {
 const (
 	agentLabel = "io.github.aronnaxlin.mygoify.soloist"
 	unitName   = "mygoify-soloist.service"
+	agentUnit  = "mygoify-agent.service"
 )
 
 // Start writes the service and starts it, restarting it if what it runs
@@ -269,7 +276,11 @@ func (s *Service) startUnit() error {
 	if err != nil {
 		return err
 	}
-	if unitChanged {
+	agentChanged, err := s.writeAgentUnit(dir)
+	if err != nil {
+		return err
+	}
+	if unitChanged || agentChanged {
 		if err := s.run("systemctl", "--user", "daemon-reload"); err != nil {
 			return err
 		}
@@ -282,11 +293,57 @@ func (s *Service) startUnit() error {
 	if err := s.run("systemctl", "--user", login, unitName); err != nil {
 		return err
 	}
+	start := "start"
 	if keyChanged || unitChanged {
 		// Starts it too if it doesn't run.
-		return s.run("systemctl", "--user", "restart", unitName)
+		start = "restart"
 	}
-	return s.run("systemctl", "--user", "start", unitName)
+	if err := s.run("systemctl", "--user", start, unitName); err != nil {
+		return err
+	}
+	if s.Agent == "" {
+		return nil
+	}
+	// It starts whenever Soloist does, by the link of its [Install]; a
+	// new one restarts alone, Soloist playing on.
+	if err := s.run("systemctl", "--user", "enable", agentUnit); err != nil {
+		return err
+	}
+	if agentChanged {
+		start = "restart"
+	}
+	return s.run("systemctl", "--user", start, agentUnit)
+}
+
+// writeAgentUnit writes the agent's unit, or takes it away when there is
+// no agent, saying whether it changed.
+func (s *Service) writeAgentUnit(dir string) (bool, error) {
+	path := filepath.Join(dir, agentUnit)
+	if s.Agent == "" {
+		if _, err := os.Stat(path); err != nil {
+			return false, nil
+		}
+		s.run("systemctl", "--user", "disable", "--now", agentUnit)
+		return true, os.Remove(path)
+	}
+	return writeIfChanged(path, s.agentUnitFile(), 0o644)
+}
+
+// agentUnitFile is the agent's systemd user unit: bound to Soloist's, it
+// starts as Soloist does and stops with it.
+func (s *Service) agentUnitFile() []byte {
+	return []byte(`[Unit]
+Description=MyGoify's agent: what plays, for the media keys and controls
+BindsTo=` + unitName + `
+After=` + unitName + `
+
+[Service]
+ExecStart=` + systemdQuote(s.Agent) + ` agent
+Restart=on-failure
+
+[Install]
+WantedBy=` + unitName + `
+`)
 }
 
 // unit is the systemd user unit. ${SOLOIST_API_KEY} comes from its

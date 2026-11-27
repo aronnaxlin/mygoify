@@ -144,7 +144,21 @@ func (a *app) vault() secret.Store {
 
 // soloistService is Soloist's service as cfg and key set it up.
 func soloistService(cfg spotifySettings, key string) *soloist.Service {
-	return &soloist.Service{Bin: expandHome(cfg.SoloistBin), Key: key, DeviceName: cfg.DeviceName, DataDir: soloistDataDir(), Logs: filepath.Join(dataDir(), "soloist.log"), AtLogin: cfg.SoloistAtLogin}
+	return &soloist.Service{Bin: expandHome(cfg.SoloistBin), Key: key, DeviceName: cfg.DeviceName, DataDir: soloistDataDir(), Logs: filepath.Join(dataDir(), "soloist.log"), AtLogin: cfg.SoloistAtLogin, Agent: agentExe()}
+}
+
+// agentExe is the executable that runs as the agent beside Soloist, on
+// Linux, where it shows what plays on the session bus (DESIGN.md §4.3):
+// the app's own. Elsewhere there is none, and the app shows it itself.
+func agentExe() string {
+	if runtime.GOOS != "linux" {
+		return ""
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return exe
 }
 
 // soloistDataDir is where Soloist keeps its pairing, as connectSpotify has

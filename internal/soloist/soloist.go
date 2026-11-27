@@ -44,6 +44,9 @@ type Config struct {
 	// LoggedIn, if set, is called, off the main thread, each time Soloist
 	// says it is logged in to Spotify: paired, for onboarding to go on.
 	LoggedIn func()
+	// NoLevels hears nothing of what Soloist plays: the agent shows no
+	// visualizer, and a tap would cost it a process.
+	NoLevels bool
 }
 
 // Backend plays through a Soloist. It connects as Watch is called, and
@@ -286,7 +289,7 @@ func (b *Backend) handle(data []byte) {
 		if ev.Status != "" {
 			b.status = ev.Status
 		}
-		if b.status == "playing" && !b.tapping && !b.noTap {
+		if b.status == "playing" && !b.tapping && !b.noTap && !b.cfg.NoLevels {
 			b.tapping = true
 			go b.tap(b.tapGen)
 		}

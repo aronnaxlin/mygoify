@@ -243,6 +243,8 @@ func Run() error {
 		}
 		a.pl = playback.New(a.post, a.backend)
 		a.pl.Artwork = fetchArt
+		// The agent shows the system what plays, beside Soloist.
+		a.pl.Quiet = a.svc != nil && agentExe() != ""
 		a.pl.Changed = a.playbackChanged
 		// While Spotify limits the app's calls, until when.
 		a.pl.Explain = failed
