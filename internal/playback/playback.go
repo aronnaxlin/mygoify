@@ -93,6 +93,9 @@ type Player struct {
 	Changed func()
 	// Artwork, if set, fetches a cover, to show the system what plays.
 	Artwork func(url string) ([]byte, error)
+	// Quiet shows the system nothing of what plays, which MyGoify's agent
+	// shows it instead: else it would list two players.
+	Quiet bool
 
 	st   State
 	held bool // a test holds the position where it is
@@ -194,6 +197,9 @@ func (p *Player) apply(st State) {
 func (p *Player) sync() {
 	if p.Changed != nil {
 		defer p.Changed()
+	}
+	if p.Quiet {
+		return
 	}
 	t := p.Current()
 	if t == nil {

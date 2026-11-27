@@ -98,6 +98,39 @@ func TestUnitRestartsOnlyWhenChanged(t *testing.T) {
 	}
 }
 
+// The agent starts with Soloist, on Linux; a new agent, or none, restarts
+// or stops only the agent, Soloist playing on.
+func TestAgentUnitLeavesSoloistPlaying(t *testing.T) {
+	s, ran := fakeService(t)
+	s.Agent = "/opt/MyGoify/mygoify"
+	if err := s.startUnit(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(s.Dir, agentUnit))
+	if !strings.Contains(string(b), `ExecStart="/opt/MyGoify/mygoify" agent`) || !strings.Contains(string(b), "BindsTo="+unitName) {
+		t.Fatalf("agent unit:\n%s", b)
+	}
+	for _, step := range []struct {
+		agent, want string
+	}{
+		{"/opt/MyGoify/mygoify", "systemctl disable, systemctl start, systemctl enable, systemctl start"},
+		{"/usr/bin/mygoify", "systemctl daemon-reload, systemctl disable, systemctl start, systemctl enable, systemctl restart"},
+		{"", "systemctl disable, systemctl daemon-reload, systemctl disable, systemctl start"},
+	} {
+		*ran = nil
+		s.Agent = step.agent
+		if err := s.startUnit(); err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(*ran, ", "); got != step.want {
+			t.Errorf("agent %q ran %s", step.agent, got)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(s.Dir, agentUnit)); err == nil {
+		t.Error("no agent left its unit")
+	}
+}
+
 // Starting Soloist at login, or no longer, leaves the Soloist that plays
 // be, and tells launchd so for the next login, on macOS.
 func TestAgentAtLoginKeepsPlaying(t *testing.T) {
