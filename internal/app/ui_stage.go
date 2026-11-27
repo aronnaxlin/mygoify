@@ -7,7 +7,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"mygoify/internal/lyrics"
-	"mygoify/locales"
+	"mygoify/internal/music"
 )
 
 // The stage shows lyrics as Folia's classic visualizer does: one line at a
@@ -90,21 +90,23 @@ func spaceWords(shapes []wordShape, widths []float32, gap float32) {
 	}
 }
 
-// stage shows the lyrics of the track playing on the whole stage.
-func (a *app) stage(c *ui.Context, accent ui.Color) {
+// stage shows the lyrics of the track playing on the whole stage, or its
+// cover, in the middle, when it has none.
+func (a *app) stage(c *ui.Context, tr *music.Track, art *artwork, accent ui.Color) {
 	pl := a.pl
-	lines, loaded := a.currentLyrics()
+	lines, _ := a.currentLyrics()
 	w, h := c.Size()
 	f := min(64, max(36, w*0.045))
 	box := ui.Box(c.Key("stage")).Grow(1)
 	if len(lines) == 0 {
 		box.Children(func() {
 			ui.Column(c).Absolute().Top(0).Left(0).Right(0).Bottom(0).Center().Children(func() {
-				if !loaded {
+				if !a.lyricsNone() {
 					stageSkeleton(c, npShimmer(c), f, w)
 					return
 				}
-				ui.Text(c, locales.NoLyrics()).FontSize(28).FontWeight(800).TextColor(white.Alpha(0.4))
+				size := max(160, min(420, h-300))
+				ui.Box(c).Size(size, size).Children(func() { a.npCover(c, tr, art, size) })
 			})
 		})
 		return

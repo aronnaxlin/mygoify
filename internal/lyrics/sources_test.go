@@ -293,3 +293,28 @@ func TestNearestOfPrefersTheSong(t *testing.T) {
 		t.Errorf("asked for a live take, chose %q", picks[i].Name)
 	}
 }
+
+// An instrumental has no lyrics, rather than a line saying so: NetEase
+// serves "纯音乐，请欣赏", with who made it, and QQ Music a line of its own,
+// which showed as the song's lyrics.
+func TestSourcesInstrumentalHasNoLyrics(t *testing.T) {
+	ne := &fakeSource{name: "netease", found: Found{LRC: "[00:00.00]作曲 : Yann Tiersen\n[00:05.00]纯音乐，请欣赏\n"}}
+	qq := &fakeSource{name: "qq", found: Found{LRC: "[00:00.00]此歌曲为没有填词的纯音乐，请您欣赏\n"}}
+	s := &Sources{All: []Source{ne, qq}}
+	lines, err := s.Find(context.Background(), spring)
+	if err != nil || lines != nil {
+		t.Fatalf("found %+v, %v", lines, err)
+	}
+}
+
+// A source with lyrics wins over one that says the song has no words,
+// which may have taken an instrumental take for it.
+func TestSourcesLyricsWinOverWordless(t *testing.T) {
+	ne := &fakeSource{name: "netease", found: Found{LRC: "[00:05.00]纯音乐，请欣赏\n"}}
+	other := &fakeSource{name: "other", found: Found{LRC: "[00:01.00]春日影\n"}}
+	s := &Sources{All: []Source{ne, other}}
+	lines, err := s.Find(context.Background(), spring)
+	if err != nil || len(lines) != 1 || lines[0].Text != "春日影" {
+		t.Fatalf("found %+v, %v", lines, err)
+	}
+}

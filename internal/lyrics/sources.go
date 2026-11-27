@@ -40,9 +40,23 @@ type Found struct {
 	LRC, Translation, YRC string
 }
 
-// Lines returns the lines to show of what was found, or none.
+// Lines returns the lines to show of what was found, or none. An
+// instrumental has none: NetEase and QQ Music serve one a line saying it
+// has no words, and at most who made it.
 func (f Found) Lines() []Line {
-	return Build(f.LRC, f.Translation, f.YRC)
+	lines := Build(f.LRC, f.Translation, f.YRC)
+	for _, l := range lines {
+		if !IsCredit(l.Text) && !wordless(l.Text) {
+			return lines
+		}
+	}
+	return nil
+}
+
+// wordless reports whether a line says the song has no words, as
+// NetEase's "纯音乐，请欣赏" and QQ Music's "此歌曲为没有填词的纯音乐，请您欣赏".
+func wordless(text string) bool {
+	return strings.Contains(text, "纯音乐") || strings.Contains(text, "純音樂")
 }
 
 // Sources asks all its sources at once for a track's lyrics: word-timed
@@ -212,6 +226,11 @@ func (s *Sources) Find(ctx context.Context, q Query) ([]Line, error) {
 		if a.err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", a.from, a.err))
 			continue
+		}
+		// A source that says the song has no words may have taken another
+		// for it: a source with lyrics of it wins.
+		if a.found.Lines() == nil {
+			a.found = Found{}
 		}
 		// A source may have the translation of lines another has: of
 		// whichever source has one of its own, the first, else the first

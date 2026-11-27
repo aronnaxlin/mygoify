@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -189,5 +190,40 @@ func TestTranslationsOnlyInChinese(t *testing.T) {
 		if got := tt.HasText("来自另一边的问候"); got != c.shows {
 			t.Errorf("in %s, the translation shows: %v", c.locale, got)
 		}
+	}
+}
+
+// A song with no lyrics has its cover in the middle of Now Playing, which
+// stays there while the next song's lyrics load, and goes back beside the
+// lyrics once a song has some. Before, the pane said there were none.
+func TestCoverCentersWithoutLyrics(t *testing.T) {
+	a := newTestApp()
+	a.settings = defaultSettings()
+	a.pl.Cue([]music.Track{{ID: "1", Name: "一"}, {ID: "2", Name: "二"}})
+	a.setLyrics(nil)
+	a.nowPlaying = true
+	tt := ui.NewTester(a.view, 1200, 800)
+	settle := func() ui.Rect {
+		tt.Frame()
+		tt.Advance(2 * time.Second)
+		tt.Frame()
+		r, ok := tt.Find("专辑封面")
+		if !ok {
+			t.Fatal("no cover")
+		}
+		return r
+	}
+	centered := func(r ui.Rect) bool { return math.Abs(float64(r.X+r.W/2-600)) < 2 }
+	if r := settle(); !centered(r) {
+		t.Fatalf("without lyrics, the cover is at %v", r)
+	}
+	a.pl.Next()
+	a.playbackChanged()
+	if r := settle(); !centered(r) {
+		t.Errorf("as the next song's lyrics load, the cover moved to %v", r)
+	}
+	a.setLyrics([]lyrics.Line{{At: 0, Text: "春日影"}})
+	if r := settle(); centered(r) {
+		t.Errorf("with lyrics, the cover stays in the middle at %v", r)
 	}
 }
