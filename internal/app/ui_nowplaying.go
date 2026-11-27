@@ -128,7 +128,7 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 				a.paneTabs(c)
 				a.stageStyleButton(c)
 			})
-			a.stage(c, accent)
+			a.stage(c, tr, art, accent)
 			a.stageBar(c, tr, art, accent)
 			return
 		}
@@ -148,7 +148,16 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 		side = max(coverSize, 280)
 		padX := npSideX(w)
 		reveal(npTabsRow(c, w), pointerIn).Children(func() { a.paneTabs(c) })
-		ui.Row(c).Grow(1).Padding(0, padX, 44, padX).Gap(72).AlignItems(ui.Stretch).Children(func() {
+		// A song with no lyrics shows no pane of them: the cover and the
+		// controls move to the middle.
+		alone := a.npPane == paneLyrics && a.lyricsNone()
+		body := ui.Row(c.Key("np-body")).Grow(1).Gap(72).AlignItems(ui.Stretch)
+		shift := float32(0)
+		if alone {
+			shift = max(0, (w-2*padX-side)/2)
+		}
+		shift = body.AnimateTo("alone", shift, ui.Animation{Spring: ui.SpringOptions{Duration: 500 * time.Millisecond}})
+		body.Padding(0, padX, 44, padX+shift).Children(func() {
 			var coverTop float32
 			ui.Column(c).Width(side).Justify(ui.Center).Gap(0).Children(func() {
 				coverTop = ui.Box(c.Key("cover-top")).Height(0).LayoutBounds().Y
@@ -180,6 +189,9 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 				})
 			})
 
+			if alone {
+				return
+			}
 			pane := ui.Column(c.Key("pane")).Grow(1).Basis(0).MinWidth(0)
 			pane.Children(func() {
 				// The pane starts level with the cover beside it, but below the
@@ -336,19 +348,12 @@ func (a *app) paneTab(c *ui.Context, i int, label string) {
 
 func (a *app) lyricsPane(c *ui.Context, tr *music.Track, h float32) {
 	pl := a.pl
-	lines, loaded := a.currentLyrics()
+	lines, _ := a.currentLyrics()
 	if len(lines) == 0 {
-		col := ui.Column(c).Grow(1)
-		if loaded {
-			col.Center()
+		// A song with none shows no pane (nowPlayingBody).
+		if !a.lyricsNone() {
+			ui.Column(c).Grow(1).Children(func() { lyricsSkeleton(c, npShimmer(c)) })
 		}
-		col.Children(func() {
-			if !loaded {
-				lyricsSkeleton(c, npShimmer(c))
-				return
-			}
-			ui.Text(c, locales.NoLyrics()).FontSize(24).FontWeight(700).TextColor(white.Alpha(0.4))
-		})
 		return
 	}
 	pos := pl.Position()

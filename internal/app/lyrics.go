@@ -20,6 +20,8 @@ type lyricsState struct {
 	track  string // the track they are of
 	lines  []lyrics.Line
 	loaded bool
+	// noneBefore says the track before showed as having no lyrics.
+	noneBefore bool
 }
 
 // lyricsSources is what the settings say of where a track's lyrics are
@@ -103,6 +105,16 @@ func (a *app) currentLyrics() ([]lyrics.Line, bool) {
 	return a.lyr.lines, a.lyr.loaded
 }
 
+// lyricsNone reports whether the track playing shows as having no lyrics:
+// it has none, or while they load, the track before had none, so that Now
+// Playing keeps its cover in the middle going from one song of an
+// instrumental album to the next.
+func (a *app) lyricsNone() bool {
+	// Until the new track's lyrics are asked for, a.lyr is the last's.
+	l := &a.lyr
+	return len(l.lines) == 0 && (l.loaded || l.noneBefore)
+}
+
 // playbackChanged hears that what plays, or how, changed: a mix of
 // Spotify's is kept, and a new track's lyrics load, and the next one's, to
 // be at hand as it plays.
@@ -115,7 +127,7 @@ func (a *app) playbackChanged() {
 	if tr == nil || tr.ID == a.lyr.track {
 		return
 	}
-	a.lyr = lyricsState{track: tr.ID}
+	a.lyr = lyricsState{track: tr.ID, noneBefore: a.lyricsNone()}
 	a.askLyrics(*tr, 0)
 	id := tr.ID
 	lyricsLater(lyricsWait, func() {

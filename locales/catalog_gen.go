@@ -868,16 +868,6 @@ func (msgs Messages) TabWall() string {
 	return Catalog.Format(msgs.locale, "tabWall", nil)
 }
 
-// NoLyrics says "暂无歌词"
-// in the language the app shows.
-func NoLyrics() string { return In(i18n.Locale()).NoLyrics() }
-
-// NoLyrics says "暂无歌词"
-// in the language of msgs.
-func (msgs Messages) NoLyrics() string {
-	return Catalog.Format(msgs.locale, "noLyrics", nil)
-}
-
 // StageStyleFlow says "流光"
 // in the language the app shows.
 func StageStyleFlow() string { return In(i18n.Locale()).StageStyleFlow() }
