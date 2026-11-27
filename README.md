@@ -38,10 +38,12 @@ The application architecture separates the user interface from the audio engine:
 - **Lyrics**: Real-time synced lyrics with word-by-word highlights and translations when available. Powered by [LRCLIB](https://lrclib.net/) alongside optional third-party lyric sources that can be toggled in settings.
 - **Playback Controls**: Full control over play/pause, next/previous, seeking, volume, shuffle, and repeat modes.
 - **Queue**: Synchronized queue viewer directly reflected from Soloist, including album cover wall and "Add to Queue".
-- **Desktop Integration**: Global media keys, MPRIS on Linux, Now Playing on macOS, and system tray integration (minimize to tray with continuous playback).
+- **Desktop Integration**: Global media keys and MPRIS on Linux, Now Playing on macOS. On Linux a small background agent runs beside Soloist, so the media keys, playerctl and your desktop's media controls work with the window closed; closing the window quits the interface while the music plays on. On macOS the app minimizes to the menu bar.
 - **Audio Visualizer**: Real-time animated audio visualizer (player bar spectrum, macOS notch indicator, and reactive smoke background). The spectrum is computed in memory strictly from Soloist's own audio stream (via PipeWire on Linux capturing only Soloist's stream, and via Core Audio process tap on macOS targeting only the Soloist process), without capturing audio from other applications, and without recording or exporting audio files.
 - **Radio**: Start Spotify's radio of a song from its menu (it begins with that song) or of an artist from their page; the home page offers radios of the artists and songs you play most. Radios play through Soloist, even while Spotify is limiting the app's requests.
 - **Made for You**: Discover Weekly, Daily Mixes, the daylist and artist radios show on the home page with their own names and covers, once you have played them anywhere or pasted their link into the search field. The Web API doesn't list them, so MyGoify finds them this way.
+- **Mini Player** (Linux): MyGoify's icon opens a small player under it: the song playing, Like and Save album, the controls, the volume, and what plays next, where a click plays a song and Play next queues it after this one. Its links open the page in MyGoify. On Omarchy the icon sits in Omarchy's bar as the app's mark, and the player takes your theme's colors, font and borders; elsewhere the icon is in the tray. It only runs while open.
+- **Albums**: Save albums and find them in the sidebar. An album's page shows its kind, length, release date and copyright notices.
 - **Interface Languages**: English, 简体中文, 繁體中文 and 日本語, following the system by default.
 
 ---
@@ -125,8 +127,9 @@ By default, playback streams at approximately 160 kbps (High).
 
 - **v1.0.0**: First release (2026-11-03).
 - **v1.1.0**: Radios and the playlists Spotify makes for you (2026-11-08).
+- **v1.2.0**: The mini player, the background agent and saved albums (2026-11-27).
 - **Next**:
-  - Standalone background agent (`mygo-spotify-agent`) providing MPRIS / Now Playing controls when the UI is closed (<80 MB combined memory usage).
+  - Omarchy's media controls preferring MyGoify while it plays, and the mini player on macOS.
   - Spotify Connect device switching.
   - Omarchy theme synchronization and Waybar integration.
   - Pure-Go fallback backend (`go-librespot`) for broader platform compatibility.
