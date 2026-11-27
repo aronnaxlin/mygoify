@@ -167,6 +167,10 @@ func (a *app) load(r route) {
 		a.loadArtist(r.id)
 	case pageAlbum:
 		a.loadAlbum(r.id)
+	case pageSavedAlbums:
+		if !a.savedAlbumsPage.loaded {
+			a.loadSavedAlbums()
+		}
 	}
 }
 
@@ -216,6 +220,7 @@ func (a *app) sidebar(c *ui.Context) {
 			if a.searched.query != "" {
 				a.navItem(c, iconSearch, locales.NavSearchResults(), a.searched)
 			}
+			a.navItem(c, iconAlbum, locales.SavedAlbums(), route{page: pageSavedAlbums})
 			a.myPlaylists(c, locales.MyPlaylists(), a.mine, true, &a.mineCollapsed)
 			a.myPlaylists(c, locales.SavedPlaylists(), a.saved, false, &a.savedCollapsed)
 		})
@@ -387,6 +392,8 @@ func (a *app) content(c *ui.Context) {
 		a.artistPage(c)
 	case pageAlbum:
 		a.albumPage(c)
+	case pageSavedAlbums:
+		a.savedAlbumsView(c)
 	}
 }
 

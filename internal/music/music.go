@@ -157,18 +157,42 @@ func (p *Playlist) URL() string { return "https://open.spotify.com/playlist/" + 
 
 type AlbumProfile struct {
 	Album
+	// Kind is what Spotify calls it: AlbumKind, SingleKind (an EP too) or
+	// CompilationKind.
+	Kind    string
 	Artists []Artist
 	// Released is when it came out, as precisely as Spotify knows: a year,
 	// a month or a day ("2023", "2023-06" or "2023-06-14").
 	Released   string
 	TrackCount int
 	Label      string
+	// Copyrights are its notices, as "© 2019 Taylor Swift" and
+	// "℗ 2019 Taylor Swift".
+	Copyrights []string
 	Songs      []Track
+	// Saved is set when the listener saved it to their library.
+	Saved bool
 }
+
+// What Spotify calls an album: one, a single or an EP, or a compilation.
+const (
+	AlbumKind       = "album"
+	SingleKind      = "single"
+	CompilationKind = "compilation"
+)
 
 func (al *AlbumProfile) URI() string         { return "spotify:album:" + al.ID }
 func (al *AlbumProfile) URL() string         { return "https://open.spotify.com/album/" + al.ID }
 func (al *AlbumProfile) ArtistNames() string { return names(al.Artists) }
+
+// Length is how long its songs play, together.
+func (al *AlbumProfile) Length() time.Duration {
+	var ms int64
+	for _, t := range al.Songs {
+		ms += t.Duration
+	}
+	return time.Duration(ms) * time.Millisecond
+}
 
 // Year is the year it came out, or "".
 func (al *AlbumProfile) Year() string {

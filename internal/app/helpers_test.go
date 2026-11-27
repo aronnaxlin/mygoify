@@ -37,6 +37,7 @@ type stubLib struct {
 	album     func(id string) (*music.AlbumProfile, error)
 	artist    func(id string) (*music.ArtistProfile, error)
 	follow    func(id string, follow bool) error
+	saveAlbum func(id string, save bool) error
 	search    func(q string, kind music.SearchType, limit, offset int) (music.SearchResult, error)
 	playlist  func(id string) (*music.Playlist, error)
 	likedMore func() ([]music.Track, bool, error)
@@ -77,6 +78,13 @@ func (s *stubLib) FollowArtist(id string, follow bool) error {
 		return s.follow(id, follow)
 	}
 	return s.Fake.FollowArtist(id, follow)
+}
+
+func (s *stubLib) SaveAlbum(id string, save bool) error {
+	if s.saveAlbum != nil {
+		return s.saveAlbum(id, save)
+	}
+	return s.Fake.SaveAlbum(id, save)
 }
 
 func (s *stubLib) Search(q string, kind music.SearchType, limit, offset int) (music.SearchResult, error) {

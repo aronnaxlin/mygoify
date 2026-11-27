@@ -1360,6 +1360,118 @@ func (msgs Messages) AlbumLoadFailed() string {
 	return Catalog.Format(msgs.locale, "albumLoadFailed", nil)
 }
 
+// Single says "单曲"
+// in the language the app shows.
+func Single() string { return In(i18n.Locale()).Single() }
+
+// Single says "单曲"
+// in the language of msgs.
+func (msgs Messages) Single() string {
+	return Catalog.Format(msgs.locale, "single", nil)
+}
+
+// Compilation says "合辑"
+// in the language the app shows.
+func Compilation() string { return In(i18n.Locale()).Compilation() }
+
+// Compilation says "合辑"
+// in the language of msgs.
+func (msgs Messages) Compilation() string {
+	return Catalog.Format(msgs.locale, "compilation", nil)
+}
+
+// LengthHoursMinutes says "{hours} 小时 {minutes} 分钟"
+// in the language the app shows.
+func LengthHoursMinutes(hours string, minutes string) string {
+	return In(i18n.Locale()).LengthHoursMinutes(hours, minutes)
+}
+
+// LengthHoursMinutes says "{hours} 小时 {minutes} 分钟"
+// in the language of msgs.
+func (msgs Messages) LengthHoursMinutes(hours string, minutes string) string {
+	return Catalog.Format(msgs.locale, "lengthHoursMinutes", map[string]any{"hours": hours, "minutes": minutes})
+}
+
+// LengthMinutes says "{minutes} 分钟"
+// in the language the app shows.
+func LengthMinutes(minutes string) string { return In(i18n.Locale()).LengthMinutes(minutes) }
+
+// LengthMinutes says "{minutes} 分钟"
+// in the language of msgs.
+func (msgs Messages) LengthMinutes(minutes string) string {
+	return Catalog.Format(msgs.locale, "lengthMinutes", map[string]any{"minutes": minutes})
+}
+
+// SaveAlbum says "收藏"
+// in the language the app shows.
+func SaveAlbum() string { return In(i18n.Locale()).SaveAlbum() }
+
+// SaveAlbum says "收藏"
+// in the language of msgs.
+func (msgs Messages) SaveAlbum() string {
+	return Catalog.Format(msgs.locale, "saveAlbum", nil)
+}
+
+// AlbumSaved says "已收藏"
+// in the language the app shows.
+func AlbumSaved() string { return In(i18n.Locale()).AlbumSaved() }
+
+// AlbumSaved says "已收藏"
+// in the language of msgs.
+func (msgs Messages) AlbumSaved() string {
+	return Catalog.Format(msgs.locale, "albumSaved", nil)
+}
+
+// SavedToLibrary says "已收藏到音乐库"
+// in the language the app shows.
+func SavedToLibrary() string { return In(i18n.Locale()).SavedToLibrary() }
+
+// SavedToLibrary says "已收藏到音乐库"
+// in the language of msgs.
+func (msgs Messages) SavedToLibrary() string {
+	return Catalog.Format(msgs.locale, "savedToLibrary", nil)
+}
+
+// RemovedFromLibrary says "已从音乐库移除"
+// in the language the app shows.
+func RemovedFromLibrary() string { return In(i18n.Locale()).RemovedFromLibrary() }
+
+// RemovedFromLibrary says "已从音乐库移除"
+// in the language of msgs.
+func (msgs Messages) RemovedFromLibrary() string {
+	return Catalog.Format(msgs.locale, "removedFromLibrary", nil)
+}
+
+// SavedAlbums says "收藏的专辑"
+// in the language the app shows.
+func SavedAlbums() string { return In(i18n.Locale()).SavedAlbums() }
+
+// SavedAlbums says "收藏的专辑"
+// in the language of msgs.
+func (msgs Messages) SavedAlbums() string {
+	return Catalog.Format(msgs.locale, "savedAlbums", nil)
+}
+
+// NoSavedAlbums says "收藏的专辑会显示在这里"
+// in the language the app shows.
+func NoSavedAlbums() string { return In(i18n.Locale()).NoSavedAlbums() }
+
+// NoSavedAlbums says "收藏的专辑会显示在这里"
+// in the language of msgs.
+func (msgs Messages) NoSavedAlbums() string {
+	return Catalog.Format(msgs.locale, "noSavedAlbums", nil)
+}
+
+// SavedAlbumsLoadFailed says "收藏的专辑加载失败"
+// in the language the app shows.
+func SavedAlbumsLoadFailed() string { return In(i18n.Locale()).SavedAlbumsLoadFailed() }
+
+// SavedAlbumsLoadFailed says "收藏的专辑加载失败"
+// in the language of msgs.
+func (msgs Messages) SavedAlbumsLoadFailed() string {
+	return Catalog.Format(msgs.locale, "savedAlbumsLoadFailed", nil)
+}
+
 // PlaylistLoadFailed says "歌单加载失败"
 // in the language the app shows.
 func PlaylistLoadFailed() string { return In(i18n.Locale()).PlaylistLoadFailed() }

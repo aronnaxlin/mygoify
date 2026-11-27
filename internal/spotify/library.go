@@ -68,12 +68,18 @@ type artist struct {
 type album struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
+	AlbumType   string   `json:"album_type"`
 	Images      []image  `json:"images"`
 	Artists     []artist `json:"artists"`
 	ReleaseDate string   `json:"release_date"`
 	TotalTracks int      `json:"total_tracks"`
-	Label       string   `json:"label"`
-	Tracks      *page[track]
+	// Label is absent in Development Mode.
+	Label      string `json:"label"`
+	Copyrights []struct {
+		Text string `json:"text"`
+		Type string `json:"type"` // C for the work, P for the recording
+	} `json:"copyrights"`
+	Tracks *page[track]
 }
 
 type track struct {
@@ -148,10 +154,14 @@ func (t *track) playable() bool {
 func (a *album) profile() music.AlbumProfile {
 	p := music.AlbumProfile{
 		Album:      music.Album{ID: a.ID, Name: a.Name, Images: images(a.Images)},
+		Kind:       a.AlbumType,
 		Artists:    artists(a.Artists),
 		Released:   a.ReleaseDate,
 		TrackCount: a.TotalTracks,
 		Label:      a.Label,
+	}
+	for _, c := range a.Copyrights {
+		p.Copyrights = append(p.Copyrights, copyright(c.Text, c.Type))
 	}
 	if a.Tracks != nil {
 		for i := range a.Tracks.Items {
@@ -161,6 +171,20 @@ func (a *album) profile() music.AlbumProfile {
 		}
 	}
 	return p
+}
+
+// copyright returns a notice as it reads, with its mark: Spotify gives
+// some without one.
+func copyright(text, kind string) string {
+	text = strings.TrimSpace(text)
+	mark := "©"
+	if kind == "P" {
+		mark = "℗"
+	}
+	if strings.ContainsAny(text, "©℗") || strings.HasPrefix(text, "(C)") || strings.HasPrefix(text, "(P)") {
+		return text
+	}
+	return mark + " " + text
 }
 
 func (p *playlist) music() music.Playlist {
@@ -599,12 +623,24 @@ func (l *Library) likedPlaylist() (*music.Playlist, error) {
 // albumFresh is how long an album read stays good: one rarely changes.
 const albumFresh = 7 * 24 * time.Hour
 
+// Album returns an album, read in the last week, and asks whether the
+// listener saved it, which may have changed since.
 func (l *Library) Album(id string) (*music.AlbumProfile, error) {
-	name, err := l.mine("album-" + id)
+	// album2: kept since it has its kind and copyrights.
+	name, err := l.mine("album2-" + id)
 	if err != nil {
 		return nil, err
 	}
-	return cached(l, name, albumFresh, func() (*music.AlbumProfile, error) { return l.album(id) })
+	al, err := cached(l, name, albumFresh, func() (*music.AlbumProfile, error) { return l.album(id) })
+	if err != nil {
+		return nil, err
+	}
+	saved := *al
+	var got []bool
+	if l.do("GET", "/me/library/contains?uris="+url.QueryEscape(saved.URI()), nil, &got) == nil && len(got) == 1 {
+		saved.Saved = got[0]
+	}
+	return &saved, nil
 }
 
 func (l *Library) album(id string) (*music.AlbumProfile, error) {
@@ -788,6 +824,32 @@ func (l *Library) Like(trackID string, like bool) error {
 
 func (l *Library) FollowArtist(id string, follow bool) error {
 	return l.keep("spotify:artist:"+id, follow)
+}
+
+func (l *Library) SaveAlbum(id string, save bool) error {
+	return l.keep("spotify:album:"+id, save)
+}
+
+// savedAlbumsPage is the most albums Spotify gives of the listener's at
+// once.
+const savedAlbumsPage = 50
+
+func (l *Library) SavedAlbums(limit, offset int) ([]music.AlbumProfile, bool, error) {
+	var p page[struct {
+		Album album `json:"album"`
+	}]
+	path := fmt.Sprintf("/me/albums?limit=%d&offset=%d", min(limit, savedAlbumsPage), offset)
+	if err := l.do("GET", path, nil, &p); err != nil {
+		return nil, false, err
+	}
+	out := make([]music.AlbumProfile, len(p.Items))
+	for i := range p.Items {
+		al := &p.Items[i].Album
+		al.Tracks = nil // the albums show as cards, without their songs
+		out[i] = al.profile()
+		out[i].Saved = true
+	}
+	return out, p.Next != "", nil
 }
 
 func (l *Library) CreatePlaylist(name string) (*music.Playlist, error) {

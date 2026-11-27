@@ -23,6 +23,7 @@ const (
 	pageSearch
 	pageArtist
 	pageAlbum
+	pageSavedAlbums
 )
 
 type route struct {
@@ -82,7 +83,10 @@ type app struct {
 	artists   map[string]*artistData
 	artistTab int // what an artist's page lists: artistHot, artistLatest or artistAlbums
 	albums    map[string]*albumData
-	trackList ui.ListState
+	// The albums the listener saved, as they load a page at a time.
+	savedAlbums     []music.AlbumProfile
+	savedAlbumsPage paged
+	trackList       ui.ListState
 	// Where the page and the sidebar are scrolled, kept while Now Playing
 	// covers them, unbuilt.
 	pageScroll ui.ScrollState

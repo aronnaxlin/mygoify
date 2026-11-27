@@ -1,7 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 
@@ -14,6 +16,7 @@ type albumData struct {
 	album   *music.AlbumProfile
 	loading bool
 	err     string
+	saving  bool // a save or its undoing is on its way
 }
 
 func (a *app) loadAlbum(id string) {
@@ -51,7 +54,75 @@ func (a *app) albumPage(c *ui.Context) {
 		a.trackSkeleton(c, s, false, func(c *ui.Context) { a.playlistHeaderSkeleton(c, s) })
 		return
 	}
-	a.trackRows(c, d.album.Songs, false, func(c *ui.Context) { a.albumHeader(c, d.album) })
+	a.trackRows(c, d.album.Songs, false, func(c *ui.Context) { a.albumHeader(c, d.album) }, func(c *ui.Context) { a.albumFooter(c, d.album) })
+}
+
+// albumKind names what an album is: an album, a single or a compilation.
+func albumKind(al *music.AlbumProfile) string {
+	switch al.Kind {
+	case music.SingleKind:
+		return locales.Single()
+	case music.CompilationKind:
+		return locales.Compilation()
+	}
+	return locales.Album()
+}
+
+// albumLength says how long an album plays, to the minute: "1 小时 2 分钟".
+func albumLength(d time.Duration) string {
+	m := int((d + 30*time.Second) / time.Minute)
+	if m < 60 {
+		return locales.LengthMinutes(fmt.Sprint(m))
+	}
+	return locales.LengthHoursMinutes(fmt.Sprint(m/60), fmt.Sprint(m%60))
+}
+
+// albumFooter ends an album's songs with when it came out and its
+// copyrights, as small print.
+func (a *app) albumFooter(c *ui.Context, al *music.AlbumProfile) {
+	ui.Column(c).PaddingX(12).Padding(24, 12, 8, 12).Gap(3).Children(func() {
+		if al.Released != "" {
+			ui.Text(c, al.Released).FontSize(12.5).FontFeatures("tnum").TextColor(a.pal.muted).Margin(0, 0, 4, 0)
+		}
+		for _, cr := range al.Copyrights {
+			ui.Text(c, cr).FontSize(11.5).TextColor(a.pal.faint)
+		}
+	})
+}
+
+// toggleAlbumSaved saves an album to the listener's library, or takes it
+// out, at once, going back if Spotify refuses. Signed out, it asks the
+// listener to sign in.
+func (a *app) toggleAlbumSaved(id string) {
+	d := a.albums[id]
+	if d == nil || d.album == nil || d.saving {
+		return
+	}
+	if a.profile == nil {
+		a.openOnboarding()
+		return
+	}
+	al := d.album
+	save := !al.Saved
+	al.Saved, d.saving = save, true
+	go func() {
+		err := a.lib.SaveAlbum(id, save)
+		a.post(func() {
+			d.saving = false
+			switch {
+			case err != nil:
+				al.Saved = !save
+				a.toast = locales.ActionFailed()
+				return
+			case save:
+				a.toast = locales.SavedToLibrary()
+			default:
+				a.toast = locales.RemovedFromLibrary()
+			}
+			// Their page lists it, or doesn't, as it loads anew.
+			a.savedAlbums, a.savedAlbumsPage = nil, paged{}
+		})
+	}()
 }
 
 func (a *app) albumHeader(c *ui.Context, al *music.AlbumProfile) {
@@ -61,7 +132,7 @@ func (a *app) albumHeader(c *ui.Context, al *music.AlbumProfile) {
 			a.coverFill(c, al.Images, 600, 14)
 		})
 		ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(8).Children(func() {
-			ui.Text(c, locales.Album()).FontSize(12).FontWeight(600).TextColor(p.muted)
+			ui.Text(c, albumKind(al)).FontSize(12).FontWeight(600).TextColor(p.muted)
 			ui.Text(c, al.Name).FontSize(30).FontWeight(800).LetterSpacing(-0.6).MaxLines(2).LineHeight(1.2)
 			ui.RichText(c).FontSize(13).TextColor(p.muted).Children(func() {
 				for i, ar := range al.Artists {
@@ -74,6 +145,9 @@ func (a *app) albumHeader(c *ui.Context, al *music.AlbumProfile) {
 				if al.Released != "" {
 					meta = " · " + al.Released + meta
 				}
+				if n := al.Length(); n > 0 {
+					meta += " · " + albumLength(n)
+				}
 				ui.Text(c, meta)
 			})
 			if al.Label != "" {
@@ -85,6 +159,13 @@ func (a *app) albumHeader(c *ui.Context, al *music.AlbumProfile) {
 						a.pl.ToggleShuffle()
 					}
 					a.pl.PlayQueue(al.URI(), al.Songs, firstPlayable(al.Songs))
+				}
+				icon, label := iconPlus, locales.SaveAlbum()
+				if al.Saved {
+					icon, label = iconCheck, locales.AlbumSaved()
+				}
+				if pillButton(c.Key("save"), icon, label, p.hover.Over(p.bg), p.text).Clicked() {
+					a.toggleAlbumSaved(al.ID)
 				}
 			})
 		})
@@ -130,4 +211,40 @@ func (a *app) albumCard(c *ui.Context, al *music.AlbumProfile) {
 	if card.Clicked() {
 		a.open(route{page: pageAlbum, id: al.ID})
 	}
+}
+
+// savedAlbumsPage is how many of the listener's saved albums load at a time.
+const savedAlbumsPage = 50
+
+// loadSavedAlbums loads the next page of the albums the listener saved.
+func (a *app) loadSavedAlbums() {
+	if a.savedAlbumsPage.loading {
+		return
+	}
+	a.savedAlbumsPage.loading, a.savedAlbumsPage.err = true, ""
+	offset := len(a.savedAlbums)
+	go func() {
+		albums, more, err := a.lib.SavedAlbums(savedAlbumsPage, offset)
+		a.post(func() {
+			a.savedAlbumsPage.loading = false
+			if err != nil {
+				a.savedAlbumsPage.err = failed(err, locales.SavedAlbumsLoadFailed())
+				return
+			}
+			a.savedAlbums = append(a.savedAlbums, albums...)
+			a.savedAlbumsPage.loaded, a.savedAlbumsPage.more = true, more && len(albums) > 0
+		})
+	}()
+}
+
+// savedAlbumsView lists the albums the listener saved, the latest first.
+func (a *app) savedAlbumsView(c *ui.Context) {
+	a.scrollPage(c, func() {
+		ui.Text(c, locales.SavedAlbums()).FontSize(30).FontWeight(800).LetterSpacing(-0.6).Margin(0, 0, 20, 0)
+		a.albumGrid(c, a.savedAlbums)
+		a.pageFoot(c, &a.savedAlbumsPage, a.loadSavedAlbums)
+		if a.savedAlbumsPage.loaded && len(a.savedAlbums) == 0 {
+			a.empty(c, locales.NoSavedAlbums())
+		}
+	})
 }
