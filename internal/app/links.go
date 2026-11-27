@@ -36,6 +36,18 @@ func spotifyLink(s string) (kind, id string, ok bool) {
 	return parts[0], parts[1], true
 }
 
+// openArgs opens the page of the first link to Spotify among args, as the
+// app is started with one or another instance hands its own over.
+func (a *app) openArgs(args []string) {
+	for _, arg := range args {
+		if _, _, ok := spotifyLink(arg); ok {
+			a.nowPlaying = false
+			a.openLink(arg)
+			return
+		}
+	}
+}
+
 // openLink opens what a link to Spotify, typed in the search field, names,
 // and reports whether it was one it opens: an album's, an artist's or a
 // playlist's page. A playlist Spotify made for the listener, which the Web

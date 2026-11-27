@@ -86,6 +86,12 @@ func secrets(inFiles bool) secret.Store {
 // service, started, unless the app plays through a Soloist started by
 // hand.
 func connectSpotify(cfg spotifySettings, keep secret.Store) (library.Library, playback.Backend, service) {
+	return connect(cfg, keep, true)
+}
+
+// connect is connectSpotify, which starts Soloist's service only if
+// start: the mini player follows the Soloist that runs.
+func connect(cfg spotifySettings, keep secret.Store, start bool) (library.Library, playback.Backend, service) {
 	cfg = cfg.withEnv()
 	if cfg.ClientID == "" {
 		return nil, nil, nil
@@ -98,7 +104,7 @@ func connectSpotify(cfg spotifySettings, keep secret.Store) (library.Library, pl
 		return nil, nil, nil
 	}
 	var svc service
-	if key := soloistKey(keep); cfg.SoloistBin != "" && key != "" {
+	if key := soloistKey(keep); start && cfg.SoloistBin != "" && key != "" {
 		svc = &soloistRunner{svc: soloistService(cfg, key)}
 		// The backend connects once it listens.
 		go func() {

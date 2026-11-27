@@ -51,6 +51,14 @@ func (a *app) link(c *ui.Context, text string, color, hover ui.Color, r route) {
 // openPage opens a page in the main window, from wherever a link to it
 // shows: over Now Playing, which closes, or the notch.
 func (a *app) openPage(r route) {
+	if a.mini {
+		// The app opens on it, and the mini player goes.
+		if uri := r.uri(); uri != "" {
+			openApp(uri)
+			a.closeMini()
+		}
+		return
+	}
 	a.open(r)
 	a.showMain()
 	a.redraw()

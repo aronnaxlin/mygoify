@@ -1,6 +1,7 @@
 package app
 
 import (
+	"os"
 	"runtime"
 	"time"
 
@@ -25,6 +26,20 @@ const (
 	pageAlbum
 	pageSavedAlbums
 )
+
+// uri is what names r's page as a Spotify URI, for the app to open it
+// from another process: "" for a page of none.
+func (r route) uri() string {
+	switch r.page {
+	case pageAlbum:
+		return "spotify:album:" + r.id
+	case pageArtist:
+		return "spotify:artist:" + r.id
+	case pagePlaylist:
+		return "spotify:playlist:" + r.id
+	}
+	return ""
+}
 
 type route struct {
 	page pageKind
@@ -133,6 +148,16 @@ type app struct {
 	sig                   playerSig
 	quitting              bool
 	relaunching           bool // the app quits to start again at once
+	// agent is set while MyGoify's agent runs beside Soloist (Linux): it
+	// shows the system what plays, and its icon opens the mini player, so
+	// the window closing ends this process, the music playing on
+	// (DESIGN.md §4.3). closed says the window closed so.
+	agent  bool
+	closed bool
+	// mini is set in the mini player's process: links open the app on
+	// their page rather than a page of its own (RunPanel).
+	mini       bool
+	stopClicks func() // stops the mini player's watch for clicks outside it
 
 	settings    settings
 	settingsWin *mygo.Window
@@ -189,6 +214,12 @@ func (a *app) closing(e *mygo.CloseEvent) {
 		return
 	}
 	e.PreventDefault()
+	if a.agent {
+		// The agent stays, with Soloist: this process goes.
+		a.closed = true
+		quitApp()
+		return
+	}
 	if a.canHide() && !a.settings.CloseQuits {
 		a.win.Hide()
 	} else {
@@ -244,7 +275,8 @@ func Run() error {
 		a.pl = playback.New(a.post, a.backend)
 		a.pl.Artwork = fetchArt
 		// The agent shows the system what plays, beside Soloist.
-		a.pl.Quiet = a.svc != nil && agentExe() != ""
+		a.agent = a.svc != nil && agentExe() != ""
+		a.pl.Quiet = a.agent
 		a.pl.Changed = a.playbackChanged
 		// While Spotify limits the app's calls, until when.
 		a.pl.Explain = failed
@@ -286,6 +318,9 @@ func Run() error {
 		// Shown or switched to the morning after, it shows the new day's.
 		a.win.OnFocus(a.freshenHome)
 		a.applyTray()
+		// Started with a link, as the mini player opens the app on an
+		// album or an artist, it opens that page.
+		a.openArgs(os.Args[1:])
 		if shotHook != nil {
 			shotHook(a)
 		}
@@ -317,6 +352,9 @@ func Run() error {
 	mygo.App.OnQuit(a.leaveSoloist)
 	mygo.App.OnWindowAllClosed(func() {})
 	mygo.App.OnActivate(func(bool) { a.showMain() })
-	mygo.App.OnSecondInstance(func([]string, string) { a.showMain() })
+	mygo.App.OnSecondInstance(func(args []string, _ string) {
+		a.showMain()
+		a.openArgs(args)
+	})
 	return mygo.App.Run()
 }

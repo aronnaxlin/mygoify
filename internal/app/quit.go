@@ -60,7 +60,7 @@ var leaveWait = 2 * time.Second
 // after the windows have gone.
 func (a *app) leaveSoloist() {
 	mode := a.settings.Quit
-	if mode == "play" || a.relaunching {
+	if mode == "play" || a.relaunching || a.closed {
 		return
 	}
 	if p, ok := a.backend.(pauser); ok {
