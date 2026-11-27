@@ -128,7 +128,7 @@ func (a *app) nowPlayingBody(c *ui.Context, tr *music.Track, art *artwork, accen
 				a.paneTabs(c)
 				a.stageStyleButton(c)
 			})
-			a.stage(c, tr, art, accent)
+			a.stage(c, accent)
 			a.stageBar(c, tr, art, accent)
 			return
 		}
