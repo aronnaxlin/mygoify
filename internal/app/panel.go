@@ -282,15 +282,28 @@ func (a *app) miniHero(c *ui.Context, tr *music.Track) {
 			}).SingleLine()
 			a.artistLinks(c, tr, p.muted, p.text).FontSize(12).SingleLine()
 			if tr.Album.Name != "" {
-				miniCaption(c, tr.Album.Name, p.faint)
+				// Its album, which opens in the app as its artists do.
+				album := ui.RichText(c).FontSize(10).FontWeight(700).LetterSpacing(1.2).Children(func() {
+					if tr.Album.ID != "" {
+						a.link(c.Key("album"), strings.ToUpper(tr.Album.Name), p.faint, p.text, route{page: pageAlbum, id: tr.Album.ID})
+					} else {
+						ui.Text(c, strings.ToUpper(tr.Album.Name)).TextColor(p.faint)
+					}
+				})
+				album.SingleLine()
 			}
 		})
-		ui.Row(c).Gap(2).AlignSelf(ui.Start).Children(func() {
+		ui.Box(c).AlignSelf(ui.Start).Children(func() { a.miniOpenApp(c) })
+	})
+	// What the listener keeps of it: the song among those they like, and
+	// its album among those they saved, said in words, as the two hearts
+	// of icons alone were taken for each other.
+	if a.profile != nil && tr != nil {
+		ui.Row(c).Gap(8).Children(func() {
 			a.miniLike(c, tr)
 			a.miniSaveAlbum(c, tr)
-			a.miniOpenApp(c)
 		})
-	})
+	}
 }
 
 // miniCaption is a line of small capitals, as Omarchy sets its captions
@@ -319,16 +332,45 @@ func (a *app) miniButton(c *ui.Context, icon *ui.SVG, color ui.Color, label stri
 	return b.Clicked()
 }
 
-// miniLike is a track's heart, as the mini player's other buttons are.
+// miniToggle is a button of what the listener keeps, an icon and its word,
+// framed as Omarchy frames its controls, filled in the accent once on.
+func (a *app) miniToggle(c *ui.Context, icon *ui.SVG, label string, on bool) bool {
+	p := a.pal
+	b := ui.ButtonBase(c).Grow(1).Basis(0).Height(28).Gap(6).Center().FocusRing(false).Label(label).Border(1, p.hairline)
+	fg := p.muted
+	switch {
+	case on:
+		b.Background(p.accent.Alpha(0.16)).Border(1, p.accent.Alpha(0.6))
+		fg = p.accent
+	case b.Hovered():
+		b.Background(p.hover)
+		fg = p.text
+	}
+	b.Children(func() {
+		ui.Icon(c, icon).Size(13, 13).TextColor(fg)
+		ui.Text(c, label).FontSize(11.5).FontWeight(600).TextColor(fg)
+	})
+	return b.Clicked()
+}
+
+// miniLike likes the song, or no longer.
 func (a *app) miniLike(c *ui.Context, tr *music.Track) {
-	if a.profile == nil {
-		return
+	icon, label, on := iconHeart, locales.LikeSong(), a.isLiked(tr)
+	if on {
+		icon, label = iconHeartFill, locales.SongLiked()
 	}
-	icon, color, label := iconHeart, a.pal.muted, locales.Like()
+	if a.miniToggle(c.Key("like"), icon, label, on) {
+		a.toggleLike(tr)
+	}
+}
+
+// miniHeart is a song's heart in the list of what plays next.
+func (a *app) miniHeart(c *ui.Context, tr *music.Track) {
+	icon, color, label := iconHeart, a.pal.muted, locales.LikeSong()
 	if a.isLiked(tr) {
-		icon, color, label = iconHeartFill, a.pal.accent, locales.Unlike()
+		icon, color, label = iconHeartFill, a.pal.accent, locales.SongLiked()
 	}
-	if a.miniButton(c.Key("like-"+tr.ID), icon, color, label) {
+	if a.miniButton(c.Key("like"), icon, color, label) {
 		a.toggleLike(tr)
 	}
 }
@@ -344,23 +386,21 @@ func (a *app) miniOpenApp(c *ui.Context) {
 // miniSaveAlbum is the button that saves the album playing, once its page
 // is read, which says whether it is saved.
 func (a *app) miniSaveAlbum(c *ui.Context, tr *music.Track) {
-	if tr.Album.ID == "" || a.profile == nil {
+	if tr.Album.ID == "" {
 		return
 	}
 	d := a.albums[tr.Album.ID]
 	if d == nil {
 		a.loadAlbum(tr.Album.ID)
-		return
+		d = a.albums[tr.Album.ID]
 	}
-	if d.album == nil {
-		return
+	// Until its page says whether it is saved, as not.
+	saved := d.album != nil && d.album.Saved
+	label := locales.SaveThisAlbum()
+	if saved {
+		label = locales.ThisAlbumSaved()
 	}
-	// The album's disc, beside the track's heart: lit once it is saved.
-	icon, label, color := iconAlbum, locales.SaveAlbum(), a.pal.muted
-	if d.album.Saved {
-		label, color = locales.AlbumSaved(), a.pal.accent
-	}
-	if a.miniButton(c.Key("save-album"), icon, color, label) {
+	if a.miniToggle(c.Key("save-album"), iconAlbum, label, saved) && d.album != nil {
 		a.toggleAlbumSaved(tr.Album.ID)
 	}
 }
@@ -443,7 +483,7 @@ func (a *app) miniQueue(c *ui.Context) {
 				a.artistLinks(c, tr, p.muted, p.text).FontSize(11).SingleLine()
 			})
 			if hovered || a.isLiked(tr) {
-				a.miniLike(c, tr)
+				a.miniHeart(c, tr)
 			}
 		})
 		if row.Clicked() && tr.Playable() {

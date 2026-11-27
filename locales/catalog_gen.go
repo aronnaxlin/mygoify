@@ -898,6 +898,46 @@ func (msgs Messages) MiniPlayer() string {
 	return Catalog.Format(msgs.locale, "miniPlayer", nil)
 }
 
+// LikeSong says "喜欢"
+// in the language the app shows.
+func LikeSong() string { return In(i18n.Locale()).LikeSong() }
+
+// LikeSong says "喜欢"
+// in the language of msgs.
+func (msgs Messages) LikeSong() string {
+	return Catalog.Format(msgs.locale, "likeSong", nil)
+}
+
+// SongLiked says "已喜欢"
+// in the language the app shows.
+func SongLiked() string { return In(i18n.Locale()).SongLiked() }
+
+// SongLiked says "已喜欢"
+// in the language of msgs.
+func (msgs Messages) SongLiked() string {
+	return Catalog.Format(msgs.locale, "songLiked", nil)
+}
+
+// SaveThisAlbum says "收藏专辑"
+// in the language the app shows.
+func SaveThisAlbum() string { return In(i18n.Locale()).SaveThisAlbum() }
+
+// SaveThisAlbum says "收藏专辑"
+// in the language of msgs.
+func (msgs Messages) SaveThisAlbum() string {
+	return Catalog.Format(msgs.locale, "saveThisAlbum", nil)
+}
+
+// ThisAlbumSaved says "已收藏专辑"
+// in the language the app shows.
+func ThisAlbumSaved() string { return In(i18n.Locale()).ThisAlbumSaved() }
+
+// ThisAlbumSaved says "已收藏专辑"
+// in the language of msgs.
+func (msgs Messages) ThisAlbumSaved() string {
+	return Catalog.Format(msgs.locale, "thisAlbumSaved", nil)
+}
+
 // TabWall says "选歌"
 // in the language the app shows.
 func TabWall() string { return In(i18n.Locale()).TabWall() }

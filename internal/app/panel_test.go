@@ -63,6 +63,20 @@ func TestMiniOpensAlbumInApp(t *testing.T) {
 	}
 }
 
+// Its album's name opens the album in the app. It showed as a caption,
+// and opened nothing, as its artists did.
+func TestMiniOpensAlbumFromItsName(t *testing.T) {
+	_, tt, opened, closed := miniApp(t)
+	r, ok := tt.Find("迷跡波")
+	if !ok {
+		t.Fatal("no album")
+	}
+	tt.ClickAt(r.X+4, r.Y+r.H/2)
+	if !slices.Equal(*opened, []string{"spotify:album:8"}) || !*closed {
+		t.Errorf("opened %q, closed %v", *opened, *closed)
+	}
+}
+
 // Escape closes the mini player.
 func TestMiniClosesOnEscape(t *testing.T) {
 	_, tt, _, closed := miniApp(t)
