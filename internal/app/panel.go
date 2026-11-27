@@ -355,9 +355,10 @@ func (a *app) miniSaveAlbum(c *ui.Context, tr *music.Track) {
 	if d.album == nil {
 		return
 	}
-	icon, label, color := iconPlus, locales.SaveAlbum(), a.pal.muted
+	// The album's disc, beside the track's heart: lit once it is saved.
+	icon, label, color := iconAlbum, locales.SaveAlbum(), a.pal.muted
 	if d.album.Saved {
-		icon, label, color = iconCheck, locales.AlbumSaved(), a.pal.accent
+		label, color = locales.AlbumSaved(), a.pal.accent
 	}
 	if a.miniButton(c.Key("save-album"), icon, color, label) {
 		a.toggleAlbumSaved(tr.Album.ID)

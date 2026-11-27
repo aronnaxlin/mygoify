@@ -7,6 +7,7 @@ package agent
 
 import (
 	"context"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -24,6 +25,8 @@ type Config struct {
 	SoloistDir string
 	// Raise opens the app's window, as the desktop asks the player to.
 	Raise func()
+	// Tray, if set, is the agent's icon in the desktop's tray.
+	Tray *TrayItem
 }
 
 // Run follows Soloist and shows what plays on the session bus until ctx
@@ -40,6 +43,11 @@ func Run(ctx context.Context, cfg Config) error {
 		return err
 	}
 	b.Watch(m.update)
+	if cfg.Tray != nil {
+		if err := exportTray(conn, *cfg.Tray); err != nil {
+			log.Printf("agent: tray: %v", err)
+		}
+	}
 	<-ctx.Done()
 	return nil
 }
