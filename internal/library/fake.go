@@ -22,19 +22,20 @@ type Fake struct {
 	// Delay is how long each answer takes, to show what loads as it does.
 	Delay time.Duration
 
-	mu        sync.Mutex
-	me        music.User
-	artists   map[string]*music.ArtistProfile
-	albums    map[string]*music.AlbumProfile
-	byArtist  map[string][]string // album IDs, newest first
-	playlists map[string]*music.Playlist
-	made      []string // the listener's playlists, newest first
-	saved     []string
-	liked     []string // track IDs, the latest liked first
-	likedRead int      // how many of them their playlist has shown
-	followed  map[string]bool
-	recent    []music.Track
-	nextID    int
+	mu          sync.Mutex
+	me          music.User
+	artists     map[string]*music.ArtistProfile
+	albums      map[string]*music.AlbumProfile
+	byArtist    map[string][]string // album IDs, newest first
+	playlists   map[string]*music.Playlist
+	made        []string // the listener's playlists, newest first
+	saved       []string
+	liked       []string // track IDs, the latest liked first
+	likedRead   int      // how many of them their playlist has shown
+	followed    map[string]bool
+	albumsSaved []string // album IDs, the latest saved first
+	recent      []music.Track
+	nextID      int
 }
 
 // NewFake returns a library with a few artists, albums and playlists.
@@ -52,7 +53,14 @@ func NewFake() *Fake {
 		f.artists[artist.ID] = &music.ArtistProfile{Artist: artist, Images: fakeImages("artist:" + ar.name), Genres: ar.genres}
 		for _, al := range ar.albums {
 			album := music.Album{ID: fakeID("album", al.name), Name: al.name, Images: fakeImages("album:" + al.name)}
-			profile := &music.AlbumProfile{Album: album, Artists: []music.Artist{artist}, Released: al.released, Label: ar.name + " Records"}
+			year := al.released[:4]
+			profile := &music.AlbumProfile{
+				Album: album, Kind: music.AlbumKind, Artists: []music.Artist{artist}, Released: al.released, Label: ar.name + " Records",
+				Copyrights: []string{"© " + year + " " + ar.name, "℗ " + year + " " + ar.name + " Records"},
+			}
+			if len(al.songs) < 4 {
+				profile.Kind = music.SingleKind
+			}
 			for i, name := range al.songs {
 				profile.Songs = append(profile.Songs, music.Track{
 					ID: fakeID("track", al.name+"/"+name), Name: name, Artists: []music.Artist{artist}, Album: album,
@@ -247,12 +255,43 @@ func (f *Fake) Playlist(id string) (*music.Playlist, error) {
 
 func (f *Fake) Album(id string) (*music.AlbumProfile, error) {
 	f.wait()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	al, ok := f.albums[id]
 	if !ok {
 		return nil, errNotFound
 	}
 	c := *al
+	c.Saved = slices.Contains(f.albumsSaved, id)
 	return &c, nil
+}
+
+func (f *Fake) SaveAlbum(id string, save bool) error {
+	f.wait()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.albums[id]; !ok {
+		return errNotFound
+	}
+	f.albumsSaved = slices.DeleteFunc(f.albumsSaved, func(x string) bool { return x == id })
+	if save {
+		f.albumsSaved = append([]string{id}, f.albumsSaved...)
+	}
+	return nil
+}
+
+func (f *Fake) SavedAlbums(limit, offset int) ([]music.AlbumProfile, bool, error) {
+	f.wait()
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	ids := f.albumsSaved
+	var out []music.AlbumProfile
+	for _, id := range ids[min(offset, len(ids)):min(offset+limit, len(ids))] {
+		c := *f.albums[id]
+		c.Songs, c.Saved = nil, true
+		out = append(out, c)
+	}
+	return out, offset+limit < len(ids), nil
 }
 
 func (f *Fake) Artist(id string) (*music.ArtistProfile, error) {
