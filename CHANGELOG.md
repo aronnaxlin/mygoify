@@ -1,5 +1,21 @@
 # Changelog / 更新日志
 
+## 1.2.0
+
+A mini player, and saved albums.
+
+- Mini player (Linux): click MyGoify's icon to open a small player under it, with the song playing, Like and Save album buttons, playback controls, the volume, and what plays next. Click a song up next to play it, or use Play next to queue it after this one. Click the song's album or artist to open their page in MyGoify. On Omarchy the icon sits in Omarchy's bar as the app's mark, in the bar's color, and the player drops from it in your theme's colors, font and borders. On other desktops the icon is in the tray. The mini player only runs while it is open.
+- Media keys and controls with the window closed (Linux): a small background agent runs beside Soloist and shows what plays to the media keys, playerctl and your desktop's media controls. Closing the window now quits the interface, and the music keeps playing; the icon stays to bring it back.
+- Saved albums: save an album from its page, and find your saved albums in the sidebar. An album's page also shows whether it is an album, a single or a compilation, how long it plays, and, under its songs, its release date and copyright notices. Spotify's developer API doesn't give play counts, so MyGoify can't show them.
+- Instrumentals: songs without lyrics no longer show "No lyrics" or a line saying the song is instrumental. Now Playing moves the cover and controls to the middle instead, and the lyrics stage stays empty.
+
+迷你播放器，以及收藏专辑。
+
+- 迷你播放器（Linux）：点 MyGoify 的图标，在图标下方弹出一个小播放器，有正在播放的歌曲、"喜欢"和"收藏专辑"按钮、播放控制、音量，以及接下来要播放的歌。点"接下来播放"里的一首会直接播放；用"下一首播放"可以把它排到当前这首后面。点歌曲的专辑或歌手，会在 MyGoify 里打开对应页面。在 Omarchy 上，图标是 App 的标志，放在 Omarchy 的栏上，颜色跟随栏；小播放器从图标下方弹出，用你主题的颜色、字体和边框。在其他桌面上，图标在托盘里。小播放器只在打开时运行。
+- 关窗口后仍能用媒体键和系统媒体控件（Linux）：一个很小的后台程序和 Soloist 一起运行，把正在播放的内容提供给媒体键、playerctl 和桌面的媒体控件。现在关掉窗口会退出界面，音乐继续播放，图标还在，可以随时打开。
+- 收藏专辑：在专辑页收藏专辑，侧栏里可以看到收藏的专辑。专辑页还会显示它是专辑、单曲还是合辑，总时长，以及曲目下方的发行日期和版权信息。Spotify 的开发者接口不提供播放次数，所以 MyGoify 无法显示。
+- 纯音乐：没有歌词的歌曲不再显示"暂无歌词"或"纯音乐，请欣赏"。正在播放页会把封面和控件移到中间，歌词舞台保持空白。
+
 ## 1.1.0
 
 Recommendations: Spotify's radios, and the playlists Spotify makes for you.
