@@ -149,8 +149,14 @@ func RunPanel() error {
 	return mygo.App.Run()
 }
 
-// closeMini closes the mini player, and its process with it.
+// closeMini closes the mini player: the flyout of the menu bar icon
+// (macOS), or the process of its own (Linux).
 func (a *app) closeMini() {
+	if a.miniFly != nil {
+		a.miniFly.Close()
+		a.miniFly = nil
+		return
+	}
 	if a.stopClicks != nil {
 		a.stopClicks()
 		a.stopClicks = nil
@@ -208,8 +214,11 @@ func (a *app) miniView(c *ui.Context) {
 	pal, th, om := miniPalette(t)
 	a.pal = pal
 	p := a.pal
-	root := ui.Column(c).Fill().Background(p.bg).TextColor(p.text).FontSize(12.5)
-	if om {
+	root := ui.Column(c).Fill().TextColor(p.text).FontSize(12.5)
+	switch {
+	case a.miniFly != nil:
+		// In the menu bar's popover, whose material is its background.
+	case om:
 		// Framed as Hyprland frames windows.
 		if th.BorderWidth > 0 {
 			root.Border(float32(th.BorderWidth), th.Border)
@@ -217,12 +226,12 @@ func (a *app) miniView(c *ui.Context) {
 		if th.Font != "" {
 			root.Font(th.Font + ", system-ui")
 		}
-		root.Radius(float32(th.Rounding))
-	} else {
-		root.Radius(10)
+		root.Radius(float32(th.Rounding)).Background(p.bg)
+	default:
+		root.Radius(10).Background(p.bg)
 	}
 	c.OnShortcut(0, ui.KeyEscape, a.closeMini)
-	a.npScrub.thin = true
+	a.miniScrub.thin = true
 	root.Children(func() {
 		tr := a.pl.Current()
 		ui.Column(c).Padding(miniPad).Gap(14).Children(func() {
@@ -232,7 +241,7 @@ func (a *app) miniView(c *ui.Context) {
 			}
 			// Where it is, first: the bar and its times under it.
 			ui.Column(c).Gap(2).Children(func() {
-				a.scrubber(c.Key("mini-scrub"), &a.npScrub, p.hairline, p.text, 14, ui.Transparent)
+				a.scrubber(c.Key("mini-scrub"), &a.miniScrub, p.hairline, p.text, 14, ui.Transparent)
 				ui.Row(c).Children(func() {
 					ui.Text(c, clock(a.pl.Position())).FontSize(10.5).FontFeatures("tnum").TextColor(p.muted)
 					ui.Spacer(c)
@@ -378,7 +387,11 @@ func (a *app) miniHeart(c *ui.Context, tr *music.Track) {
 // miniOpenApp opens the app's window, and closes the mini player.
 func (a *app) miniOpenApp(c *ui.Context) {
 	if a.miniButton(c.Key("open-app"), iconOpen, a.pal.muted, locales.OpenMyGoify()) {
-		openApp()
+		if a.mini {
+			openApp()
+		} else {
+			a.showMain()
+		}
 		a.closeMini()
 	}
 }
@@ -462,8 +475,8 @@ func (a *app) miniQueue(c *ui.Context) {
 		})
 		return
 	}
-	a.queueList.Key = func(row int) any { return next[row] }
-	ui.List(c.Key("mini-queue"), &a.queueList, len(next), func(r int) {
+	a.miniList.Key = func(row int) any { return next[row] }
+	ui.List(c.Key("mini-queue"), &a.miniList, len(next), func(r int) {
 		i := next[r]
 		tr := &pl.Queue()[i]
 		a.wantLike(tr.ID)

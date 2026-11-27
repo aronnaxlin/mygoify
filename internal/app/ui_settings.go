@@ -63,7 +63,8 @@ func (a *app) changeLanguage() {
 	}
 	saveLocaleFile(tag)
 	a.setMenu()
-	if a.tray != nil {
+	// The menu bar's icon builds its menu as it is right-clicked.
+	if a.tray != nil && !trayMini() {
 		a.tray.SetMenu(a.trayMenu())
 	}
 	if a.settingsWin != nil {
