@@ -216,8 +216,8 @@ func (a *app) miniView(c *ui.Context) {
 	p := a.pal
 	root := ui.Column(c).Fill().TextColor(p.text).FontSize(12.5)
 	switch {
-	case a.miniFly != nil:
-		// In the menu bar's popover, whose material is its background.
+	case a.miniGlass():
+		// On the menu bar's pane of glass, which is its background.
 	case om:
 		// Framed as Hyprland frames windows.
 		if th.BorderWidth > 0 {
@@ -277,7 +277,7 @@ func (a *app) miniHero(c *ui.Context, tr *music.Track) {
 		}
 		a.wantLike(tr.ID)
 		cov := ui.ButtonBase(c.Key("cover")).FocusRing(false).Label(locales.AlbumCover())
-		cov.Children(func() { a.cover(c, tr.Album.Images, 160, 52, 0) })
+		cov.Children(func() { a.cover(c, tr.Album.Images, 160, 52, a.miniRadius(8)) })
 		if cov.Clicked() && tr.Album.ID != "" {
 			a.openPage(route{page: pageAlbum, id: tr.Album.ID})
 		}
@@ -315,6 +315,14 @@ func (a *app) miniHero(c *ui.Context, tr *music.Track) {
 	}
 }
 
+// miniRadius is r over glass, where corners are rounded, else 0.
+func (a *app) miniRadius(r float32) float32 {
+	if a.miniGlass() {
+		return r
+	}
+	return 0
+}
+
 // miniCaption is a line of small capitals, as Omarchy sets its captions
 // and the heads of its sections.
 func miniCaption(c *ui.Context, text string, color ui.Color) ui.Element {
@@ -330,24 +338,57 @@ func (a *app) miniSection(c *ui.Context, title, value string) {
 	})
 }
 
+// miniGlass says whether the mini player is on the menu bar's pane of
+// glass (macOS), where its controls are rounded as AppKit's are, rather
+// than square as Omarchy's.
+func (a *app) miniGlass() bool { return trayMini() && !a.mini }
+
+// miniHover is what fills a control under the pointer: over glass, a
+// veil of the text's color, which the glass shows through.
+func (a *app) miniHover() ui.Color {
+	if a.miniGlass() {
+		return a.pal.text.Alpha(0.1)
+	}
+	return a.pal.hover
+}
+
 // miniButton is a square icon button, filled under the pointer as
-// Omarchy's are.
+// Omarchy's are, or rounded over glass.
 func (a *app) miniButton(c *ui.Context, icon *ui.SVG, color ui.Color, label string) bool {
 	b := ui.ButtonBase(c).Size(miniIconB, miniIconB).Center().FocusRing(false).Label(label).Tooltip(label)
+	if a.miniGlass() {
+		b.Radius(miniIconB / 2)
+	}
 	if b.Hovered() {
-		b.Background(a.pal.hover)
+		b.Background(a.miniHover())
 	}
 	b.Children(func() { ui.Icon(c, icon).Size(15, 15).TextColor(color) })
 	return b.Clicked()
 }
 
 // miniToggle is a button of what the listener keeps, an icon and its word,
-// framed as Omarchy frames its controls, filled in the accent once on.
+// framed as Omarchy frames its controls, filled in the accent once on;
+// over glass, a capsule filled as macOS fills its buttons on glass.
 func (a *app) miniToggle(c *ui.Context, icon *ui.SVG, label string, on bool) bool {
 	p := a.pal
-	b := ui.ButtonBase(c).Grow(1).Basis(0).Height(28).Gap(6).Center().FocusRing(false).Label(label).Border(1, p.hairline)
+	b := ui.ButtonBase(c).Grow(1).Basis(0).Height(28).Gap(6).Center().FocusRing(false).Label(label)
 	fg := p.muted
 	switch {
+	case a.miniGlass():
+		b.Radius(14).Background(p.text.Alpha(0.07))
+		switch {
+		case on:
+			b.Background(p.accent.Alpha(0.22))
+			fg = p.accent
+		case b.Hovered():
+			b.Background(p.text.Alpha(0.13))
+			fg = p.text
+		}
+	default:
+		b.Border(1, p.hairline)
+	}
+	switch {
+	case a.miniGlass():
 	case on:
 		b.Background(p.accent.Alpha(0.16)).Border(1, p.accent.Alpha(0.6))
 		fg = p.accent
@@ -482,15 +523,19 @@ func (a *app) miniQueue(c *ui.Context) {
 		a.wantLike(tr.ID)
 		row := ui.ButtonBase(c.Key(i)).Height(miniRow).PaddingX(miniPad).Gap(10).AlignItems(ui.Center).FocusRing(false).Label(tr.Name).
 			ContextMenu(a.songItems(tr, ""))
+		if a.miniGlass() {
+			// Inset and rounded, as the rows of macOS's menus.
+			row.MarginX(6).PaddingX(miniPad - 6).Radius(8)
+		}
 		hovered := row.Hovered()
 		if hovered {
-			row.Background(p.hover)
+			row.Background(a.miniHover())
 		}
 		if !tr.Playable() {
 			row.Opacity(0.4)
 		}
 		row.Children(func() {
-			a.cover(c, tr.Album.Images, 96, 28, 0)
+			a.cover(c, tr.Album.Images, 96, 28, a.miniRadius(5))
 			ui.Column(c).Grow(1).Shrink(1).MinWidth(0).Gap(1).Children(func() {
 				ui.Text(c, tr.Name).FontWeight(600).SingleLine()
 				a.artistLinks(c, tr, p.muted, p.text).FontSize(11).SingleLine()

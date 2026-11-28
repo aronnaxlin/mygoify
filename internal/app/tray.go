@@ -155,6 +155,10 @@ func (a *app) trayMenu() *mygo.Menu {
 // Linux the agent's icon opens it, in a process of its own.
 func trayMini() bool { return runtime.GOOS == "darwin" }
 
+// miniGlassRadius rounds the mini player's pane of glass, as macOS 26
+// rounds Control Center's.
+const miniGlassRadius = 18
+
 // miniClosedAt is when the flyout of the mini player last closed: a click
 // on the icon closes it first, as AppKit closes a popover on a click on
 // what opened it, and the click then reaching the icon doesn't open it
@@ -173,11 +177,16 @@ func (a *app) toggleMini() {
 	fly := mygo.NewFlyout(mygo.FlyoutOptions{
 		Tray:      a.tray,
 		Placement: mygo.PlacementBottom,
+		Gap:       6,
 		Width:     miniWidth,
 		Height:    miniHeight,
 		Focusable: true,
-		Popover:   true,
-		Content:   ui.View(a.miniView),
+		// A pane of Liquid Glass, as macOS 26 draws the panels of Control
+		// Center and of the menu bar's other icons.
+		Vibrancy:     mygo.VibrancyGlass,
+		CornerRadius: miniGlassRadius,
+		Shadow:       true,
+		Content:      ui.View(a.miniView),
 	})
 	a.miniFly = fly
 	fly.OnClose(func(*mygo.CloseEvent) {
