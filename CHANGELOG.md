@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## 1.2.1
+
+The mini player on macOS.
+
+- Mini player (macOS): click MyGoify's icon in the menu bar to open the mini player under it, on a pane of Liquid Glass like Control Center's. Right-click the icon, or Control-click it, for the menu it opened before. Click the song, its album or artist to open their page in MyGoify's window. Press Esc or click elsewhere to close it.
+
+macOS 上的迷你播放器。
+
+- 迷你播放器（macOS）：点菜单栏里的 MyGoify 图标，会在图标下方打开迷你播放器，背景是和控制中心一样的 Liquid Glass。右键或按住 Control 点图标，打开原来的菜单。点歌曲、专辑或歌手，会在 MyGoify 窗口里打开对应页面。按 Esc 或点别处即可关闭。
+
 ## 1.2.0
 
 A mini player, and saved albums.
