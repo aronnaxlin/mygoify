@@ -158,6 +158,12 @@ type app struct {
 	// their page rather than a page of its own (RunPanel).
 	mini       bool
 	stopClicks func() // stops the mini player's watch for clicks outside it
+	// miniFly is the mini player in the flyout of the menu bar icon, while
+	// it shows (macOS); miniScrub and miniList are its bar and its list,
+	// kept apart from Now Playing's, which shows in the same process.
+	miniFly   *mygo.Window
+	miniScrub scrubState
+	miniList  ui.ListState
 
 	settings    settings
 	settingsWin *mygo.Window
@@ -341,7 +347,8 @@ func Run() error {
 	// Once the windows have gone, so that quitting shows at once.
 	mygo.App.OnLocaleChanged(func(string) {
 		a.setMenu()
-		if a.tray != nil {
+		// The menu bar's icon builds its menu as it is right-clicked.
+		if a.tray != nil && !trayMini() {
 			a.tray.SetMenu(a.trayMenu())
 		}
 		if a.settingsWin != nil {

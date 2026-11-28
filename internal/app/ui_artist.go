@@ -59,6 +59,10 @@ func (a *app) openPage(r route) {
 		}
 		return
 	}
+	// From the menu bar's mini player, which goes as the page opens.
+	if a.miniFly != nil {
+		a.closeMini()
+	}
 	a.open(r)
 	a.showMain()
 	a.redraw()
